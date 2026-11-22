@@ -73,7 +73,8 @@ class EnvioDiagnosticoService {
 					List.of(new EmailSender.Anexo(relatorio.nomeArquivo(), anexo))));
 			diagnosticos.atualizarStatusEmail(id, StatusEmail.ENVIADO, Instant.now(clock));
 		}
-		catch (RuntimeException e) {
+		catch (RuntimeException | Error e) {
+			// Error também: uma falha de classpath não pode deixar o status preso em PENDENTE.
 			log.error("Falha ao enviar o diagnóstico {} por e-mail", id, e);
 			diagnosticos.atualizarStatusEmail(id, StatusEmail.FALHOU, null);
 		}
