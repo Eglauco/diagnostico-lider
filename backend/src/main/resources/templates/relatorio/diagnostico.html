@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<title th:text="|Diagnóstico de carreira — ${r.nome}|">Diagnóstico de carreira</title>
+<style th:utext="${fontes}"></style>
+<style>
+  @page { size: A4; margin: 0; }
+  :root {
+    --abeto: #0F2B26;
+    --abeto-2: #4A635C;
+    --abeto-3: #7D918B;
+    --nevoa: #EDF2EF;
+    --nevoa-2: #F5F8F6;
+    --linha: #D2DDD8;
+    --brasa: #FF5B37;
+    --faixa: #0F2B26;
+    --faixa-suave: #EDF2EF;
+  }
+  .faixa-TRAVADA  { --faixa: #C2364B; --faixa-suave: #F8E6E9; }
+  .faixa-PLATO    { --faixa: #A86A00; --faixa-suave: #FBF0DC; }
+  .faixa-ASCENSAO { --faixa: #1F8A5B; --faixa-suave: #E2F2EA; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 13.5px; line-height: 1.55; color: var(--abeto); background: #fff;
+    font-feature-settings: 'tnum' 1;
+  }
+  .display {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-variation-settings: 'opsz' 96;
+    letter-spacing: -0.02em;
+    word-spacing: 0.08em;
+  }
+
+  .pagina {
+    width: 210mm; min-height: 297mm; padding: 14mm 17mm 13mm;
+    position: relative; display: flex; flex-direction: column;
+    break-after: page;
+  }
+  .pagina:last-child { break-after: auto; }
+
+  /* Cabeçalho ------------------------------------------------------- */
+  .topo { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--linha); }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 13px; letter-spacing: 0.01em; }
+  .marca svg { display: block; }
+  .topo time { color: var(--abeto-2); font-size: 12.5px; }
+
+  /* Abertura -------------------------------------------------------- */
+  .quem { margin-top: 30px; color: var(--abeto-2); font-size: 13px; }
+  .quem strong { display: block; color: var(--abeto); font-size: 24px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+  .selo {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 26px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faixa);
+  }
+  .selo i { width: 9px; height: 9px; border-radius: 50%; background: var(--faixa); display: block; }
+  h1.display {
+    font-size: 58px; line-height: 0.98; font-weight: 700; font-stretch: 82%;
+    margin-top: 8px; max-width: 560px;
+  }
+  .resumo { margin-top: 14px; font-size: 18px; line-height: 1.45; max-width: 560px; color: var(--abeto); }
+
+  /* Curva ----------------------------------------------------------- */
+  .curva { margin-top: 26px; background: var(--nevoa-2); border-radius: 18px; padding: 14px 2px 4px; }
+  .curva svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .curva .rotulo { font-family: 'Instrument Sans', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--abeto-3); }
+  .curva .balao { font-family: 'Instrument Sans', sans-serif; font-size: 12px; font-weight: 600; fill: #fff; }
+  .curva .proxima { font-family: 'Instrument Sans', sans-serif; font-size: 11.5px; font-weight: 600; fill: var(--abeto-2); }
+
+  /* Índice ---------------------------------------------------------- */
+  .indice { margin-top: 24px; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 24px; }
+  .indice h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); }
+  .indice p { font-size: 12.5px; color: var(--abeto-2); max-width: 420px; }
+  .indice .numero { grid-row: span 2; font-size: 64px; line-height: 0.9; font-weight: 700; font-stretch: 82%; }
+  .indice .numero small { font-size: 18px; font-weight: 500; color: var(--abeto-3); letter-spacing: 0; margin-left: 2px; }
+  .regua { margin-top: 14px; position: relative; }
+  .regua .faixas { display: grid; grid-template-columns: 40fr 30fr 31fr; gap: 3px; }
+  .regua .faixas span { height: 8px; border-radius: 4px; }
+  .regua .faixas span:nth-child(1) { background: #E9C3CA; }
+  .regua .faixas span:nth-child(2) { background: #F0D9A8; }
+  .regua .faixas span:nth-child(3) { background: #BFE0CF; }
+  .regua .nomes { display: grid; grid-template-columns: 40fr 30fr 31fr; gap: 3px; margin-top: 6px; font-size: 11px; color: var(--abeto-2); }
+  .regua .marcador { position: absolute; top: -5px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--faixa); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--faixa); }
+
+  /* Dimensões ------------------------------------------------------- */
+  .secao { margin-top: 30px; }
+  .secao > h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); padding-bottom: 10px; border-bottom: 1px solid var(--linha); }
+  .dimensao { display: grid; grid-template-columns: 150px 1fr 40px; align-items: center; gap: 4px 16px; padding: 12px 0; border-bottom: 1px solid var(--linha); break-inside: avoid; }
+  .dimensao strong { font-size: 14.5px; font-weight: 600; }
+  .dimensao .barra { height: 10px; background: var(--nevoa); border-radius: 5px; overflow: hidden; }
+  .dimensao .barra i { display: block; height: 100%; background: var(--abeto); border-radius: 5px; }
+  .dimensao b { text-align: right; font-size: 17px; font-weight: 700; }
+  .dimensao span { grid-column: 1 / -1; font-size: 12.5px; color: var(--abeto-2); }
+
+  /* Página 2 -------------------------------------------------------- */
+  h2.titulo { font-size: 30px; line-height: 1.1; font-weight: 700; font-stretch: 85%; margin-top: 30px; }
+  .significado { margin-top: 12px; font-size: 16px; line-height: 1.6; max-width: 600px; }
+  .passos { margin-top: 18px; list-style: none; counter-reset: passo; }
+  .passos li {
+    counter-increment: passo; position: relative; padding: 14px 0 14px 56px; border-top: 1px solid var(--linha);
+    font-size: 15px; line-height: 1.5; break-inside: avoid;
+  }
+  .passos li:last-child { border-bottom: 1px solid var(--linha); }
+  .passos li::before {
+    content: counter(passo); position: absolute; left: 0; top: 11px;
+    width: 34px; height: 34px; border-radius: 50%; background: var(--faixa-suave); color: var(--faixa);
+    font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .respostas { margin-top: 16px; }
+  .resposta { padding: 14px 0; border-top: 1px solid var(--linha); break-inside: avoid; }
+  .resposta small { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-3); }
+  .resposta p { margin-top: 3px; font-size: 13.5px; color: var(--abeto-2); }
+  .resposta strong { display: block; margin-top: 6px; font-size: 14.5px; font-weight: 600; padding-left: 14px; border-left: 3px solid var(--brasa); }
+
+  .rodape { margin-top: auto; padding-top: 24px; display: flex; justify-content: space-between; gap: 24px; font-size: 11px; color: var(--abeto-3); border-top: 1px solid var(--linha); }
+  .rodape a { color: var(--abeto-2); text-decoration: none; }
+  .rodape p { max-width: 420px; }
+</style>
+</head>
+<body th:classappend="|faixa-${r.faixa.codigo}|">
+
+<!-- ======================= Página 1 ======================= -->
+<section class="pagina">
+  <header class="topo">
+    <div class="marca">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+        <rect width="26" height="26" rx="7" fill="#0F2B26"/>
+        <path d="M5 19 C 9 19, 9 8, 13 8 S 17 8, 21 12" fill="none" stroke="#FF5B37" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      Diagnóstico do Líder
+    </div>
+    <time th:text="${r.data}">22 de novembro de 2026</time>
+  </header>
+
+  <p class="quem">Diagnóstico de carreira de <strong th:text="${r.nome}">Ana Souza</strong></p>
+
+  <p class="selo"><i></i>Seu momento</p>
+  <h1 class="display" th:text="${r.faixa.titulo}">Carreira no platô</h1>
+  <p class="resumo" th:text="${r.faixa.resumo}">Resumo</p>
+
+  <figure class="curva" th:with="c=${r.curva}">
+    <svg th:attr="viewBox=|0 0 ${c.largura} ${c.altura}|" role="img" aria-label="Curva da carreira com a sua posição">
+      <defs>
+        <linearGradient id="preenchimento" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FF5B37" stop-opacity="0.16"/>
+          <stop offset="1" stop-color="#FF5B37" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="10" th:attr="x2=${c.largura - 10},y1=${c.base},y2=${c.base}" stroke="#D2DDD8" stroke-width="1"/>
+      <path th:attr="d=${c.area}" fill="url(#preenchimento)"/>
+      <path th:attr="d=${c.proximaCurva}" fill="none" stroke="#0F2B26" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity="0.55"/>
+      <text class="proxima" text-anchor="end" th:attr="x=${c.largura - 30},y=14">Sua próxima curva ↗</text>
+      <path th:attr="d=${c.curva}" fill="none" stroke="#FF5B37" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <g th:with="x=${c.voce.x},y=${c.voce.y}">
+        <line th:attr="x1=${x},x2=${x},y1=${y},y2=${c.base}" stroke="#0F2B26" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>
+        <circle th:attr="cx=${x},cy=${y}" r="15" fill="var(--faixa)" opacity="0.16"/>
+        <circle th:attr="cx=${x},cy=${y}" r="8" fill="var(--faixa)" stroke="#fff" stroke-width="3"/>
+        <rect th:attr="x=${x - 56},y=${y - 46}" width="112" height="26" rx="13" fill="#0F2B26"/>
+        <text class="balao" text-anchor="middle" th:attr="x=${x},y=${y - 28.5}">Você está aqui</text>
+      </g>
+
+      <text class="rotulo" text-anchor="middle" th:attr="x=${c.subida.x},y=${c.subida.y}" th:text="${c.subida.texto}">Subida</text>
+      <text class="rotulo" text-anchor="middle" th:attr="x=${c.plato.x},y=${c.plato.y}" th:text="${c.plato.texto}">Platô</text>
+      <text class="rotulo" text-anchor="middle" th:attr="x=${c.queda.x},y=${c.queda.y}" th:text="${c.queda.texto}">Queda</text>
+    </svg>
+  </figure>
+
+  <div class="indice">
+    <h2>Índice de movimento da carreira</h2>
+    <div class="numero display"><span th:text="${r.pontuacao}">58</span><small>/100</small></div>
+    <p>Quanto mais alto, mais a sua carreira está em subida. Abaixo de 40, ela está travada.</p>
+  </div>
+  <div class="regua">
+    <div class="faixas"><span></span><span></span><span></span></div>
+    <i class="marcador" th:style="|left: ${r.pontuacao}%|"></i>
+    <div class="nomes"><span>Travada</span><span>Platô</span><span>Ascensão</span></div>
+  </div>
+
+  <section class="secao">
+    <h2>Por dimensão</h2>
+    <div class="dimensao" th:each="d : ${r.dimensoes}">
+      <strong th:text="${d.nome}">Direção</strong>
+      <div class="barra"><i th:style="|width: ${d.pontuacao}%|"></i></div>
+      <b th:text="${d.pontuacao}">67</b>
+      <span th:text="${d.descricao}">Descrição</span>
+    </div>
+  </section>
+</section>
+
+<!-- ======================= Página 2 ======================= -->
+<section class="pagina">
+  <header class="topo">
+    <div class="marca">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+        <rect width="26" height="26" rx="7" fill="#0F2B26"/>
+        <path d="M5 19 C 9 19, 9 8, 13 8 S 17 8, 21 12" fill="none" stroke="#FF5B37" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      Diagnóstico do Líder
+    </div>
+    <time th:text="${r.nome}">Ana Souza</time>
+  </header>
+
+  <h2 class="titulo display">O que isso significa</h2>
+  <p class="significado" th:text="${r.faixa.descricao}">Descrição</p>
+
+  <h2 class="titulo display">Próximos passos</h2>
+  <ol class="passos">
+    <li th:each="passo : ${r.faixa.recomendacoes}" th:text="${passo}">Passo</li>
+  </ol>
+
+  <h2 class="titulo display">Suas respostas</h2>
+  <div class="respostas">
+    <div class="resposta" th:each="item : ${r.respostas}">
+      <small th:if="${item.dimensao}" th:text="${item.dimensao}">Direção</small>
+      <p th:text="${item.enunciado}">Pergunta</p>
+      <strong th:text="${item.resposta}">Resposta</strong>
+    </div>
+  </div>
+
+  <footer class="rodape">
+    <p>Este diagnóstico é um ponto de partida para reflexão e conversa, não uma avaliação definitiva da sua carreira.</p>
+    <a th:href="${r.urlResultado}">Ver online</a>
+  </footer>
+</section>
+
+</body>
+</html>

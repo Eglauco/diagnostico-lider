@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Seu diagnóstico de carreira</title>
+</head>
+<body style="margin:0;padding:0;background:#EDF2EF;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F2B26;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;" th:text="${r.faixa.resumo}">Resumo</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EDF2EF;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:20px;">
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td style="width:26px;height:26px;background:#0F2B26;border-radius:7px;"></td>
+              <td style="padding-left:10px;font-size:14px;font-weight:600;">Diagnóstico do Líder</td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <p style="margin:0;font-size:16px;line-height:1.5;color:#4A635C;" th:text="|Olá, ${r.primeiroNome}. Seu diagnóstico está pronto.|">Olá, Ana. Seu diagnóstico está pronto.</p>
+            <h1 style="margin:10px 0 0;font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-0.02em;" th:text="${r.faixa.titulo}">Carreira no platô</h1>
+            <p style="margin:12px 0 0;font-size:17px;line-height:1.5;" th:text="${r.faixa.resumo}">Resumo</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F8F6;border-radius:14px;">
+              <tr>
+                <td style="padding:16px 20px;font-size:13px;color:#4A635C;">Índice de movimento da carreira</td>
+                <td align="right" style="padding:16px 20px;font-size:28px;font-weight:700;"><span th:text="${r.pontuacao}">58</span><span style="font-size:14px;color:#7D918B;font-weight:500;">/100</span></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <a th:href="${r.urlResultado}" style="display:inline-block;background:#0F2B26;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:16px;padding:15px 26px;border-radius:999px;">Ver meu diagnóstico</a>
+            <p style="margin:16px 0 0;font-size:14px;line-height:1.5;color:#4A635C;">O relatório completo, com os próximos passos recomendados, está em PDF neste e-mail.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 28px;">
+            <p style="margin:0;padding-top:18px;border-top:1px solid #D2DDD8;font-size:12px;line-height:1.5;color:#7D918B;">Você recebeu este e-mail porque respondeu ao Diagnóstico do Líder. Seus dados são usados apenas para gerar e enviar o seu diagnóstico.</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

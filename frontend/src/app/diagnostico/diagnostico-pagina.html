@@ -1,0 +1,77 @@
+@if (campanha.error()) {
+  <app-nao-encontrado
+    titulo="Este link não está disponível"
+    mensagem="O diagnóstico pode ter sido encerrado, ou o endereço chegou incompleto. Confira o link que você recebeu."
+  />
+} @else if (!pronto()) {
+  <div class="grid min-h-dvh place-items-center" aria-busy="true">
+    <span class="size-9 animate-spin rounded-full border-[3px] border-linha border-t-brasa" aria-hidden="true"></span>
+    <span class="sr-only">Carregando o diagnóstico</span>
+  </div>
+} @else if (calculando()) {
+  <app-calculando [nome]="primeiroNome()" />
+} @else {
+  <div class="mx-auto flex min-h-dvh w-full max-w-xl flex-col">
+    @if (indice() > 0) {
+      <app-barra-progresso class="sticky top-0 z-20" [atual]="indice()" [grupos]="grupos()" (voltar)="voltar()" />
+    }
+
+    <main class="palco flex-1" [attr.data-direcao]="direcao()">
+      @for (etapa of etapaVisivel(); track etapa.chave) {
+        <section class="flex flex-col" [class.etapa-cheia]="etapa.tipo !== 'inicio'" animate.enter="etapa-entrar" animate.leave="etapa-sair">
+          @if (etapa.tipo === 'inicio') {
+            <app-boas-vindas
+              [empresa]="empresaDaCampanha()"
+              [totalPerguntas]="grupos()[1]"
+              [retomada]="retomada()"
+              (comecar)="comecar()"
+              (continuar)="continuarDeOndeParou()"
+              (recomecar)="recomecar()"
+              (verResultado)="verResultado()"
+            />
+          } @else if (etapa.tipo === 'campo') {
+            <app-etapa-campo
+              [campo]="etapa.campo"
+              [controle]="formulario[etapa.campo]"
+              sobretitulo="Sobre você"
+              [rotulo]="rotuloCampo(etapa.campo)"
+              [ajuda]="ajudaCampo(etapa.campo)"
+              [erro]="mensagemErro(etapa.campo)"
+              [ultimo]="etapa.ultimo"
+              [enviando]="enviando()"
+              (editou)="editou(etapa.campo)"
+              (continuar)="continuarCampo(etapa)"
+            />
+          } @else if (etapa.tipo === 'pergunta') {
+            <app-etapa-pergunta
+              [pergunta]="etapa.pergunta"
+              [numero]="etapa.numero"
+              [total]="etapa.total"
+              [dimensao]="etapa.dimensao"
+              [ultima]="etapa.ultima"
+              [selecionadas]="respostas()[etapa.pergunta.id] ?? []"
+              [enviando]="enviando()"
+              (escolher)="escolher(etapa, $event)"
+              (avancar)="avancarPergunta(etapa)"
+            />
+          }
+        </section>
+      }
+    </main>
+  </div>
+}
+
+<!-- Avisos de erro: ficam acima do rodapé fixo, perto do polegar. -->
+<div class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[max(96px,calc(env(safe-area-inset-bottom)+88px))]" aria-live="assertive">
+  @if (erro(); as mensagem) {
+    <div class="aparecer pointer-events-auto flex max-w-md items-start gap-3 rounded-2xl bg-abeto px-4 py-3.5 text-[15px] text-white shadow-2xl" role="alert">
+      <svg class="mt-0.5 shrink-0 text-brasa" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.5" stroke-linecap="round" />
+      </svg>
+      <p class="flex-1">{{ mensagem }}</p>
+      <button type="button" class="-my-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10" aria-label="Fechar aviso" (click)="erro.set(null)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" /></svg>
+      </button>
+    </div>
+  }
+</div>

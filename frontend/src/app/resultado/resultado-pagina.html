@@ -1,0 +1,142 @@
+@if (resultado.error()) {
+  <app-nao-encontrado
+    titulo="Não encontramos este diagnóstico"
+    mensagem="O link pode estar incompleto. Use o botão do e-mail que você recebeu ou faça o diagnóstico de novo."
+  />
+} @else if (resultado.value(); as r) {
+  <div class="mx-auto w-full max-w-xl" [style.--faixa]="faixa().cor" [style.--faixa-suave]="faixa().suave">
+    <header class="flex items-center justify-between gap-3 px-5 pt-5 sm:px-8 sm:pt-8">
+      <app-marca />
+      <time class="text-[13px] text-abeto-2" [attr.datetime]="r.concluidoEm">{{ r.concluidoEm | date: "d 'de' MMMM" }}</time>
+    </header>
+
+    <!-- Abertura: o veredito em uma frase. -->
+    <section class="px-5 pt-10 sm:px-8 sm:pt-14">
+      <p class="surgir text-[15px] text-abeto-2" style="--i: 0">Diagnóstico de carreira de <strong class="font-semibold text-abeto">{{ r.nome }}</strong></p>
+      <p class="rotulo surgir mt-7 inline-flex items-center gap-2 text-[var(--faixa)]" style="--i: 1">
+        <i class="block size-2.5 rounded-full bg-[var(--faixa)]"></i>Seu momento
+      </p>
+      <h1 class="display surgir mt-2 text-[48px] leading-[0.96] font-bold sm:text-[64px]" style="--i: 2">{{ r.faixa.titulo }}</h1>
+      <p class="surgir mt-4 text-[19px] leading-snug" style="--i: 3">{{ r.faixa.resumo }}</p>
+    </section>
+
+    <!-- A curva com o ponto do líder. -->
+    <figure class="surgir mx-3 mt-8 rounded-[28px] bg-white/75 px-2 pt-14 pb-1 ring-1 ring-linha/70 sm:mx-6" style="--i: 4">
+      <app-curva modo="resultado" [indice]="r.pontuacao" [cor]="faixa().cor" />
+      <figcaption class="sr-only">
+        Curva da carreira: subida, platô e queda. Você está na fase "{{ r.faixa.titulo }}", com índice {{ r.pontuacao }} de 100.
+      </figcaption>
+    </figure>
+
+    <!-- Índice de movimento. -->
+    <section class="px-5 pt-9 sm:px-8" aria-labelledby="titulo-indice">
+      <div class="flex items-end justify-between gap-6">
+        <div>
+          <h2 id="titulo-indice" class="rotulo text-abeto-2">Índice de movimento</h2>
+          <p class="mt-2 text-[15px] leading-snug text-abeto-2">Quanto mais alto, mais a sua carreira está em subida.</p>
+        </div>
+        <p class="display shrink-0 text-[68px] leading-[0.82] font-bold tabular-nums" [attr.aria-label]="r.pontuacao + ' de 100'">
+          {{ indiceExibido() }}<span class="ml-0.5 text-[18px] font-medium tracking-normal text-abeto-3">/100</span>
+        </p>
+      </div>
+      <div class="relative mt-5" aria-hidden="true">
+        <div class="grid grid-cols-[40fr_30fr_31fr] gap-1">
+          <span class="h-2 rounded-full bg-[#E9C3CA]"></span>
+          <span class="h-2 rounded-full bg-[#F0D9A8]"></span>
+          <span class="h-2 rounded-full bg-[#BFE0CF]"></span>
+        </div>
+        <span
+          class="absolute -top-[5px] -ml-[9px] size-[18px] rounded-full border-[3px] border-nevoa bg-[var(--faixa)] shadow-[0_0_0_1px_var(--faixa)]"
+          [style.left.%]="indiceExibido()"
+        ></span>
+        <div class="mt-2 grid grid-cols-[40fr_30fr_31fr] gap-1 text-[12px] text-abeto-2">
+          <span>Travada</span><span>Platô</span><span>Ascensão</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dimensões. -->
+    <section class="px-5 pt-12 sm:px-8" aria-labelledby="titulo-dimensoes">
+      <h2 id="titulo-dimensoes" class="rotulo border-b border-linha pb-3 text-abeto-2">Por dimensão</h2>
+      @for (d of r.dimensoes; track d.codigo; let i = $index) {
+        <div class="border-b border-linha py-4">
+          <div class="flex items-baseline justify-between gap-4">
+            <h3 class="text-[17px] font-semibold">{{ d.nome }}</h3>
+            <span class="text-[19px] font-bold tabular-nums">{{ d.pontuacao }}</span>
+          </div>
+          <div class="mt-2.5 h-2.5 overflow-hidden rounded-full bg-white" role="img" [attr.aria-label]="d.nome + ': ' + d.pontuacao + ' de 100'">
+            <div
+              class="h-full rounded-full bg-abeto transition-[width] duration-1000 ease-[var(--ease-mola)]"
+              [style.width.%]="barrasVisiveis() ? d.pontuacao : 0"
+              [style.transition-delay.ms]="i * 120"
+            ></div>
+          </div>
+          <p class="mt-2 text-[14px] text-abeto-2">{{ d.descricao }}</p>
+        </div>
+      }
+    </section>
+
+    <!-- O que isso significa. -->
+    <section class="px-5 pt-12 sm:px-8">
+      <h2 class="display text-[30px] leading-tight font-bold">O que isso significa</h2>
+      <p class="mt-3 text-[17px] leading-relaxed">{{ r.faixa.descricao }}</p>
+    </section>
+
+    <!-- Próximos passos (uma sequência de verdade, por isso numerada). -->
+    <section class="px-5 pt-12 sm:px-8">
+      <h2 class="display text-[30px] leading-tight font-bold">Próximos passos</h2>
+      <ol class="mt-5">
+        @for (passo of r.faixa.recomendacoes; track $index; let i = $index) {
+          <li class="flex gap-4 border-t border-linha py-4 last:border-b">
+            <span class="display grid size-9 shrink-0 place-items-center rounded-full bg-[var(--faixa-suave)] text-[16px] font-bold text-[var(--faixa)]">{{ i + 1 }}</span>
+            <span class="pt-1 text-[17px] leading-snug">{{ passo }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+
+    <p class="px-5 pt-10 pb-6 text-[13px] leading-snug text-abeto-2 sm:px-8">
+      Este diagnóstico é um ponto de partida para reflexão e conversa, não uma avaliação definitiva da sua carreira.
+    </p>
+
+    <!-- Ação principal no polegar. -->
+    <div class="rodape-fixo z-10 px-5 sm:px-8">
+      <button type="button" class="botao-primario w-full" [attr.aria-busy]="baixando()" (click)="baixarPdf()">
+        @if (baixando()) {
+          <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+          Gerando o seu PDF…
+        } @else {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Baixar diagnóstico em PDF
+        }
+      </button>
+      <p class="mt-3 min-h-5 text-center text-[13px] text-abeto-2" aria-live="polite">
+        @if (erroPdf(); as mensagem) {
+          <span class="font-medium text-travada">{{ mensagem }}</span>
+        } @else {
+          @switch (r.statusEmail) {
+            @case ('ENVIADO') {
+              <span class="inline-flex items-center gap-1.5">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" class="text-ascensao" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                Uma cópia foi enviada para {{ r.emailMascarado }}
+              </span>
+            }
+            @case ('PENDENTE') {
+              Enviando uma cópia para {{ r.emailMascarado }}…
+            }
+            @case ('FALHOU') {
+              Não conseguimos enviar o e-mail. Baixe o PDF por aqui.
+            }
+          }
+        }
+      </p>
+    </div>
+  </div>
+} @else {
+  <div class="grid min-h-dvh place-items-center" aria-busy="true">
+    <span class="size-9 animate-spin rounded-full border-[3px] border-linha border-t-brasa" aria-hidden="true"></span>
+    <span class="sr-only">Carregando o seu diagnóstico</span>
+  </div>
+}

@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: diagnostico-lider
+  # No Railway, as variáveis PG* vêm do serviço Postgres (referência ${{Postgres.PGHOST}} etc.).
+  datasource:
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:diagnostico_lider}
+    username: ${PGUSER:postgres}
+    password: ${PGPASSWORD:root}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_batch_fetch_size: 64
+        jdbc:
+          time_zone: UTC
+  threads:
+    virtual:
+      enabled: true
+  thymeleaf:
+    cache: ${THYMELEAF_CACHE:true}
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/css,application/javascript,image/svg+xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  # Endereço público do front, usado nos links do e-mail.
+  url-publica: ${APP_URL_PUBLICA:http://localhost:4200}
+  pdf:
+    # chrome: usa o Chrome/Edge instalado (dev, sem Docker). gotenberg: serviço Gotenberg (produção).
+    motor: ${PDF_MOTOR:chrome}
+    gotenberg-url: ${GOTENBERG_URL:http://localhost:3000}
+    chrome-path: ${CHROME_PATH:}
+  email:
+    # log: só registra no console (dev). resend: envia pela API HTTP da Resend (produção).
+    provedor: ${EMAIL_PROVEDOR:log}
+    remetente: ${EMAIL_REMETENTE:Diagnóstico do Líder <onboarding@resend.dev>}
+    resend-api-key: ${RESEND_API_KEY:}
