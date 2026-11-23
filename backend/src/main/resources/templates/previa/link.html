@@ -5,7 +5,9 @@
 <title>Prévia do link</title>
 <style th:utext="${fontes}"></style>
 <!-- Imagem 1200×630 que o WhatsApp (e LinkedIn, Telegram, iMessage) mostra quando o link é
-     enviado. Mesma linguagem da capa do relatório: fundo escuro, a curva como assinatura. -->
+     enviado. Mesma linguagem da capa do relatório: fundo escuro, a curva como assinatura.
+     Margem lateral de 120px: a caixa da prévia enquanto se digita no WhatsApp é mais estreita
+     (1,6:1) e corta ~90px de cada lado; nada importante fica nessa faixa. -->
 <style th:inline="css">
   :root {
     --tinta: [(${t.tinta})]; --fundo: [(${t.fundo})]; --destaque: [(${t.destaqueSobreTinta})];
@@ -21,7 +23,7 @@
       var(--tinta);
     -webkit-font-smoothing: antialiased;
   }
-  .topo { position: absolute; top: 52px; left: 64px; right: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .topo { position: absolute; top: 52px; left: 120px; right: 120px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
   .marca { display: flex; align-items: center; gap: 18px; min-width: 0; }
   .selo { display: flex; align-items: center; height: 76px; padding: 0 22px; border-radius: 20px; background: #fff; box-shadow: 0 18px 40px -22px rgba(0,0,0,0.55); }
   .selo img { display: block; max-height: 48px; max-width: 320px; }
@@ -29,21 +31,21 @@
     display: grid; place-items: center; width: 76px; height: 76px; border-radius: 20px; background: var(--destaque); color: var(--tinta);
     font: 700 30px/1 'Bricolage Grotesque', sans-serif; letter-spacing: -0.01em;
   }
-  .nome { font: 600 28px/1.15 'Instrument Sans', sans-serif; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nome { font: 600 28px/1.15 'Instrument Sans', sans-serif; max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .produto { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 600; letter-spacing: 0.01em; }
   .credito { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 600; color: color-mix(in srgb, var(--fundo) 72%, transparent); white-space: nowrap; }
 
-  .rotulo { position: absolute; left: 64px; top: 188px; font-size: 17px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--destaque); }
+  .rotulo { position: absolute; left: 120px; top: 188px; font-size: 17px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--destaque); }
   h1 {
-    position: absolute; left: 64px; top: 222px; width: 590px;
+    position: absolute; left: 120px; top: 222px; width: 520px;
     font-family: 'Bricolage Grotesque', sans-serif; font-variation-settings: 'opsz' 96; font-weight: 700; font-stretch: 84%;
-    font-size: 80px; line-height: 0.95; letter-spacing: -0.015em; text-wrap: balance;
+    font-size: 78px; line-height: 0.95; letter-spacing: -0.015em; text-wrap: balance;
   }
-  .fatos { position: absolute; left: 64px; bottom: 50px; display: flex; flex-direction: column; gap: 10px; font-size: 22px; font-weight: 500; color: color-mix(in srgb, var(--fundo) 86%, transparent); }
+  .fatos { position: absolute; left: 120px; bottom: 50px; display: flex; flex-direction: column; gap: 10px; font-size: 21px; font-weight: 500; color: color-mix(in srgb, var(--fundo) 86%, transparent); }
   .fatos span { display: flex; align-items: center; gap: 12px; }
   .fatos svg { flex: none; color: var(--destaque); }
 
-  svg.curva { position: absolute; right: 36px; bottom: 26px; width: 700px; height: 450px; overflow: visible; }
+  svg.curva { position: absolute; right: 120px; bottom: 26px; width: 580px; height: 430px; overflow: visible; }
   .rot { font: 600 15px 'Instrument Sans', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; fill: var(--fundo); fill-opacity: 0.55; }
   .balao { font: 600 19px 'Instrument Sans', sans-serif; fill: var(--tinta); }
 </style>

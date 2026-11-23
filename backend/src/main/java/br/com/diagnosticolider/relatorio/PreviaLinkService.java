@@ -41,7 +41,7 @@ public class PreviaLinkService {
 	public static final int ALTURA = 630;
 
 	/** Mude quando o desenho da imagem mudar: todos os endereços mudam junto. */
-	private static final String DESENHO = "1";
+	private static final String DESENHO = "2";
 
 	/** "Você está aqui?" no platô da curva (índice que cai no platô). */
 	private static final int INDICE_NO_PLATO = 47;
@@ -124,7 +124,7 @@ public class PreviaLinkService {
 		var contexto = new Context(PT_BR);
 		contexto.setVariable("fontes", FontesEmbutidas.CSS);
 		contexto.setVariable("t", MarcaEmpresa.temaDe(empresa));
-		contexto.setVariable("c", CurvaCarreira.desenhar(700, 450, INDICE_NO_PLATO));
+		contexto.setVariable("c", CurvaCarreira.desenhar(580, 430, INDICE_NO_PLATO));
 		if (empresa != null) {
 			contexto.setVariable("empresa", empresa.getNome());
 			contexto.setVariable("sigla", MarcaEmpresa.siglaDe(empresa.getNome()));
