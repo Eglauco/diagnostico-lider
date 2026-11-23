@@ -36,7 +36,7 @@
               sobretitulo="Sobre você"
               [rotulo]="rotuloCampo(etapa.campo)"
               [ajuda]="ajudaCampo(etapa.campo)"
-              [erro]="mensagemErro(etapa.campo)"
+              [erro]="mensagemErro(etapa.campo) ?? erro()"
               [ultimo]="etapa.ultimo"
               [enviando]="enviando()"
               (editou)="editou(etapa.campo)"
@@ -52,6 +52,7 @@
               [erro]="erroPerfil(etapa.perfil)"
               [enviando]="enviando()"
               [ultimo]="etapa.ultimo"
+              [continuarNoCampo]="etapa.perfil === 'cargo' && perfil().cargo === CARGO_OUTRO"
               (escolher)="escolherPerfil(etapa, $event)"
               (avancar)="avancarPerfil(etapa)"
             >
@@ -60,20 +61,35 @@
                   <label for="cargo-outro" class="block text-[17px] font-semibold">
                     Qual é o seu cargo? <span class="font-normal text-abeto-2">(opcional)</span>
                   </label>
-                  <input
-                    #campoOutro
-                    id="cargo-outro"
-                    class="entrada-grande mt-2"
-                    type="text"
-                    maxlength="80"
-                    autocomplete="organization-title"
-                    autocapitalize="words"
-                    enterkeyhint="next"
-                    placeholder="Ex.: Head de vendas"
-                    [value]="perfil().outroNome"
-                    (input)="editouOutroNome(campoOutro.value)"
-                    (keydown.enter)="avancarPerfil(etapa)"
-                  />
+                  <div class="mt-2 flex items-center gap-3">
+                    <input
+                      #campoOutro
+                      id="cargo-outro"
+                      class="entrada-grande min-w-0 flex-1"
+                      type="text"
+                      maxlength="80"
+                      autocomplete="organization-title"
+                      autocapitalize="words"
+                      enterkeyhint="next"
+                      placeholder="Ex.: Head de vendas"
+                      [value]="perfil().outroNome"
+                      (input)="editouOutroNome(campoOutro.value)"
+                      (keydown.enter)="avancarPerfil(etapa)"
+                    />
+                    <!-- O nome é opcional: a seta já vem pronta para seguir. -->
+                    <button
+                      type="button"
+                      class="botao-enviar botao-enviar-pronto"
+                      [attr.aria-label]="etapa.ultimo ? 'Ir para as perguntas' : 'Continuar'"
+                      [attr.aria-busy]="enviando()"
+                      [disabled]="enviando()"
+                      (click)="avancarPerfil(etapa)"
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+                        <path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               }
             </app-etapa-escolha>
@@ -96,9 +112,10 @@
   </div>
 }
 
-<!-- Avisos de erro: ficam acima do rodapé fixo (e do teclado), perto do polegar. -->
-<div class="pointer-events-none fixed inset-x-0 bottom-[var(--teclado,0px)] z-30 flex justify-center px-4 pb-[max(96px,calc(env(safe-area-inset-bottom)+88px))] teclado:pb-[92px]" aria-live="assertive">
-  @if (erro(); as mensagem) {
+<!-- Avisos de erro: ficam acima do rodapé fixo, perto do polegar. Nas etapas de texto o erro
+     aparece no próprio campo, porque ali o teclado cobriria o aviso. -->
+<div class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[max(96px,calc(env(safe-area-inset-bottom)+88px))]" aria-live="assertive">
+  @if (erroNoAviso(); as mensagem) {
     <div class="aparecer pointer-events-auto flex max-w-md items-start gap-3 rounded-2xl bg-abeto px-4 py-3.5 text-[15px] text-white shadow-2xl" role="alert">
       <svg class="mt-0.5 shrink-0 text-brasa" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
         <circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.5" stroke-linecap="round" />

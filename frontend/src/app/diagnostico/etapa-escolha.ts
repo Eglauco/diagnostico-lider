@@ -67,8 +67,8 @@ const LETRAS = 'ABCDEFGHIJKLMN';
         }
       </div>
 
-      @if (selecionada() && !enviando()) {
-        <div class="aparecer mt-3 flex justify-end" data-acao-do-campo>
+      @if (selecionada() && !enviando() && !continuarNoCampo()) {
+        <div class="aparecer mt-3 flex justify-end">
           <button type="button" class="botao-secundario" (click)="avancar.emit()">
             {{ ultimo() ? 'Ir para as perguntas' : 'Continuar' }} <span aria-hidden="true">→</span>
           </button>
@@ -88,6 +88,8 @@ export class EtapaEscolha {
   readonly ajuda = input<string | null>(null);
   readonly opcoes = input.required<OpcaoPerfil[]>();
   readonly selecionada = input<string | null>(null);
+  /** O conteúdo projetado (ex.: "Qual é o seu cargo?") já traz o botão de seguir grudado no campo. */
+  readonly continuarNoCampo = input(false);
   readonly erro = input<string | null>(null);
   readonly enviando = input(false);
   /** Última etapa de identificação: avançar cria o diagnóstico. */

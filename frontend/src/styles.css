@@ -1,8 +1,5 @@
 @import 'tailwindcss';
 
-/* teclado:… vale enquanto o teclado do celular está aberto (ver compartilhado/teclado-virtual.ts). */
-@custom-variant teclado (&:where([data-teclado] *));
-
 /* ===================================================================
    Diagnóstico do Líder — tokens
    Abeto (verde profundo) como tinta, Névoa (verde-acinzentado frio) como
@@ -121,25 +118,45 @@
   .entrada-grande:focus { border-bottom-color: var(--color-abeto); }
   .entrada-grande:focus-visible { outline: none; }
   .entrada-grande[aria-invalid='true'] { border-bottom-color: var(--color-travada); }
+  /* Botão de enviar grudado no campo, como no WhatsApp. Vazio: contorno discreto (ainda tocável,
+     mostra o que falta). Com algo escrito: cheio, na cor de ação. */
+  .botao-enviar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--color-abeto-2);
+    box-shadow: inset 0 0 0 1.5px var(--color-linha);
+    transition: background-color 200ms, color 200ms, box-shadow 200ms, transform 160ms var(--ease-mola);
+  }
+  .botao-enviar:hover { color: var(--color-abeto); box-shadow: inset 0 0 0 1.5px var(--color-abeto-3); }
+  .botao-enviar:active { transform: scale(0.92); }
+  .botao-enviar[aria-busy='true'] { cursor: progress; }
+  .botao-enviar-pronto,
+  .botao-enviar-pronto:hover {
+    background: var(--color-acao);
+    color: var(--color-sobre-acao);
+    box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--color-abeto) 80%, transparent);
+  }
+  .botao-enviar-pronto:hover { background: var(--color-acao-forte); }
+  .botao-enviar-pronto svg { animation: seta-pronta 360ms var(--ease-mola); }
+  @keyframes seta-pronta { from { transform: translateX(-6px); opacity: 0; } }
+
   .entrada-grande:-webkit-autofill {
     -webkit-box-shadow: 0 0 0 1000px var(--color-nevoa) inset;
     -webkit-text-fill-color: var(--color-abeto);
   }
 
-  /* Barra fixa no rodapé do celular, acima do teclado e da safe area. --teclado sobe a barra
-     no iPhone, onde o teclado cobre a página em vez de encolhê-la. */
+  /* Barra fixa no rodapé do celular, acima da safe area. */
   .rodape-fixo {
     position: sticky;
-    bottom: var(--teclado, 0px);
+    bottom: 0;
     padding-top: 28px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--color-nevoa) 62%, rgb(237 242 239 / 0));
-  }
-  /* Com o teclado aberto a tela encolhe pela metade: a barra fica mais justa (a safe area está
-     embaixo do teclado). */
-  [data-teclado] .rodape-fixo {
-    padding-top: 14px;
-    padding-bottom: 10px;
   }
 
   /* Cartão de alternativa do questionário (perguntas, cargo e tempo no cargo). */
@@ -231,12 +248,6 @@
 /* Troca de etapa: a nova entra na direção em que o líder está indo. */
 .palco { display: grid; }
 .etapa-cheia { min-height: calc(100dvh - 4rem); }
-/* No iPhone o teclado cobre a página: a etapa ganha a altura dele no fim, para dar espaço de rolar
-   o campo e o botão para cima do teclado em telas baixas (no Android --teclado é 0). */
-[data-teclado] .etapa-cheia {
-  min-height: calc(100dvh - 4rem + var(--teclado, 0px));
-  padding-bottom: var(--teclado, 0px);
-}
 .palco > * { grid-area: 1 / 1; min-width: 0; }
 
 @keyframes entrar-frente { from { opacity: 0; transform: translate3d(32px, 0, 0); } }

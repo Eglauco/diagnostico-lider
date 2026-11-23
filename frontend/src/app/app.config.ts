@@ -1,11 +1,10 @@
-import { ApplicationConfig, LOCALE_ID, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
 
 import { sessaoExpiradaInterceptor } from './admin/acesso/sessao';
-import { acompanharTeclado } from './compartilhado/teclado-virtual';
 import { routes } from './app.routes';
 
 registerLocaleData(localePt);
@@ -21,7 +20,5 @@ export const appConfig: ApplicationConfig = {
       withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
     ),
     { provide: LOCALE_ID, useValue: 'pt-BR' },
-    // Rodapé com o botão principal sempre acima do teclado do celular (inclusive no iPhone).
-    provideAppInitializer(acompanharTeclado),
   ],
 };

@@ -109,6 +109,8 @@ export class DiagnosticoPagina {
   protected readonly enviando = signal(false);
   protected readonly calculando = signal(false);
   protected readonly erro = signal<string | null>(null);
+  /** Nas etapas de texto o erro vai para o próprio campo: no celular, o teclado cobriria o aviso. */
+  protected readonly erroNoAviso = computed(() => (this.etapaVisivel()[0]?.tipo === 'campo' ? null : this.erro()));
   private readonly errosServidor = signal<Record<string, string>>({});
   private readonly tentou = signal<Partial<Record<CampoId, boolean>>>({});
 
