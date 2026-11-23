@@ -3,10 +3,34 @@ package br.com.diagnosticolider.relatorio;
 import java.util.List;
 import java.util.UUID;
 
-/** Tudo o que o PDF e o e-mail precisam, já resolvido (sem entidades JPA). */
+import br.com.diagnosticolider.empresa.MarcaEmpresa;
+import br.com.diagnosticolider.empresa.PaletaMarca;
+
+/**
+ * Tudo o que o PDF e o e-mail precisam, já resolvido (sem entidades JPA). "empresa" vem quando o
+ * líder respondeu pelo link de uma empresa; "tema" é a paleta (da empresa ou a do Diagnóstico).
+ */
 public record RelatorioDados(UUID id, String nome, String primeiroNome, String email, String data, int pontuacao,
 		Faixa faixa, List<Dimensao> dimensoes, List<RespostaItem> respostas, CurvaCarreira.Desenho curva,
-		String urlResultado) {
+		String urlResultado, MarcaEmpresa empresa, PaletaMarca.Tema tema, Logo logo) {
+
+	/**
+	 * Logomarca da empresa: embutida no PDF (dataUri) e por endereço público no e-mail (url).
+	 * pedeNome: logo só com o símbolo, então o nome da empresa vai ao lado.
+	 * larguraEmail/alturaEmail: tamanho exato no e-mail (o Outlook estica imagem sem largura).
+	 */
+	public record Logo(String dataUri, String url, boolean pedeNome, int larguraEmail, int alturaEmail) {
+
+		static final int ALTURA_EMAIL = 34;
+
+		static final int LARGURA_MAX_EMAIL = 200;
+
+		static Logo de(String dataUri, String url, MarcaEmpresa.Logo logo) {
+			double escala = Math.min((double) ALTURA_EMAIL / logo.altura(), (double) LARGURA_MAX_EMAIL / logo.largura());
+			return new Logo(dataUri, url, logo.pedeNome(), (int) Math.round(logo.largura() * escala),
+					(int) Math.round(logo.altura() * escala));
+		}
+	}
 
 	public record Faixa(String codigo, String titulo, String resumo, String descricao, List<String> recomendacoes) {
 	}

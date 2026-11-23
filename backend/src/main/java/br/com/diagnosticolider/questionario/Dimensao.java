@@ -34,7 +34,15 @@ public class Dimensao {
 	@Column(nullable = false)
 	private int ordem;
 
+	/** O que a empresa pode fazer para fortalecer esta dimensão (relatório consolidado). */
+	@Column(name = "acao_empresa")
+	private String acaoEmpresa;
+
 	protected Dimensao() {
+	}
+
+	public String getAcaoEmpresa() {
+		return acaoEmpresa;
 	}
 
 	public Long getId() {

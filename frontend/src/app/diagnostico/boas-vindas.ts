@@ -1,7 +1,8 @@
 import { Component, input, output } from '@angular/core';
 
 import { Curva } from '../compartilhado/curva';
-import { Marca } from '../compartilhado/marca';
+import { CreditoDiagnostico, MarcaEmpresaCabecalho } from '../compartilhado/marca-empresa';
+import { MarcaEmpresa } from '../compartilhado/tema-marca';
 
 export type Retomada =
   | { tipo: 'em-andamento'; primeiroNome: string; respondidas: number; total: number }
@@ -9,15 +10,13 @@ export type Retomada =
 
 @Component({
   selector: 'app-boas-vindas',
-  imports: [Curva, Marca],
+  imports: [CreditoDiagnostico, Curva, MarcaEmpresaCabecalho],
   host: { class: 'flex min-h-dvh flex-col' },
   template: `
-    <header class="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-8 sm:pt-8">
-      <app-marca />
-      @if (empresa(); as nome) {
-        <span class="rounded-full bg-white/70 px-3 py-1.5 text-[13px] font-medium text-abeto-2 ring-1 ring-linha">
-          Convite de <strong class="font-semibold text-abeto">{{ nome }}</strong>
-        </span>
+    <header class="flex items-center justify-between gap-3 px-5 pt-5 sm:px-8 sm:pt-8">
+      <app-marca-empresa [empresa]="empresa()" />
+      @if (empresa()) {
+        <app-credito-diagnostico class="hidden shrink-0 sm:inline-flex" />
       }
     </header>
 
@@ -54,7 +53,7 @@ export type Retomada =
     <div class="rodape-fixo surgir mt-auto px-5 sm:px-8" style="--i: 5">
       @switch (retomada()?.tipo) {
         @case ('em-andamento') {
-          <div class="rounded-3xl bg-white p-5 shadow-[0_18px_40px_-28px_rgb(15_43_38/0.6)] ring-1 ring-linha">
+          <div class="rounded-3xl bg-white p-5 shadow-[0_18px_40px_-28px_color-mix(in_srgb,var(--color-abeto)_60%,transparent)] ring-1 ring-linha">
             <p class="text-[17px] font-semibold">Que bom ter você de volta, {{ retomada()!.primeiroNome }}.</p>
             <p class="mt-1 text-[15px] text-abeto-2">{{ textoProgresso() }}</p>
             <button type="button" class="botao-primario mt-4 w-full" (click)="continuar.emit()">
@@ -66,7 +65,7 @@ export type Retomada =
           </div>
         }
         @case ('concluido') {
-          <div class="rounded-3xl bg-white p-5 shadow-[0_18px_40px_-28px_rgb(15_43_38/0.6)] ring-1 ring-linha">
+          <div class="rounded-3xl bg-white p-5 shadow-[0_18px_40px_-28px_color-mix(in_srgb,var(--color-abeto)_60%,transparent)] ring-1 ring-linha">
             <p class="text-[17px] font-semibold">{{ retomada()!.primeiroNome }}, você já concluiu este diagnóstico.</p>
             <button type="button" class="botao-primario mt-4 w-full" (click)="verResultado.emit()">
               Ver meu resultado <span class="seta" aria-hidden="true">→</span>
@@ -81,13 +80,17 @@ export type Retomada =
             Começar diagnóstico <span class="seta" aria-hidden="true">→</span>
           </button>
           <p class="mt-3 text-center text-[13px] text-abeto-2">Usamos seus dados apenas para gerar e enviar o seu diagnóstico.</p>
+          @if (empresa()) {
+            <p class="mt-2 flex justify-center sm:hidden"><app-credito-diagnostico class="inline-flex" /></p>
+          }
         }
       }
     </div>
   `,
 })
 export class BoasVindas {
-  readonly empresa = input<string | null>(null);
+  /** Link de empresa: ela aparece em destaque; link geral: null. */
+  readonly empresa = input<MarcaEmpresa | null>(null);
   readonly totalPerguntas = input.required<number>();
   readonly retomada = input<Retomada | null>(null);
 

@@ -44,6 +44,21 @@ public class Campanha {
 	protected Campanha() {
 	}
 
+	/** Link de uma empresa: os diagnósticos feitos por ele entram no consolidado dela. */
+	public static Campanha daEmpresa(String codigo, Empresa empresa, Questionario questionario) {
+		Campanha campanha = new Campanha();
+		campanha.codigo = codigo;
+		campanha.nome = empresa.getNome();
+		campanha.empresa = empresa;
+		campanha.questionario = questionario;
+		campanha.ativa = true;
+		return campanha;
+	}
+
+	public void renomear(String nome) {
+		this.nome = nome;
+	}
+
 	public boolean vinculadaAEmpresa() {
 		return empresa != null;
 	}

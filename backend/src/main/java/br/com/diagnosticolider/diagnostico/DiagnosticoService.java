@@ -20,6 +20,9 @@ import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.DiagnosticoDto;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.IniciarRequest;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.ResultadoDto;
+import br.com.diagnosticolider.empresa.Cargo;
+import br.com.diagnosticolider.empresa.CargoService;
+import br.com.diagnosticolider.empresa.LogomarcaService;
 import br.com.diagnosticolider.questionario.Dimensao;
 import br.com.diagnosticolider.questionario.Opcao;
 import br.com.diagnosticolider.questionario.Pergunta;
@@ -39,34 +42,64 @@ public class DiagnosticoService {
 
 	private final Clock clock;
 
+	private final LogomarcaService logomarcas;
+
 	DiagnosticoService(DiagnosticoRepository diagnosticos, CampanhaService campanhas, CalculadoraResultado calculadora,
-			ApplicationEventPublisher eventos, Clock clock) {
+			ApplicationEventPublisher eventos, Clock clock, LogomarcaService logomarcas) {
 		this.diagnosticos = diagnosticos;
 		this.campanhas = campanhas;
 		this.calculadora = calculadora;
 		this.eventos = eventos;
 		this.clock = clock;
+		this.logomarcas = logomarcas;
 	}
 
 	public DiagnosticoDto iniciar(String codigoCampanha, IniciarRequest req) {
 		Campanha campanha = campanhas.campanhaAtiva(codigoCampanha);
 		QuestionarioVersao versao = campanhas.versaoPublicada(campanha);
+		PerfilCargo perfil = perfil(campanha, req);
 		Diagnostico diagnostico = Diagnostico.iniciar(campanha, versao, respondente(campanha, req), agora());
+		diagnostico.definirPerfil(perfil);
 		return DiagnosticoDto.de(diagnosticos.save(diagnostico));
 	}
 
 	public DiagnosticoDto atualizarRespondente(UUID id, IniciarRequest req) {
 		Diagnostico diagnostico = carregar(id);
 		diagnostico.atualizarRespondente(respondente(diagnostico.getCampanha(), req));
+		diagnostico.definirPerfil(perfil(diagnostico.getCampanha(), req));
 		return DiagnosticoDto.de(diagnostico);
 	}
 
-	/** Link de empresa: a empresa vem da campanha. Link geral: o líder informa. */
-	private static Respondente respondente(Campanha campanha, IniciarRequest req) {
-		String empresa = campanha.vinculadaAEmpresa() ? campanha.getEmpresa().getNome() : req.empresa();
-		if (empresa == null || empresa.isBlank()) {
-			throw new RegraNegocioException("Informe a empresa em que você trabalha.");
+	/**
+	 * Empresa com cargos cadastrados: cargo (ou "Outro cargo") e tempo no cargo são obrigatórios.
+	 * Link geral ou empresa sem cargos: nada é perguntado, e o que vier é ignorado.
+	 */
+	private PerfilCargo perfil(Campanha campanha, IniciarRequest req) {
+		List<Cargo> cargos = campanhas.cargosDoLink(campanha);
+		if (cargos.isEmpty()) {
+			return PerfilCargo.NENHUM;
 		}
+		boolean outro = Boolean.TRUE.equals(req.cargoOutro());
+		Cargo cargo = null;
+		if (!outro) {
+			if (req.cargoId() == null) {
+				throw new RegraNegocioException("Escolha o seu cargo para continuar.").noCampo("cargo");
+			}
+			cargo = cargos.stream()
+				.filter(c -> c.getId().equals(req.cargoId()))
+				.findFirst()
+				.orElseThrow(() -> new RegraNegocioException("Esse cargo saiu da lista. Escolha de novo.").noCampo("cargo"));
+		}
+		if (req.tempoCargo() == null) {
+			throw new RegraNegocioException("Escolha há quanto tempo você está no cargo.").noCampo("tempoCargo");
+		}
+		String outroNome = outro ? CargoService.normalizar(req.cargoOutroNome()) : "";
+		return new PerfilCargo(cargo, outro, outroNome.isEmpty() ? null : outroNome, req.tempoCargo());
+	}
+
+	/** Link de empresa: a empresa vem da campanha. Link geral: não pedimos empresa ao líder. */
+	private static Respondente respondente(Campanha campanha, IniciarRequest req) {
+		String empresa = campanha.vinculadaAEmpresa() ? campanha.getEmpresa().getNome() : null;
 		return Respondente.de(req.nome(), req.email(), req.whatsapp(), empresa);
 	}
 
@@ -98,7 +131,7 @@ public class DiagnosticoService {
 	public ResultadoDto finalizar(UUID id) {
 		Diagnostico diagnostico = carregar(id);
 		if (diagnostico.concluido()) {
-			return ResultadoDto.de(diagnostico);
+			return ResultadoDto.de(diagnostico, logomarcas.marca(diagnostico.getEmpresa()));
 		}
 
 		QuestionarioVersao versao = diagnostico.getVersao();
@@ -134,7 +167,7 @@ public class DiagnosticoService {
 
 		diagnostico.concluir(calculo.geral(), versao.faixaPara(calculo.geral()), porDimensao, agora());
 		eventos.publishEvent(new DiagnosticoConcluido(diagnostico.getId()));
-		return ResultadoDto.de(diagnostico);
+		return ResultadoDto.de(diagnostico, logomarcas.marca(diagnostico.getEmpresa()));
 	}
 
 	@Transactional(readOnly = true)
@@ -143,7 +176,7 @@ public class DiagnosticoService {
 		if (!diagnostico.concluido()) {
 			throw RegraNegocioException.conflito("Este diagnóstico ainda não foi concluído.");
 		}
-		return ResultadoDto.de(diagnostico);
+		return ResultadoDto.de(diagnostico, logomarcas.marca(diagnostico.getEmpresa()));
 	}
 
 	private Diagnostico carregar(UUID id) {

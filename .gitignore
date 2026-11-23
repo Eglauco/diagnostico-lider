@@ -17,3 +17,6 @@
 .DS_Store
 Thumbs.db
 *.log
+
+# Arquivos enviados em desenvolvimento sem bucket (logomarcas)
+**/.arquivos/

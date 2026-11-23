@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<title th:text="|Relatório consolidado — ${r.empresa}|">Relatório consolidado</title>
+<style th:utext="${fontes}"></style>
+<style>
+  @page { size: A4; margin: 0; }
+  :root {
+    --abeto: #0F2B26; --abeto-2: #4A635C; --abeto-3: #7D918B; --abeto-claro: #1D4A42;
+    --nevoa: #EDF2EF; --nevoa-2: #F5F8F6; --linha: #D2DDD8; --brasa: #FF5B37;
+    --travada: #C2364B; --travada-suave: #F8E6E9;
+    --plato: #A86A00; --plato-suave: #FBF0DC;
+    --ascensao: #1F8A5B; --ascensao-suave: #E2F2EA;
+  }
+  .f-TRAVADA  { --cor: var(--travada);  --suave: var(--travada-suave); }
+  .f-PLATO    { --cor: var(--plato);    --suave: var(--plato-suave); }
+  .f-ASCENSAO { --cor: var(--ascensao); --suave: var(--ascensao-suave); }
+  .f-neutro   { --cor: var(--abeto);    --suave: var(--nevoa); }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 13px; line-height: 1.5; color: var(--abeto); background: #fff;
+    font-feature-settings: 'tnum' 1;
+  }
+  .display {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-variation-settings: 'opsz' 96; font-stretch: 84%;
+    letter-spacing: -0.02em; word-spacing: 0.08em;
+  }
+  .rotulo { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); }
+
+  .pagina {
+    width: 210mm; height: 297mm; padding: 14mm 17mm 12mm; overflow: hidden;
+    position: relative; display: flex; flex-direction: column; break-after: page;
+  }
+  .pagina:last-child { break-after: auto; }
+
+  /* Cabeçalho e rodapé ------------------------------------------------ */
+  .topo { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--linha); }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 12.5px; }
+  .marca svg { display: block; }
+  .topo span { color: var(--abeto-2); font-size: 11.5px; max-width: 320px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rodape {
+    margin-top: auto; padding-top: 10px; border-top: 1px solid var(--linha);
+    display: flex; justify-content: space-between; gap: 20px; font-size: 10.5px; color: var(--abeto-3);
+  }
+
+  .abertura { margin-top: 26px; }
+  .abertura h2 { font-size: 34px; line-height: 1.02; font-weight: 700; margin-top: 6px; }
+  .abertura p { margin-top: 8px; font-size: 14px; color: var(--abeto-2); max-width: 560px; }
+  h3.secao { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); padding-bottom: 8px; border-bottom: 1px solid var(--linha); }
+
+  /* Capa --------------------------------------------------------------- */
+  .capa { padding: 0; }
+  .capa-escura {
+    background: radial-gradient(120% 90% at 18% -10%, var(--brilho) 0%, transparent 60%), var(--abeto);
+    color: #fff; padding: 14mm 17mm 6mm;
+  }
+  .capa-escura .topo { border-bottom-color: rgba(237,242,239,0.16); }
+  .capa-escura .topo span { color: rgba(237,242,239,0.7); }
+  .capa-escura .sobre { margin-top: 30px; color: rgba(237,242,239,0.72); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .capa-escura h1 { font-size: 54px; line-height: 0.98; font-weight: 700; margin-top: 8px; max-width: 600px; }
+  .capa-escura h1.longo { font-size: 40px; line-height: 1.02; }
+  .capa-escura .meta { margin-top: 12px; font-size: 14.5px; color: rgba(237,242,239,0.82); }
+  .curva-grupo { margin-top: 8px; }
+  .curva-grupo svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .curva-grupo .rot { font-family: 'Instrument Sans', sans-serif; font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; fill: rgba(237,242,239,0.55); }
+  .curva-grupo .pilula { font-family: 'Instrument Sans', sans-serif; font-size: 11.5px; font-weight: 600; fill: var(--abeto); }
+  .ponto { stroke: #fff; stroke-width: 1.6; }
+  .p-TRAVADA { fill: var(--travada); } .p-PLATO { fill: #D18A0F; } .p-ASCENSAO { fill: #2BA571; }
+  .legenda { margin-top: 8px; display: flex; gap: 16px; font-size: 11px; color: rgba(237,242,239,0.75); }
+  .legenda i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; border: 1.5px solid #fff; vertical-align: -1px; }
+
+  .capa-clara { padding: 7mm 17mm 12mm; flex: 1; display: flex; flex-direction: column; }
+  .kpis { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 12px; }
+  .kpi { padding: 14px 16px; border-radius: 16px; background: var(--nevoa-2); border: 1px solid rgba(210,221,216,0.7); }
+  .kpi dt { font-size: 11.5px; font-weight: 600; color: var(--abeto-2); }
+  .kpi dd { margin-top: 6px; font-size: 44px; line-height: 0.95; font-weight: 700; }
+  .kpi dd small { font-size: 15px; font-weight: 500; color: var(--abeto-3); letter-spacing: 0; margin-left: 2px; }
+  .kpi p { margin-top: 6px; font-size: 11.5px; color: var(--abeto-2); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; background: var(--suave); color: var(--cor); font-size: 11px; font-weight: 600; }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--cor); }
+
+  .distribuicao { margin-top: 16px; }
+  .barra-pilha { margin-top: 14px; display: flex; gap: 3px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--nevoa); }
+  .barra-pilha span { display: block; height: 100%; background: var(--cor); }
+  .faixas-grade { margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .faixa-col { padding-top: 10px; border-top: 3px solid var(--cor); }
+  .faixa-col b { display: block; font-size: 12.5px; font-weight: 600; color: var(--cor); }
+  .faixa-col strong { display: block; margin-top: 4px; font-size: 38px; line-height: 1; font-weight: 700; }
+  .faixa-col span { display: block; margin-top: 4px; font-size: 11.5px; color: var(--abeto-2); }
+  .sumario { margin-top: 16px; }
+  .sumario ol { margin-top: 6px; list-style: none; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, auto); grid-auto-flow: column; column-gap: 28px; }
+  .sumario li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--linha); font-size: 12.5px; }
+  .sumario li span:last-child { color: var(--abeto-3); font-weight: 600; }
+
+  /* Retrato do grupo --------------------------------------------------- */
+  .destaques { margin-top: 18px; list-style: none; }
+  .destaques li { display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding: 11px 0; border-top: 1px solid var(--linha); break-inside: avoid; }
+  .destaques li:last-child { border-bottom: 1px solid var(--linha); }
+  .destaques i { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--cor); box-shadow: 0 0 0 4px var(--suave); }
+  .destaques h4 { font-size: 14.5px; font-weight: 600; line-height: 1.35; }
+  .destaques p { margin-top: 2px; font-size: 12.5px; color: var(--abeto-2); }
+
+  .duas { margin-top: 22px; display: grid; grid-template-columns: 1.35fr 1fr; gap: 28px; }
+  .histograma { margin-top: 12px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; align-items: end; }
+  .coluna { display: flex; flex-direction: column; align-items: center; }
+  .coluna .valor { font-size: 11px; font-weight: 600; height: 15px; }
+  .coluna .area { width: 100%; height: 104px; display: flex; align-items: flex-end; }
+  .coluna .area span { display: block; width: 100%; min-height: 2px; border-radius: 4px 4px 1px 1px; background: var(--cor); }
+  .coluna.vazia .area span { background: var(--linha); }
+  .coluna small { margin-top: 5px; font-size: 8.5px; color: var(--abeto-3); white-space: nowrap; }
+  .numeros { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .numeros dt { font-size: 11px; color: var(--abeto-2); font-weight: 600; }
+  .numeros dd { font-size: 28px; line-height: 1.05; font-weight: 700; }
+  .referencia { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--nevoa-2); font-size: 11.5px; color: var(--abeto-2); }
+  .referencia strong { color: var(--abeto); }
+
+  .participacao { margin-top: 22px; }
+  .participacao dl { margin-top: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .participacao dt { font-size: 11px; color: var(--abeto-2); font-weight: 600; }
+  .participacao dd { font-size: 24px; line-height: 1.1; font-weight: 700; }
+  .participacao dd.texto { font-size: 17px; line-height: 1.25; padding-top: 4px; }
+
+  /* Dimensões ---------------------------------------------------------- */
+  .dimensoes { margin-top: 18px; }
+  .dimensao { padding: 16px 0; border-top: 1px solid var(--linha); break-inside: avoid; }
+  .dimensao:last-child { border-bottom: 1px solid var(--linha); }
+  .dim-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .dim-cab h4 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .dim-cab .nota { font-size: 38px; line-height: 0.9; font-weight: 700; }
+  .dim-cab .nota small { font-size: 14px; font-weight: 500; color: var(--abeto-3); letter-spacing: 0; }
+  .escala { position: relative; margin-top: 20px; height: 14px; }
+  .escala .zonas { display: flex; height: 100%; border-radius: 7px; overflow: hidden; }
+  .escala .zonas span:nth-child(1) { background: var(--travada-suave); }
+  .escala .zonas span:nth-child(2) { background: var(--plato-suave); }
+  .escala .zonas span:nth-child(3) { background: var(--ascensao-suave); }
+  .escala .intervalo { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: rgba(15,43,38,0.4); }
+  .escala .intervalo::before, .escala .intervalo::after { content: ''; position: absolute; top: -3px; width: 2px; height: 10px; border-radius: 1px; background: rgba(15,43,38,0.55); }
+  .escala .intervalo::before { left: 0; } .escala .intervalo::after { right: 0; }
+  .escala .media { position: absolute; top: -3px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: var(--abeto); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--abeto); }
+  .escala .ref { position: absolute; top: -8px; height: 30px; width: 0; border-left: 2px dashed var(--brasa); }
+  .escala .ref b { position: absolute; top: -15px; left: 0; transform: translateX(-50%); font-size: 9.5px; font-weight: 600; color: var(--brasa-texto); white-space: nowrap; }
+  .marcas { position: relative; height: 16px; margin-top: 5px; font-size: 9.5px; color: var(--abeto-3); }
+  .marcas span { position: absolute; transform: translateX(-50%); }
+  .marcas span:first-child { transform: none; }
+  .marcas span:last-child { transform: translateX(-100%); }
+  .dim-dados { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12px; color: var(--abeto-2); }
+  .dim-dados strong { color: var(--abeto); }
+  .dim-acao { margin-top: 8px; font-size: 12.5px; }
+  .dim-acao b { font-weight: 600; }
+  .agir { margin-top: 18px; padding: 14px 16px; border-radius: 14px; background: var(--nevoa-2); border-left: 4px solid var(--brasa); break-inside: avoid; }
+  .agir small { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); }
+  .agir p { margin-top: 4px; font-size: 13.5px; }
+  .agir strong { font-weight: 600; }
+
+  /* Perguntas ---------------------------------------------------------- */
+  .perguntas { margin-top: 16px; }
+  .pergunta { padding: 13px 0; border-top: 1px solid var(--linha); break-inside: avoid; }
+  .pergunta:last-child { border-bottom: 1px solid var(--linha); }
+  .perg-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .perg-cab small { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-3); }
+  .perg-cab .indice { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--suave); color: var(--cor); }
+  .pergunta h4 { margin-top: 5px; font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+  .opcoes { margin-top: 10px; list-style: none; }
+  .opcao { display: grid; grid-template-columns: 22px 1fr 150px 74px; align-items: center; gap: 10px; padding: 4px 0; }
+  .opcao .letra { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--abeto-2); border: 1px solid var(--linha); }
+  .opcao .texto { font-size: 12.5px; line-height: 1.35; }
+  .opcao .texto small { color: var(--abeto-3); font-size: 10.5px; margin-left: 4px; white-space: nowrap; }
+  .opcao .barra { height: 8px; border-radius: 4px; background: var(--nevoa); overflow: hidden; }
+  .opcao .barra i { display: block; height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--abeto-3) 65%, #fff); }
+  .opcao .pct { text-align: right; font-size: 13.5px; font-weight: 700; line-height: 1.1; }
+  .opcao .pct small { display: block; font-size: 10px; font-weight: 500; color: var(--abeto-3); }
+  .opcao.top .letra { background: var(--abeto); border-color: var(--abeto); color: #fff; }
+  .opcao.top .texto { font-weight: 600; }
+  .opcao.top .barra i { background: var(--abeto); }
+  .perg-rodape { margin-top: 8px; font-size: 11.5px; color: var(--abeto-2); }
+
+  /* Faixas ------------------------------------------------------------- */
+  .grupos { margin-top: 8px; }
+  .grupo { padding: 10px 0 10px 18px; border-left: 4px solid var(--cor); margin-top: 12px; break-inside: avoid; }
+  .grupo-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .grupo-cab h4 { font-size: 19px; font-weight: 700; }
+  .grupo-cab span { font-size: 13px; font-weight: 600; color: var(--cor); white-space: nowrap; }
+  .grupo .faixa-limite { font-size: 11px; color: var(--abeto-3); margin-top: 1px; }
+  .grupo .leitura { margin-top: 6px; font-size: 13px; color: var(--abeto-2); }
+  .acoes { margin-top: 8px; list-style: none; counter-reset: acao; }
+  .acoes li { counter-increment: acao; position: relative; padding: 4px 0 4px 32px; font-size: 13px; line-height: 1.45; }
+  .acoes li::before {
+    content: counter(acao); position: absolute; left: 0; top: 4px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--suave); color: var(--cor); font-weight: 700; font-size: 11.5px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .grupo.vazio .leitura, .grupo.vazio .acoes { display: none; }
+  .grupo.vazio { opacity: 0.6; }
+
+  /* Metodologia -------------------------------------------------------- */
+  .metodo { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .metodo section { break-inside: avoid; }
+  .metodo h4 { font-size: 14px; font-weight: 600; }
+  .metodo p { margin-top: 4px; font-size: 12.5px; color: var(--abeto-2); }
+  .tabela-faixas { margin-top: 8px; width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .tabela-faixas td { padding: 6px 0; border-top: 1px solid var(--linha); }
+  .tabela-faixas td:last-child { text-align: right; color: var(--abeto-2); }
+  .tabela-faixas i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--cor); margin-right: 8px; }
+  .privacidade { margin-top: 24px; padding: 18px 20px; border-radius: 16px; background: var(--abeto); color: #fff; break-inside: avoid; }
+  .privacidade h4 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .privacidade p { margin-top: 6px; font-size: 12.5px; color: rgba(237,242,239,0.85); }
+  .aviso { margin-top: 16px; font-size: 12px; color: var(--abeto-2); }
+
+  /* Por cargo ------------------------------------------------------------ */
+  .escada-legenda { margin-top: 18px; display: flex; justify-content: space-between; gap: 16px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-3); padding-bottom: 8px; border-bottom: 1px solid var(--linha); }
+  .escada { list-style: none; position: relative; }
+  .degrau { position: relative; display: grid; grid-template-columns: 200px 1fr 84px; align-items: center; gap: 18px; padding: 11px 10px 11px 26px; border-bottom: 1px solid var(--linha); break-inside: avoid; }
+  /* Trilho da escada: um ponto por cargo, ligado ao próximo. */
+  .degrau::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--linha); }
+  .degrau:first-child::before { top: 50%; }
+  .degrau.ultimo-cargo::before { bottom: 50%; }
+  .degrau::after { content: ''; position: absolute; left: 4px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: #fff; border: 2px solid var(--abeto-3); }
+  .degrau.outros { border-top: 1px dashed var(--linha); }
+  .degrau.outros::before, .degrau.outros::after { display: none; }
+  .degrau.pior { background: var(--travada-suave); border-radius: 12px; border-bottom-color: transparent; }
+  .degrau.pior::after { border-color: var(--travada); background: var(--travada); }
+  .degrau-nome b { display: block; font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .degrau-nome small { display: block; margin-top: 1px; font-size: 11.5px; color: var(--abeto-2); }
+  .degrau-nome .chip { margin-top: 5px; }
+  .degrau .barra-pilha { margin-top: 0; height: 14px; border-radius: 7px; }
+  .degrau-partes { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11px; color: var(--abeto-2); }
+  .degrau-partes span b { color: var(--cor); font-weight: 700; }
+  .degrau-partes .oculto { color: var(--abeto-3); font-style: italic; }
+  .degrau-indice { text-align: right; }
+  .degrau-indice strong { display: block; font-size: 30px; line-height: 1; font-weight: 700; color: var(--cor); }
+  .degrau-indice small { display: block; margin-top: 3px; font-size: 10.5px; color: var(--abeto-3); }
+  .notas-cargos { margin-top: 14px; font-size: 11.5px; color: var(--abeto-2); }
+  .notas-cargos p + p { margin-top: 3px; }
+
+  .mapa { margin-top: 18px; width: 100%; border-collapse: separate; border-spacing: 4px; table-layout: fixed; }
+  .mapa th { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--abeto-2); text-align: center; padding: 0 2px 4px; }
+  .mapa th:first-child { text-align: left; width: 190px; }
+  .mapa tbody th { text-transform: none; letter-spacing: 0; text-align: left; padding: 0 8px 0 0; }
+  .mapa tbody th b { display: block; font-size: 13.5px; font-weight: 600; color: var(--abeto); line-height: 1.25; }
+  .mapa tbody th small { display: block; font-size: 10.5px; font-weight: 500; color: var(--abeto-3); }
+  .mapa td { height: 40px; border-radius: 9px; background: var(--suave); color: var(--cor); text-align: center; font-size: 16px; font-weight: 700; }
+  .mapa td.geral { background: #fff; border: 1.5px solid var(--cor); }
+  .mapa-legenda { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11px; color: var(--abeto-2); }
+  .mapa-legenda i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--cor); margin-right: 6px; vertical-align: -1px; }
+  .tempo { margin-top: 26px; }
+  .tempo > p { margin-top: 8px; font-size: 12.5px; color: var(--abeto-2); }
+  .tempo .degrau { grid-template-columns: 200px 1fr 84px; padding-left: 10px; }
+  .tempo .degrau::before, .tempo .degrau::after { display: none; }
+
+  /* Monograma da empresa (o "logo" enquanto não há logo enviado). */
+  .monograma {
+    width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    background: var(--acao); color: var(--sobre-acao); font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .monograma-capa {
+    width: 48px; height: 48px; border-radius: 13px; margin-top: 20px; display: flex; align-items: center; justify-content: center;
+    background: #fff; color: var(--abeto); font-size: 19px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .capa-escura .monograma-capa + .sobre, .capa-escura .logo-capa + .sobre { margin-top: 14px; }
+  .marca img.logo { display: block; height: 26px; width: auto; max-width: 170px; object-fit: contain; }
+  /* Na capa escura, a logo vai num cartão branco: funciona com qualquer cor de logo. */
+  .logo-capa { display: inline-flex; margin-top: 18px; padding: 10px 14px; border-radius: 14px; background: #fff; }
+  .logo-capa img { display: block; height: 38px; width: auto; max-width: 240px; object-fit: contain; }
+</style>
+<!-- Paleta da empresa (PaletaMarca): sem cores próprias, sai a identidade do Diagnóstico. -->
+<style th:inline="css">
+  :root {
+    --abeto: [(${r.tema.tinta})]; --abeto-2: [(${r.tema.tinta2})]; --abeto-3: [(${r.tema.tinta3})];
+    --nevoa: [(${r.tema.fundo})]; --nevoa-2: [(${r.tema.fundo2})]; --linha: [(${r.tema.linha})];
+    --brasa: [(${r.tema.destaque})]; --brasa-texto: [(${r.tema.destaqueTexto})];
+    --brilho: [(${r.tema.tintaBrilho})]; --acao: [(${r.tema.acao})]; --sobre-acao: [(${r.tema.sobreAcao})];
+  }
+</style>
+</head>
+<body>
+
+<!-- Peças repetidas em todas as páginas (definições; não aparecem aqui). -->
+<div th:remove="all">
+  <header class="topo" th:fragment="topo">
+    <div class="marca">
+      <img th:if="${r.logo != null}" class="logo" th:src="${r.logo}" th:alt="${r.empresa}" alt="Empresa">
+      <span th:if="${r.logo == null}" class="monograma" th:text="${r.sigla}">CH</span>
+      <span th:if="${r.logo == null or r.logoPedeNome}" th:text="${r.empresa}">Empresa</span>
+    </div>
+    <span>Relatório consolidado · Diagnóstico do Líder</span>
+  </header>
+  <footer class="rodape" th:fragment="rodape(numero)">
+    <span>Dados agregados, sem identificação dos líderes.</span>
+    <span th:text="|${numero} de ${r.paginas.total}|">1 de 6</span>
+  </footer>
+</div>
+
+<!-- =========================== Capa =========================== -->
+<section class="pagina capa">
+  <div class="capa-escura">
+    <header class="topo">
+      <div class="marca">
+        <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true">
+          <rect width="26" height="26" rx="7" fill="#FFFFFF" fill-opacity="0.12"/>
+          <path d="M5 19 C 9 19, 9 8, 13 8 S 17 8, 21 12" fill="none" th:attr="stroke=${r.tema.destaqueSobreTinta}" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        Diagnóstico do Líder
+      </div>
+      <span th:text="|Emitido em ${r.emitidoEm}|">Emitido em 22 de novembro de 2026</span>
+    </header>
+
+    <div th:if="${r.logo != null}" class="logo-capa"><img th:src="${r.logo}" th:alt="${r.empresa}" alt="Empresa"></div>
+    <div th:if="${r.logo == null}" class="monograma-capa" th:text="${r.sigla}">CH</div>
+    <p class="sobre">Relatório consolidado de carreira</p>
+    <h1 class="display" th:classappend="${#strings.length(r.empresa) > 24} ? 'longo'" th:text="${r.empresa}">Empresa</h1>
+    <p class="meta" th:text="|${r.lideres} líderes concluíram o diagnóstico ${r.periodo}|">12 líderes</p>
+
+    <figure class="curva-grupo" th:with="c=${r.curva.desenho}">
+      <svg th:attr="viewBox=|0 0 ${c.largura} ${c.altura}|" role="img" aria-label="Curva da carreira com a posição de cada líder">
+        <defs>
+          <linearGradient id="brilho" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" th:attr="stop-color=${r.tema.destaqueSobreTinta}" stop-opacity="0.24"/>
+            <stop offset="1" th:attr="stop-color=${r.tema.destaqueSobreTinta}" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <line x1="10" th:attr="x2=${c.largura - 10},y1=${c.base},y2=${c.base}" stroke="rgba(237,242,239,0.18)" stroke-width="1"/>
+        <path th:attr="d=${c.area}" fill="url(#brilho)"/>
+        <path th:attr="d=${c.curva},stroke=${r.tema.destaqueSobreTinta}" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <g th:with="x=${c.voce.x}">
+          <line th:attr="x1=${x},x2=${x},y2=${c.base},stroke=${r.tema.fundo}" y1="20" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.7"/>
+          <rect th:attr="x=${x - 70},fill=${r.tema.fundo}" y="0" width="140" height="22" rx="11"/>
+          <text class="pilula" text-anchor="middle" th:attr="x=${x}" y="15" th:text="|Média do grupo: ${r.indice.media}|">Média do grupo: 62</text>
+        </g>
+
+        <circle th:each="p : ${r.curva.pontos}" th:class="|ponto p-${p.faixa}|"
+                th:attr="cx=${p.x},cy=${p.y},r=${r.curva.raio}"/>
+
+        <text class="rot" text-anchor="middle" th:attr="x=${c.subida.x},y=${c.subida.y}" th:text="${c.subida.texto}">Subida</text>
+        <text class="rot" text-anchor="middle" th:attr="x=${c.plato.x},y=${c.plato.y}" th:text="${c.plato.texto}">Platô</text>
+        <text class="rot" text-anchor="middle" th:attr="x=${c.queda.x},y=${c.queda.y}" th:text="${c.queda.texto}">Queda</text>
+      </svg>
+      <figcaption class="legenda">
+        <span><i style="background:#C2364B"></i>Travada</span>
+        <span><i style="background:#D18A0F"></i>Platô</span>
+        <span><i style="background:#2BA571"></i>Ascensão</span>
+        <span>Cada ponto é um líder, sem identificação.</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="capa-clara">
+    <dl class="kpis">
+      <div class="kpi" th:classappend="|f-${r.faixaDaMedia.codigo}|">
+        <dt>Índice médio de movimento da carreira</dt>
+        <dd class="display"><span th:text="${r.indice.media}">62</span><small>/100</small></dd>
+        <p><span class="chip"><i></i><span th:text="${r.faixaDaMedia.rotuloCurto()}">Platô</span></span></p>
+      </div>
+      <div class="kpi">
+        <dt>Líderes avaliados</dt>
+        <dd class="display" th:text="${r.lideres}">12</dd>
+        <p th:text="|de ${r.participacao.iniciaram} que começaram o diagnóstico|">de 14</p>
+      </div>
+      <div class="kpi">
+        <dt>Taxa de conclusão</dt>
+        <dd class="display"><span th:text="${r.participacao.taxaConclusao}">86</span><small>%</small></dd>
+        <p th:text="|tempo mediano: ${r.participacao.tempoMediano}|">tempo mediano</p>
+      </div>
+    </dl>
+
+    <section class="distribuicao">
+      <h3 class="secao">Como o grupo se distribui na curva</h3>
+      <div class="barra-pilha">
+        <span th:each="f : ${r.faixas}" th:if="${f.quantidade > 0}" th:class="|f-${f.codigo}|" th:style="|width: ${f.percentual}%|"></span>
+      </div>
+      <div class="faixas-grade">
+        <div class="faixa-col" th:each="f : ${r.faixas}" th:classappend="|f-${f.codigo}|">
+          <b th:text="${f.titulo}">Carreira travada</b>
+          <strong class="display" th:text="|${f.percentual}%|">25%</strong>
+          <span th:text="|${f.quantidade} ${f.quantidade == 1 ? 'líder' : 'líderes'} · índice de ${f.minimo} a ${f.maximo}|">3 líderes</span>
+        </div>
+      </div>
+    </section>
+
+    <nav class="sumario">
+      <h3 class="secao">Neste relatório</h3>
+      <ol>
+        <li><span>O retrato do grupo e a participação</span><span>2</span></li>
+        <li th:if="${r.porCargo != null}"><span>Em que nível a carreira trava, por cargo</span><span th:text="${r.paginas.cargos}">3</span></li>
+        <li><span>Forças e pontos de apoio por dimensão</span><span th:text="${r.paginas.dimensoes}">3</span></li>
+        <li><span>O que os líderes responderam</span><span th:text="${r.paginas.perguntas}">4</span></li>
+        <li><span>O que fazer com cada grupo</span><span th:text="${r.paginas.faixas}">5</span></li>
+        <li><span>Como ler este relatório</span><span th:text="${r.paginas.metodologia}">6</span></li>
+      </ol>
+    </nav>
+
+    <footer th:replace="~{:: rodape(1)}"></footer>
+  </div>
+</section>
+
+<!-- ===================== Retrato do grupo ===================== -->
+<section class="pagina">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Resumo executivo</p>
+    <h2 class="display">O retrato do grupo</h2>
+    <p th:text="|O que mais chama a atenção nos ${r.lideres} diagnósticos concluídos.|">O que mais chama a atenção.</p>
+  </div>
+
+  <ul class="destaques">
+    <li th:each="d : ${r.destaques}" th:class="|f-${d.codigo}|">
+      <i></i>
+      <div>
+        <h4 th:text="${d.titulo}">Destaque</h4>
+        <p th:text="${d.texto}">Texto</p>
+      </div>
+    </li>
+  </ul>
+
+  <div class="duas">
+    <section>
+      <h3 class="secao">Distribuição dos índices</h3>
+      <div class="histograma">
+        <div class="coluna" th:each="c : ${r.histograma}" th:classappend="${c.quantidade == 0 ? 'vazia' : ''} + ' f-' + ${c.faixa}">
+          <span class="valor" th:text="${c.quantidade > 0 ? c.quantidade : ''}">2</span>
+          <div class="area"><span th:style="|height: ${c.altura}%|"></span></div>
+          <small th:text="${c.rotulo}">40–49</small>
+        </div>
+      </div>
+    </section>
+    <section>
+      <h3 class="secao">O índice em números</h3>
+      <dl class="numeros">
+        <div><dt>Média</dt><dd class="display" th:text="${r.indice.media}">62</dd></div>
+        <div><dt>Mediana</dt><dd class="display" th:text="${r.indice.mediana}">60</dd></div>
+        <div><dt>Menor índice</dt><dd class="display" th:text="${r.indice.menor}">22</dd></div>
+        <div><dt>Maior índice</dt><dd class="display" th:text="${r.indice.maior}">94</dd></div>
+      </dl>
+      <p class="referencia" th:if="${r.referencia}">
+        Média geral de <strong th:text="${r.referencia.lideres}">40</strong> líderes que já fizeram o diagnóstico:
+        <strong th:text="${r.referencia.media}">58</strong>. <span th:text="|${#strings.capitalize(r.referencia.comparacao)}.|">A empresa está 4 pontos acima.</span>
+      </p>
+    </section>
+  </div>
+
+  <section class="participacao">
+    <h3 class="secao">Participação</h3>
+    <dl>
+      <div><dt>Começaram</dt><dd class="display" th:text="${r.participacao.iniciaram}">14</dd></div>
+      <div><dt>Concluíram</dt><dd class="display" th:text="${r.participacao.concluiram}">12</dd></div>
+      <div><dt>Pararam no meio</dt><dd class="display" th:text="${r.participacao.emAndamento}">2</dd></div>
+      <div><dt>Tempo mediano</dt><dd class="texto" th:text="${r.participacao.tempoMediano}">3 minutos</dd></div>
+    </dl>
+  </section>
+
+  <footer th:replace="~{:: rodape(2)}"></footer>
+</section>
+
+<!-- ===================== Por cargo: a escada ===================== -->
+<section class="pagina" th:if="${r.porCargo != null}" th:with="pc=${r.porCargo}">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Por cargo</p>
+    <h2 class="display">Em que nível a carreira trava</h2>
+    <p>Os cargos na ordem da hierarquia. A barra mostra como os líderes de cada cargo se dividem entre as faixas da curva; à direita, o índice médio do cargo.</p>
+  </div>
+
+  <p class="escada-legenda"><span>Do primeiro nível de liderança ao mais alto</span><span>Índice médio</span></p>
+  <ol class="escada">
+    <li class="degrau" th:each="g, it : ${pc.grupos}"
+        th:classappend="|${g.outros ? 'outros' : ''} ${g == pc.maisTravado ? 'pior' : ''} ${!g.outros and (it.last or pc.grupos[it.index + 1].outros) ? 'ultimo-cargo' : ''}|">
+      <div class="degrau-nome">
+        <b th:text="${g.nome}">Gerente</b>
+        <small th:text="|${g.lideres} líderes|">5 líderes</small>
+        <span class="chip f-TRAVADA" th:if="${g == pc.maisTravado}"><i></i>Mais travado</span>
+      </div>
+      <div>
+        <div class="barra-pilha">
+          <span th:each="p : ${g.faixas}" th:if="${p.quantidade > 0}" th:class="|f-${p.codigo}|" th:style="|width: ${p.percentual}%|"></span>
+        </div>
+        <p class="degrau-partes">
+          <span th:each="p : ${g.faixas}" th:if="${p.quantidade > 0}" th:class="|f-${p.codigo}|"><span th:text="${p.rotulo}">Travada</span> <b th:text="|${p.percentual}%|">40%</b></span>
+        </p>
+      </div>
+      <div class="degrau-indice" th:classappend="|f-${g.faixaDaMedia}|">
+        <strong class="display" th:text="${g.media}">58</strong>
+        <small>índice médio</small>
+      </div>
+    </li>
+  </ol>
+
+  <div class="agir" th:if="${pc.maisTravado != null}">
+    <small>Onde a carreira mais trava</small>
+    <p><strong th:text="${pc.maisTravado.nome}">Gerente</strong>: <span th:text="|${pc.maisTravado.travados}%|">60%</span> dos líderes deste cargo estão na faixa travada, com índice médio de <span th:text="${pc.maisTravado.media}">38</span> (o grupo todo tem <span th:text="${r.indice.media}">55</span>). Vale olhar o que muda ao chegar neste cargo e que apoio os líderes recebem nessa passagem.</p>
+  </div>
+
+  <div class="notas-cargos">
+    <p th:if="${pc.notaAnonimato}" th:text="${pc.notaAnonimato}">Nota</p>
+    <p th:if="${pc.notaSemCargo}" th:text="${pc.notaSemCargo}">Nota</p>
+  </div>
+
+  <footer th:replace="~{:: rodape(${r.paginas.cargos})}"></footer>
+</section>
+
+<!-- ============== Por cargo: dimensões e tempo no cargo ============== -->
+<section class="pagina" th:if="${r.porCargo != null}" th:with="pc=${r.porCargo}">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Por cargo</p>
+    <h2 class="display">Cada cargo, dimensão a dimensão</h2>
+    <p>A média de cada dimensão entre os líderes de cada cargo. Mostra onde cada nível precisa de apoio: o mesmo índice pode vir de motivos diferentes.</p>
+  </div>
+
+  <table class="mapa" th:if="${!pc.dimensoes.isEmpty()}">
+    <thead>
+      <tr>
+        <th>Cargo</th>
+        <th th:each="d : ${pc.dimensoes}" th:text="${d}">Direção</th>
+        <th>Índice</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="g : ${pc.grupos}">
+        <th scope="row"><b th:text="${g.nome}">Gerente</b><small th:text="|${g.lideres} líderes|">5 líderes</small></th>
+        <td th:each="c : ${g.dimensoes}" th:class="${c.media != null} ? |f-${c.faixa}| : 'f-neutro'" th:text="${c.media != null} ? ${c.media} : '—'">58</td>
+        <td class="geral" th:classappend="|f-${g.faixaDaMedia}|" th:text="${g.media}">58</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="mapa-legenda" th:if="${!pc.dimensoes.isEmpty()}">
+    <span th:each="f : ${r.faixas}" th:class="|f-${f.codigo}|"><i></i><span th:text="|${f.rotuloCurto()}: ${f.minimo} a ${f.maximo}|">Travada: 0 a 39</span></span>
+  </p>
+
+  <section class="tempo" th:if="${!pc.tempos.isEmpty()}">
+    <h3 class="secao">Tempo no cargo atual</h3>
+    <p>Há quanto tempo os líderes estão no cargo de hoje. Quem fica muito tempo no mesmo cargo tende a sentir o platô primeiro.</p>
+    <ol class="escada">
+      <li class="degrau" th:each="t : ${pc.tempos}">
+        <div class="degrau-nome">
+          <b th:text="${t.rotulo}">De 1 a 2 anos</b>
+          <small th:text="${t.oculto} ? 'menos de 3 líderes' : (${t.lideres == 0} ? 'nenhum líder' : |${t.lideres} líderes|)">4 líderes</small>
+        </div>
+        <div th:if="${t.media != null}">
+          <div class="barra-pilha">
+            <span th:each="p : ${t.faixas}" th:if="${p.quantidade > 0}" th:class="|f-${p.codigo}|" th:style="|width: ${p.percentual}%|"></span>
+          </div>
+          <p class="degrau-partes">
+            <span th:each="p : ${t.faixas}" th:if="${p.quantidade > 0}" th:class="|f-${p.codigo}|"><span th:text="${p.rotulo}">Travada</span> <b th:text="|${p.percentual}%|">40%</b></span>
+          </p>
+        </div>
+        <div th:if="${t.media == null}">
+          <p class="degrau-partes"><span class="oculto" th:text="${t.oculto} ? 'Sem números, para preservar o anonimato.' : '—'">Sem números</span></p>
+        </div>
+        <div class="degrau-indice" th:classappend="${t.media != null} ? |f-${t.faixaDaMedia}| : 'f-neutro'">
+          <strong class="display" th:text="${t.media != null} ? ${t.media} : '—'">58</strong>
+          <small>índice médio</small>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <footer th:replace="~{:: rodape(${r.paginas.cargos + 1})}"></footer>
+</section>
+
+<!-- ======================== Dimensões ========================= -->
+<section class="pagina" th:each="pagina, it : ${r.paginasDimensoes}">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Por dimensão</p>
+    <h2 class="display" th:text="${it.first} ? 'Onde o grupo está forte e onde precisa de apoio' : 'Por dimensão (continuação)'">Por dimensão</h2>
+    <p th:if="${it.first}">Cada dimensão vai de 0 a 100 e é calculada só com as perguntas dela. O ponto escuro é a média do grupo, a linha vai do menor ao maior resultado e o tracejado laranja marca a média geral.</p>
+  </div>
+
+  <div class="dimensoes">
+    <article class="dimensao" th:each="d : ${pagina}">
+      <div class="dim-cab">
+        <h4>
+          <span th:text="${d.nome}">Direção</span>
+          <span class="chip f-ASCENSAO" th:if="${d.destaque == 'forte'}"><i></i>Mais forte</span>
+          <span class="chip f-TRAVADA" th:if="${d.destaque == 'fragil'}"><i></i>Pede atenção</span>
+        </h4>
+        <div class="nota display"><span th:text="${d.media}">64</span><small>/100</small></div>
+      </div>
+      <div class="escala">
+        <div class="zonas">
+          <span th:style="|width: ${r.limites.alerta}%|"></span>
+          <span th:style="|width: ${r.limites.forte - r.limites.alerta}%|"></span>
+          <span th:style="|width: ${100 - r.limites.forte}%|"></span>
+        </div>
+        <i class="intervalo" th:style="|left: ${d.menor}%; width: ${d.maior - d.menor}%|"></i>
+        <i class="ref" th:if="${d.referencia != null}" th:style="|left: ${d.referencia}%|"><b th:text="|Geral ${d.referencia}|">Geral 58</b></i>
+        <i class="media" th:style="|left: ${d.media}%|"></i>
+      </div>
+      <div class="marcas">
+        <span style="left:0">0</span>
+        <span th:style="|left: ${r.limites.alerta}%|" th:text="${r.limites.alerta}">40</span>
+        <span th:style="|left: ${r.limites.forte}%|" th:text="${r.limites.forte}">70</span>
+        <span style="left:100%">100</span>
+      </div>
+      <p class="dim-dados">
+        <span><strong th:text="|${d.emAlerta}%|">20%</strong> abaixo de <span th:text="${r.limites.alerta}">40</span></span>
+        <span><strong th:text="|${d.fortes}%|">40%</strong> com <span th:text="${r.limites.forte}">70</span> ou mais</span>
+        <span>menor <strong th:text="${d.menor}">10</strong> · maior <strong th:text="${d.maior}">100</strong></span>
+      </p>
+      <p class="dim-acao" th:if="${d.acao}"><b>Como fortalecer:</b> <span th:text="${d.acao}">Ação</span></p>
+    </article>
+  </div>
+
+  <div class="agir" th:if="${it.first and r.maisFragil != null}">
+    <small>Onde agir primeiro</small>
+    <p><strong th:text="${r.maisFragil.nome}">Visibilidade</strong>: é a dimensão com a menor média do grupo
+      (<span th:text="${r.maisFragil.media}">41</span>) e <span th:text="|${r.maisFragil.emAlerta}%|">50%</span> dos líderes estão abaixo de
+      <span th:text="${r.limites.alerta}">40</span> nela. É onde um movimento da empresa tende a destravar mais carreiras.</p>
+  </div>
+
+  <footer th:replace="~{:: rodape(${r.paginas.dimensoes + it.index})}"></footer>
+</section>
+
+<!-- ======================== Perguntas ========================= -->
+<section class="pagina" th:each="pagina, it : ${r.paginasPerguntas}">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Pergunta por pergunta</p>
+    <h2 class="display" th:text="${it.first} ? 'O que os líderes responderam' : 'O que os líderes responderam (continuação)'">O que os líderes responderam</h2>
+    <p th:if="${it.first}">Quantos líderes escolheram cada alternativa, na ordem em que elas apareceram. Mais pontos indicam uma carreira em movimento; o índice da pergunta vai de 0 a 100.</p>
+  </div>
+
+  <div class="perguntas">
+    <article class="pergunta" th:each="p : ${pagina}"
+             th:classappend="${p.indice >= r.limites.forte} ? 'f-ASCENSAO' : (${p.indice >= r.limites.alerta} ? 'f-PLATO' : 'f-TRAVADA')">
+      <div class="perg-cab">
+        <small th:text="${p.dimensao != null} ? |Pergunta ${p.numero} · ${p.dimensao}| : |Pergunta ${p.numero}|">Pergunta 1 · Direção</small>
+        <span class="indice" th:text="|Índice ${p.indice}|">Índice 58</span>
+      </div>
+      <h4 th:text="${p.enunciado}">Enunciado</h4>
+      <ul class="opcoes">
+        <li class="opcao" th:each="o : ${p.opcoes}" th:classappend="${o.maisEscolhida} ? 'top' : ''">
+          <span class="letra" th:text="${o.letra}">A</span>
+          <span class="texto"><span th:text="${o.texto}">Opção</span><small th:text="|${o.pontos} ${o.pontos == 1 ? 'ponto' : 'pontos'}|">4 pontos</small></span>
+          <span class="barra"><i th:style="|width: ${o.percentual}%|"></i></span>
+          <span class="pct"><span th:text="|${o.percentual}%|">42%</span><small th:text="|${o.quantidade} ${o.quantidade == 1 ? 'líder' : 'líderes'}|">5 líderes</small></span>
+        </li>
+      </ul>
+      <p class="perg-rodape">
+        <span th:text="|${p.respondentes} ${p.respondentes == 1 ? 'líder respondeu' : 'líderes responderam'}|">12 líderes responderam</span>
+        · <strong th:text="|${p.alerta}%|">33%</strong> escolheram alternativas da metade de baixo da escala.
+      </p>
+    </article>
+  </div>
+
+  <footer th:replace="~{:: rodape(${r.paginas.perguntas + it.index})}"></footer>
+</section>
+
+<!-- ===================== O que fazer por faixa ===================== -->
+<section class="pagina">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Recomendações</p>
+    <h2 class="display">O que fazer com cada grupo</h2>
+    <p>Cada líder já recebeu o próprio relatório, com os próximos passos dele. Este relatório não diz quem está em cada faixa: as ações abaixo são para o grupo e funcionam melhor quando oferecidas a todos.</p>
+  </div>
+
+  <div class="grupos">
+    <article class="grupo" th:each="f : ${r.faixas}" th:classappend="|f-${f.codigo} ${f.quantidade == 0 ? 'vazio' : ''}|">
+      <div class="grupo-cab">
+        <h4 class="display" th:text="${f.titulo}">Carreira no platô</h4>
+        <span th:text="${f.quantidade == 0} ? 'Nenhum líder nesta faixa' : |${f.quantidade} ${f.quantidade == 1 ? 'líder' : 'líderes'} · ${f.percentual}%|">5 líderes · 42%</span>
+      </div>
+      <p class="faixa-limite" th:text="|Índice de ${f.minimo} a ${f.maximo}|">Índice de 40 a 69</p>
+      <p class="leitura" th:if="${f.leitura}" th:text="${f.leitura}">Leitura</p>
+      <ol class="acoes" th:if="${!f.acoes.isEmpty()}">
+        <li th:each="a : ${f.acoes}" th:text="${a}">Ação</li>
+      </ol>
+    </article>
+  </div>
+
+  <footer th:replace="~{:: rodape(${r.paginas.faixas})}"></footer>
+</section>
+
+<!-- ===================== Como ler o relatório ===================== -->
+<section class="pagina">
+  <header th:replace="~{:: topo}"></header>
+  <div class="abertura">
+    <p class="rotulo">Metodologia</p>
+    <h2 class="display">Como ler este relatório</h2>
+  </div>
+
+  <div class="metodo">
+    <section>
+      <h4>Índice de movimento da carreira</h4>
+      <p>Cada alternativa vale pontos. A soma das respostas de cada líder vira uma escala de 0 a 100: 0 quando todas as escolhas são as de menor pontuação e 100 quando todas são as de maior.</p>
+      <table class="tabela-faixas">
+        <tr th:each="f : ${r.faixas}" th:class="|f-${f.codigo}|">
+          <td><i></i><span th:text="${f.titulo}">Carreira travada</span></td>
+          <td th:text="|${f.minimo} a ${f.maximo}|">0 a 39</td>
+        </tr>
+      </table>
+    </section>
+    <section>
+      <h4>Dimensões e perguntas</h4>
+      <p>Cada dimensão usa o mesmo cálculo, só com as perguntas dela. O índice de cada pergunta é a média dos líderes que a responderam, na mesma escala de 0 a 100.</p>
+      <p>Os percentuais são arredondados para que cada distribuição some 100%.</p>
+    </section>
+    <section>
+      <h4>Base deste relatório</h4>
+      <p th:text="|${r.lideres} diagnósticos concluídos pelo link da empresa ${r.periodo}. Questionário: ${r.questionario}.|">Base</p>
+      <p>Quem começou e não terminou entra só na taxa de conclusão.</p>
+      <p th:if="${r.notaVersoes}" th:text="${r.notaVersoes}">Nota</p>
+    </section>
+    <section th:if="${r.porCargo != null}">
+      <h4>Cargos e tempo no cargo</h4>
+      <p th:text="|Cada líder informou o cargo e há quanto tempo está nele. Um cargo só aparece sozinho com pelo menos ${r.minimoLideres} líderes; os menores entram em “Outros cargos”, com quem escolheu “Outro cargo”.|">Cargos</p>
+    </section>
+    <section th:if="${r.referencia}">
+      <h4>Referência geral</h4>
+      <p th:text="|Média de todos os ${r.referencia.lideres} líderes que já concluíram o diagnóstico, de todas as empresas e do link aberto. Serve para situar a empresa, não como meta.|">Referência</p>
+    </section>
+  </div>
+
+  <div class="privacidade">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" th:attr="stroke=${r.tema.destaqueSobreTinta}" stroke-width="2.2" aria-hidden="true">
+        <rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke-linecap="round"/>
+      </svg>
+      Nenhum líder é identificado
+    </h4>
+    <p th:text="|Este relatório mostra apenas números agregados e só é gerado com pelo menos ${r.minimoLideres} diagnósticos concluídos. As respostas e o resultado de cada líder ficam com ele: a empresa não recebe nomes, e-mails nem relatórios individuais.|">Privacidade</p>
+  </div>
+
+  <p class="aviso">O diagnóstico é um ponto de partida para conversas de carreira e para decisões de desenvolvimento. Ele não é uma avaliação de desempenho e não deve ser usado para decisões individuais sobre os líderes.</p>
+
+  <footer th:replace="~{:: rodape(${r.paginas.metodologia})}"></footer>
+</section>
+
+</body>
+</html>

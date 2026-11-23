@@ -2,22 +2,19 @@ import { afterRenderEffect, Component, computed, effect, inject, input, signal }
 import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 
-import { CodigoFaixa, Resultado } from '../api/modelos';
+import { Resultado } from '../api/modelos';
 import { DiagnosticoApi } from '../api/diagnostico-api';
 import { Curva } from '../compartilhado/curva';
-import { Marca } from '../compartilhado/marca';
+import { baixarArquivo } from '../compartilhado/download';
+import { FAIXAS } from '../compartilhado/faixas';
+import { CreditoDiagnostico, MarcaEmpresaCabecalho } from '../compartilhado/marca-empresa';
+import { aplicarTema } from '../compartilhado/tema-marca';
 import { semMovimento } from '../compartilhado/util';
 import { NaoEncontrado } from '../nao-encontrado';
 
-const FAIXAS: Record<CodigoFaixa, { cor: string; suave: string }> = {
-  TRAVADA: { cor: '#C2364B', suave: '#F8E6E9' },
-  PLATO: { cor: '#A86A00', suave: '#FBF0DC' },
-  ASCENSAO: { cor: '#1F8A5B', suave: '#E2F2EA' },
-};
-
 @Component({
   selector: 'app-resultado-pagina',
-  imports: [Curva, DatePipe, Marca, NaoEncontrado],
+  imports: [CreditoDiagnostico, Curva, DatePipe, MarcaEmpresaCabecalho, NaoEncontrado],
   templateUrl: './resultado-pagina.html',
 })
 export class ResultadoPagina {
@@ -28,7 +25,7 @@ export class ResultadoPagina {
   protected readonly resultado = httpResource<Resultado>(() => `/api/public/diagnosticos/${this.id()}/resultado`);
   protected readonly faixa = computed(() => {
     const r = this.resultado.value();
-    return r ? FAIXAS[r.faixa.codigo] : FAIXAS.PLATO;
+    return FAIXAS[r?.faixa.codigo ?? 'PLATO'] ?? FAIXAS['PLATO'];
   });
 
   /** O índice sobe de 0 até o valor final, acompanhando o ponto na curva. */
@@ -38,7 +35,17 @@ export class ResultadoPagina {
   protected readonly erroPdf = signal<string | null>(null);
   private consultasEmail = 0;
 
+  /** Diagnóstico do link de uma empresa: as cores dela (a consulta repete enquanto o e-mail sai). */
+  private readonly marca = computed(() => (this.resultado.hasValue() ? this.resultado.value().empresa : null), {
+    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+
   constructor() {
+    effect((onCleanup) => {
+      const marca = this.marca();
+      if (marca?.personalizada) onCleanup(aplicarTema(marca.tema));
+    });
+
     afterRenderEffect(() => {
       const r = this.resultado.value();
       if (!r || this.barrasVisiveis()) return;
@@ -80,31 +87,11 @@ export class ResultadoPagina {
     this.baixando.set(true);
     this.erroPdf.set(null);
     try {
-      const resposta = await fetch(this.api.urlPdf(r.id));
-      if (!resposta.ok) throw new Error(String(resposta.status));
-      const arquivo = URL.createObjectURL(await resposta.blob());
-      const link = document.createElement('a');
-      link.href = arquivo;
-      link.download = nomeArquivo(resposta.headers.get('Content-Disposition'), r.primeiroNome);
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(arquivo), 30_000);
+      await baixarArquivo(this.api.urlPdf(r.id), 'diagnostico-carreira.pdf');
     } catch {
       this.erroPdf.set('Não conseguimos gerar o PDF agora. Tente de novo em instantes.');
     } finally {
       this.baixando.set(false);
     }
   }
-}
-
-function nomeArquivo(disposicao: string | null, primeiroNome: string): string {
-  const doServidor = disposicao?.match(/filename="([^"]+)"/)?.[1];
-  if (doServidor) return doServidor;
-  const base = primeiroNome
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[^A-Za-z0-9]+/g, '-')
-    .toLowerCase();
-  return `diagnostico-carreira-${base || 'lider'}.pdf`;
 }

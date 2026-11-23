@@ -4,20 +4,24 @@ import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { email, form, maxLength, required, validate } from '@angular/forms/signals';
 
-import { CampanhaPublica, DadosRespondente, Opcao, Pergunta } from '../api/modelos';
+import { CampanhaPublica, CARGO_OUTRO, DadosRespondente, Opcao, OpcaoPerfil, PerfilLider, Pergunta } from '../api/modelos';
 import { DiagnosticoApi, problemaDe } from '../api/diagnostico-api';
 import { armazenamento, esperar, vibrar } from '../compartilhado/util';
 import { formatarTelefone } from '../compartilhado/entrada-telefone';
+import { aplicarTema } from '../compartilhado/tema-marca';
 import { NaoEncontrado } from '../nao-encontrado';
 import { BarraProgresso } from './barra-progresso';
 import { BoasVindas, Retomada } from './boas-vindas';
 import { Calculando } from './calculando';
 import { CampoId, EtapaCampo } from './etapa-campo';
+import { EtapaEscolha } from './etapa-escolha';
 import { EtapaPergunta } from './etapa-pergunta';
 
 type Etapa =
   | { tipo: 'inicio'; chave: string }
   | { tipo: 'campo'; chave: string; campo: CampoId; ultimo: boolean }
+  /** Cargo e tempo no cargo: só no link de empresa com cargos cadastrados. */
+  | { tipo: 'perfil'; chave: string; perfil: 'cargo' | 'tempo'; ultimo: boolean }
   | {
       tipo: 'pergunta';
       chave: string;
@@ -31,9 +35,14 @@ type Etapa =
 interface ProgressoSalvo {
   id: string | null;
   dados: DadosRespondente;
+  perfil?: PerfilLider;
 }
 
-const VAZIO: DadosRespondente = { nome: '', email: '', whatsapp: '', empresa: '' };
+const VAZIO: DadosRespondente = { nome: '', email: '', whatsapp: '' };
+const PERFIL_VAZIO: PerfilLider = { cargo: null, outroNome: '', tempo: null };
+
+/** Erro do servidor → etapa onde ele aparece. */
+const ETAPA_DO_CAMPO: Record<string, string> = { cargo: 'cargo', cargoOutroNome: 'cargo', tempoCargo: 'tempo' };
 
 /**
  * O questionário inteiro numa rota, uma etapa por tela. A etapa atual vive na URL
@@ -42,7 +51,7 @@ const VAZIO: DadosRespondente = { nome: '', email: '', whatsapp: '', empresa: ''
  */
 @Component({
   selector: 'app-diagnostico-pagina',
-  imports: [BarraProgresso, BoasVindas, Calculando, EtapaCampo, EtapaPergunta, NaoEncontrado],
+  imports: [BarraProgresso, BoasVindas, Calculando, EtapaCampo, EtapaEscolha, EtapaPergunta, NaoEncontrado],
   templateUrl: './diagnostico-pagina.html',
 })
 export class DiagnosticoPagina {
@@ -63,6 +72,8 @@ export class DiagnosticoPagina {
 
   // Estado do diagnóstico ---------------------------------------------------
   protected readonly dados = signal<DadosRespondente>({ ...VAZIO });
+  protected readonly perfil = signal<PerfilLider>({ ...PERFIL_VAZIO });
+  protected readonly CARGO_OUTRO = CARGO_OUTRO;
   protected readonly diagnosticoId = signal<string | null>(null);
   protected readonly respostas = signal<Record<number, number[]>>({});
   private readonly dadosSincronizados = signal<string | null>(null);
@@ -70,13 +81,15 @@ export class DiagnosticoPagina {
   protected readonly retomada = signal<Retomada | null>(null);
   protected readonly restaurado = signal(false);
 
-  protected readonly empresaDaCampanha = computed(() => this.campanha.value()?.empresa?.nome ?? null);
+  /** Link de empresa: nome, monograma e paleta (as cores valem só se a empresa tiver cores próprias). */
+  protected readonly marca = computed(() => (this.campanha.hasValue() ? this.campanha.value().empresa : null), {
+    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
   protected readonly primeiroNome = computed(() => this.dados().nome.trim().split(/\s+/)[0] ?? '');
 
   protected readonly formulario = form(this.dados, (c) => {
     maxLength(c.nome, 160, { message: 'Use até 160 caracteres.' });
     maxLength(c.email, 254, { message: 'E-mail muito longo.' });
-    maxLength(c.empresa, 160, { message: 'Use até 160 caracteres.' });
     required(c.nome, { message: 'Escreva o seu nome para continuar.' });
     validate(c.nome, ({ value }) =>
       value().trim().length === 1 ? { kind: 'nome-curto', message: 'Escreva o seu nome completo.' } : null,
@@ -90,29 +103,34 @@ export class DiagnosticoPagina {
         ? { kind: 'whatsapp', message: 'Confira o número: DDD + número, como (11) 98765-4321.' }
         : null;
     });
-    required(c.empresa, {
-      message: 'Escreva o nome da empresa para continuar.',
-      when: () => !this.empresaDaCampanha(),
-    });
   });
 
   // Interface ----------------------------------------------------------------
   protected readonly enviando = signal(false);
   protected readonly calculando = signal(false);
   protected readonly erro = signal<string | null>(null);
-  private readonly errosServidor = signal<Partial<Record<CampoId, string>>>({});
+  private readonly errosServidor = signal<Record<string, string>>({});
   private readonly tentou = signal<Partial<Record<CampoId, boolean>>>({});
 
   // Etapas -------------------------------------------------------------------
   protected readonly etapas = computed<Etapa[]>(() => {
     const campanha = this.campanha.value();
     if (!campanha) return [];
-    const campos: CampoId[] = ['nome', 'email', 'whatsapp', ...(campanha.empresa ? [] : (['empresa'] as const))];
+    const campos: CampoId[] = ['nome', 'email', 'whatsapp'];
+    const comPerfil = !!campanha.perfil;
     const dimensoes = new Map(campanha.questionario.dimensoes.map((d) => [d.codigo, d.nome]));
     const perguntas = campanha.questionario.perguntas;
     return [
       { tipo: 'inicio', chave: 'inicio' },
-      ...campos.map((campo, i): Etapa => ({ tipo: 'campo', chave: campo, campo, ultimo: i === campos.length - 1 })),
+      ...campos.map(
+        (campo, i): Etapa => ({ tipo: 'campo', chave: campo, campo, ultimo: !comPerfil && i === campos.length - 1 }),
+      ),
+      ...(comPerfil
+        ? [
+            { tipo: 'perfil', chave: 'cargo', perfil: 'cargo', ultimo: false } satisfies Etapa,
+            { tipo: 'perfil', chave: 'tempo', perfil: 'tempo', ultimo: true } satisfies Etapa,
+          ]
+        : []),
       ...perguntas.map(
         (pergunta, i): Etapa => ({
           tipo: 'pergunta',
@@ -129,12 +147,27 @@ export class DiagnosticoPagina {
 
   protected readonly grupos = computed(() => {
     const etapas = this.etapas();
-    return [etapas.filter((e) => e.tipo === 'campo').length, etapas.filter((e) => e.tipo === 'pergunta').length];
+    return [
+      etapas.filter((e) => e.tipo === 'campo' || e.tipo === 'perfil').length,
+      etapas.filter((e) => e.tipo === 'pergunta').length,
+    ];
   });
 
+  /** O que vai para o servidor: dados do líder e, se o link pede, cargo e tempo no cargo. */
+  private readonly envio = computed(() => ({
+    dados: this.dados(),
+    perfil: this.campanha.value()?.perfil ? this.perfil() : null,
+  }));
   private readonly sincronizado = computed(
-    () => this.diagnosticoId() !== null && this.dadosSincronizados() === JSON.stringify(this.dados()),
+    () => this.diagnosticoId() !== null && this.dadosSincronizados() === JSON.stringify(this.envio()),
   );
+
+  /** Opções das telas de cargo (com "não está na lista" no fim) e de tempo no cargo. */
+  protected readonly opcoesCargo = computed<OpcaoPerfil[]>(() => [
+    ...(this.campanha.value()?.perfil?.cargos ?? []),
+    { valor: CARGO_OUTRO, texto: 'Meu cargo não está na lista' },
+  ]);
+  protected readonly opcoesTempo = computed(() => this.campanha.value()?.perfil?.tempos ?? []);
 
   /** Etapa mais avançada que o líder pode abrir: todas as anteriores precisam estar completas. */
   private readonly limite = computed(() => {
@@ -161,6 +194,12 @@ export class DiagnosticoPagina {
   protected readonly pronto = computed(() => this.campanha.hasValue() && this.restaurado());
 
   constructor() {
+    // Cores da empresa na página inteira enquanto o líder estiver aqui.
+    effect((onCleanup) => {
+      const marca = this.marca();
+      if (marca?.personalizada) onCleanup(aplicarTema(marca.tema));
+    });
+
     // Restaura o progresso salvo no aparelho assim que a campanha carrega.
     effect(() => {
       if (!this.campanha.hasValue() || untracked(this.restaurado)) return;
@@ -170,7 +209,11 @@ export class DiagnosticoPagina {
     // Salva o progresso a cada mudança.
     effect(() => {
       if (!this.restaurado()) return;
-      armazenamento.gravar(this.chave(), { id: this.diagnosticoId(), dados: this.dados() } satisfies ProgressoSalvo);
+      armazenamento.gravar(this.chave(), {
+        id: this.diagnosticoId(),
+        dados: this.dados(),
+        perfil: this.perfil(),
+      } satisfies ProgressoSalvo);
     });
 
     // URL pedindo uma etapa ainda bloqueada (ex.: recarregou sem dados): corrige a URL.
@@ -184,13 +227,16 @@ export class DiagnosticoPagina {
   private async restaurar() {
     const salvo = armazenamento.ler<ProgressoSalvo>(this.chave());
     if (salvo?.dados) {
-      this.dados.set({ ...VAZIO, ...salvo.dados, whatsapp: formatarTelefone(salvo.dados.whatsapp ?? '') });
+      // Só os campos atuais: progresso salvo por versões antigas podia trazer "empresa".
+      const { nome = '', email = '', whatsapp = '' } = salvo.dados;
+      this.dados.set({ nome, email, whatsapp: formatarTelefone(whatsapp) });
     }
+    if (salvo?.perfil) this.perfil.set(this.perfilValido(salvo.perfil));
     if (salvo?.id) {
       try {
         const d = await this.api.buscar(salvo.id);
         this.diagnosticoId.set(d.id);
-        this.dadosSincronizados.set(JSON.stringify(this.dados()));
+        this.dadosSincronizados.set(JSON.stringify(this.envio()));
         const respostas: Record<number, number[]> = {};
         Object.entries(d.respostas).forEach(([pergunta, opcoes]) => (respostas[Number(pergunta)] = opcoes));
         this.respostas.set(respostas);
@@ -209,12 +255,26 @@ export class DiagnosticoPagina {
     this.restaurado.set(true);
   }
 
+  /** Progresso salvo pode citar um cargo que saiu da lista: aí ele volta a ser perguntado. */
+  private perfilValido(salvo: Partial<PerfilLider>): PerfilLider {
+    const perfil = this.campanha.value()?.perfil;
+    const cargo = salvo.cargo ?? null;
+    const tempo = salvo.tempo ?? null;
+    return {
+      cargo: cargo === CARGO_OUTRO || perfil?.cargos.some((c) => c.valor === cargo) ? cargo : null,
+      outroNome: salvo.outroNome ?? '',
+      tempo: perfil?.tempos.some((t) => t.valor === tempo) ? tempo : null,
+    };
+  }
+
   private completa(etapa: Etapa): boolean {
     switch (etapa.tipo) {
       case 'inicio':
         return true;
       case 'campo':
         return this.formulario[etapa.campo]().valid() && (!etapa.ultimo || this.sincronizado());
+      case 'perfil':
+        return this.perfil()[etapa.perfil] !== null && (!etapa.ultimo || this.sincronizado());
       case 'pergunta':
         return (this.respostas()[etapa.pergunta.id]?.length ?? 0) > 0;
     }
@@ -262,7 +322,7 @@ export class DiagnosticoPagina {
 
   // Identificação ------------------------------------------------------------
   protected mensagemErro(campo: CampoId): string | null {
-    const doServidor = this.errosServidor()[campo];
+    const doServidor = this.errosServidor()[campo] ?? null;
     if (doServidor) return doServidor;
     if (!this.tentou()[campo]) return null;
     return this.formulario[campo]().errors()[0]?.message ?? null;
@@ -287,22 +347,23 @@ export class DiagnosticoPagina {
   private async sincronizar(): Promise<boolean> {
     this.enviando.set(true);
     this.erro.set(null);
-    const dados = this.dados();
+    const envio = this.envio();
     try {
       const id = this.diagnosticoId();
       const diagnostico = id
-        ? await this.api.atualizarRespondente(id, dados)
-        : await this.api.iniciar(this.codigoCampanha(), dados);
+        ? await this.api.atualizarRespondente(id, envio.dados, envio.perfil)
+        : await this.api.iniciar(this.codigoCampanha(), envio.dados, envio.perfil);
       this.diagnosticoId.set(diagnostico.id);
-      this.dadosSincronizados.set(JSON.stringify(dados));
+      this.dadosSincronizados.set(JSON.stringify(envio));
       return true;
     } catch (e) {
       const problema = problemaDe(e);
       const campos = problema.campos ?? {};
-      const primeiro = (Object.keys(campos) as CampoId[])[0];
+      const primeiro = Object.keys(campos)[0];
       if (primeiro) {
         this.errosServidor.set(campos);
-        const indice = this.etapas().findIndex((et) => et.tipo === 'campo' && et.campo === primeiro);
+        const chave = ETAPA_DO_CAMPO[primeiro] ?? primeiro;
+        const indice = this.etapas().findIndex((et) => et.chave === chave);
         if (indice > 0 && indice !== this.indice()) this.irPara(indice);
       } else {
         this.erro.set(problema.detail ?? 'Não foi possível continuar. Tente de novo.');
@@ -311,6 +372,57 @@ export class DiagnosticoPagina {
     } finally {
       this.enviando.set(false);
     }
+  }
+
+  // Cargo e tempo no cargo ---------------------------------------------------
+  protected tituloPerfil(perfil: 'cargo' | 'tempo'): string {
+    const nome = this.primeiroNome();
+    if (perfil === 'tempo') return 'Há quanto tempo você está nesse cargo?';
+    return nome ? `${nome}, qual é o seu cargo hoje?` : 'Qual é o seu cargo hoje?';
+  }
+
+  protected ajudaPerfil(perfil: 'cargo' | 'tempo'): string {
+    if (perfil === 'tempo') return 'Conta só o cargo atual, não o tempo de empresa.';
+    const empresa = this.marca()?.nome ?? 'A empresa';
+    return `Assim a ${empresa} vê em que nível a carreira dos líderes trava. Ela recebe só números do grupo, nunca o seu resultado.`;
+  }
+
+  protected erroPerfil(perfil: 'cargo' | 'tempo'): string | null {
+    const erros = this.errosServidor();
+    return perfil === 'tempo' ? (erros['tempoCargo'] ?? null) : (erros['cargo'] ?? erros['cargoOutroNome'] ?? null);
+  }
+
+  private limparErroPerfil() {
+    this.errosServidor.update(({ cargo: _c, cargoOutroNome: _n, tempoCargo: _t, ...resto }) => resto);
+    this.erro.set(null);
+  }
+
+  protected async escolherPerfil(etapa: Extract<Etapa, { tipo: 'perfil' }>, valor: string) {
+    if (this.enviando()) return;
+    const anterior = this.perfil()[etapa.perfil];
+    this.perfil.update((p) => ({ ...p, [etapa.perfil]: valor }));
+    this.limparErroPerfil();
+    vibrar();
+    // "Não está na lista": espera o nome do cargo (opcional) e o Continuar, já no campo.
+    if (etapa.perfil === 'cargo' && valor === CARGO_OUTRO) {
+      setTimeout(() => document.getElementById('cargo-outro')?.focus({ preventScroll: false }), 60);
+      return;
+    }
+    this.enviando.set(true);
+    await esperar(anterior === valor ? 220 : 420);
+    this.enviando.set(false);
+    await this.avancarPerfil(etapa);
+  }
+
+  protected editouOutroNome(valor: string) {
+    this.perfil.update((p) => ({ ...p, outroNome: valor }));
+    this.limparErroPerfil();
+  }
+
+  protected async avancarPerfil(etapa: Extract<Etapa, { tipo: 'perfil' }>) {
+    if (this.perfil()[etapa.perfil] === null || this.enviando()) return;
+    if (etapa.ultimo && !this.sincronizado() && !(await this.sincronizar())) return;
+    this.irPara(this.indice() + 1);
   }
 
   // Perguntas ----------------------------------------------------------------
@@ -377,8 +489,6 @@ export class DiagnosticoPagina {
         return nome ? `${nome}, qual é o seu melhor e-mail?` : 'Qual é o seu melhor e-mail?';
       case 'whatsapp':
         return 'E o seu WhatsApp?';
-      case 'empresa':
-        return 'Em qual empresa você trabalha hoje?';
     }
   }
 
@@ -390,8 +500,6 @@ export class DiagnosticoPagina {
         return 'É para ele que enviamos o seu diagnóstico.';
       case 'whatsapp':
         return 'Com DDD.';
-      case 'empresa':
-        return null;
     }
   }
 }

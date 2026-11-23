@@ -16,6 +16,9 @@ import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.config.AppProperties;
 import br.com.diagnosticolider.diagnostico.Diagnostico;
 import br.com.diagnosticolider.diagnostico.DiagnosticoRepository;
+import br.com.diagnosticolider.empresa.Empresa;
+import br.com.diagnosticolider.empresa.LogomarcaService;
+import br.com.diagnosticolider.empresa.MarcaEmpresa;
 import br.com.diagnosticolider.questionario.Opcao;
 
 @Service
@@ -36,9 +39,12 @@ public class RelatorioDadosService {
 
 	private final AppProperties props;
 
-	RelatorioDadosService(DiagnosticoRepository diagnosticos, AppProperties props) {
+	private final LogomarcaService logomarcas;
+
+	RelatorioDadosService(DiagnosticoRepository diagnosticos, AppProperties props, LogomarcaService logomarcas) {
 		this.diagnosticos = diagnosticos;
 		this.props = props;
+		this.logomarcas = logomarcas;
 	}
 
 	public RelatorioDados montar(UUID id) {
@@ -72,7 +78,17 @@ public class RelatorioDadosService {
 		String url = props.urlPublica().replaceAll("/+$", "") + "/resultado/" + d.getId();
 		return new RelatorioDados(d.getId(), r.getNome(), r.primeiroNome(), r.getEmail(),
 				DATA.format(d.getConcluidoEm()), d.getPontuacao(), faixa, dimensoes, respostas,
-				CurvaCarreira.desenhar(LARGURA_CURVA, ALTURA_CURVA, d.getPontuacao()), url);
+				CurvaCarreira.desenhar(LARGURA_CURVA, ALTURA_CURVA, d.getPontuacao()), url, logomarcas.marca(d.getEmpresa()),
+				MarcaEmpresa.temaDe(d.getEmpresa()), logo(d.getEmpresa()));
+	}
+
+	/** PDF: a imagem embutida. E-mail: o endereço permanente do backend (o assinado expira em dias). */
+	private RelatorioDados.Logo logo(Empresa empresa) {
+		var logo = logomarcas.logo(empresa);
+		String dataUri = logo == null ? null : logomarcas.dataUri(empresa);
+		return dataUri == null ? null
+				: RelatorioDados.Logo.de(dataUri,
+						props.urlPublica().replaceAll("/+$", "") + LogomarcaService.urlNoBackend(empresa), logo);
 	}
 
 }

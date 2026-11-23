@@ -34,7 +34,7 @@ import { Component, computed, input, output } from '@angular/core';
             @for (s of grupo; track s.numero) {
               <span class="h-1.5 flex-1 overflow-hidden rounded-full bg-linha">
                 <span
-                  class="block h-full rounded-full bg-abeto transition-[width] duration-500 ease-[var(--ease-mola)]"
+                  class="block h-full rounded-full bg-acao transition-[width] duration-500 ease-[var(--ease-mola)]"
                   [style.width.%]="s.numero <= atual() ? 100 : 0"
                 ></span>
               </span>

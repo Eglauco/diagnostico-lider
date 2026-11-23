@@ -6,8 +6,14 @@ import { geometriaCurva, posicaoNaCurva } from './curva-carreira';
  * hero: a curva se desenha e um ponto pulsa no platô, perguntando "e você?".
  * resultado: o ponto percorre a curva junto com o traço e para onde o líder está.
  * calculando: o ponto percorre a curva em loop enquanto o resultado é calculado.
+ * grupo: vários líderes de uma vez (painel); índices iguais viram contas empilhadas.
  */
-export type ModoCurva = 'hero' | 'resultado' | 'calculando';
+export type ModoCurva = 'hero' | 'resultado' | 'calculando' | 'grupo';
+
+export interface PontoGrupo {
+  indice: number;
+  cor: string;
+}
 
 let sequencia = 0;
 
@@ -26,8 +32,8 @@ const suavizar = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 
       >
         <defs>
           <linearGradient [attr.id]="id + '-area'" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#FF5B37" stop-opacity="0.2" />
-            <stop offset="1" stop-color="#FF5B37" stop-opacity="0" />
+            <stop offset="0" style="stop-color: var(--color-brasa)" stop-opacity="0.2" />
+            <stop offset="1" style="stop-color: var(--color-brasa)" stop-opacity="0" />
           </linearGradient>
           <clipPath [attr.id]="id + '-revelar'">
             <rect x="0" y="-40" [attr.width]="larguraRevelada()" [attr.height]="g().altura + 80" />
@@ -39,7 +45,7 @@ const suavizar = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 
           [attr.x2]="g().largura - g().margemX"
           [attr.y1]="g().base"
           [attr.y2]="g().base"
-          stroke="#D2DDD8"
+          style="stroke: var(--color-linha)"
           stroke-width="1.5"
         />
         <g [attr.clip-path]="'url(#' + id + '-revelar)'">
@@ -47,7 +53,7 @@ const suavizar = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 
           <path
             [attr.d]="g().curva"
             fill="none"
-            stroke="#FF5B37"
+            style="stroke: var(--color-brasa)"
             [attr.stroke-width]="modo() === 'hero' ? 5 : 4.5"
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -59,12 +65,29 @@ const suavizar = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 
             class="aparecer"
             [attr.d]="g().proximaCurva"
             fill="none"
-            stroke="#0F2B26"
+            style="stroke: var(--color-abeto)"
             stroke-opacity="0.45"
             stroke-width="2.2"
             stroke-dasharray="2 7"
             stroke-linecap="round"
           />
+        }
+
+        @if (modo() === 'grupo' && concluido()) {
+          @for (c of contas(); track $index) {
+            <circle
+              class="brotar"
+              [style.animation-delay.ms]="$index * 35"
+              [attr.cx]="c.x"
+              [attr.cy]="c.y"
+              r="6"
+              [attr.fill]="c.cor"
+              stroke="#fff"
+              stroke-width="2.5"
+            >
+              <title>Índice {{ c.indice }}</title>
+            </circle>
+          }
         }
 
         @if (ponto(); as p) {
@@ -74,15 +97,15 @@ const suavizar = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 
               [attr.x2]="p.x"
               [attr.y1]="p.y"
               [attr.y2]="g().base"
-              stroke="#0F2B26"
+              style="stroke: var(--color-abeto)"
               stroke-opacity="0.3"
               stroke-dasharray="3 4"
             />
           }
           @if (concluido() || modo() === 'hero') {
-            <circle class="pulso" [attr.cx]="p.x" [attr.cy]="p.y" r="7" [attr.fill]="cor()" />
+            <circle class="pulso" [attr.cx]="p.x" [attr.cy]="p.y" r="7" [style.fill]="cor()" />
           }
-          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="8.5" [attr.fill]="cor()" stroke="#fff" stroke-width="3.5" />
+          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="8.5" [style.fill]="cor()" stroke="#fff" stroke-width="3.5" />
         }
       </svg>
 
@@ -100,7 +123,7 @@ const suavizar = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 
           class="balao absolute rounded-full bg-abeto px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap text-white shadow-lg"
           [style.left.%]="(p.x / g().largura) * 100"
           [style.top.%]="(p.y / g().altura) * 100"
-          >Você está aqui</span
+          >{{ rotulo() }}</span
         >
       }
     </div>
@@ -127,10 +150,27 @@ export class Curva {
   readonly modo = input<ModoCurva>('hero');
   /** Índice de movimento (0–100). Só no modo resultado. */
   readonly indice = input<number | null>(null);
-  readonly cor = input('#0F2B26');
+  /** Cor do ponto: a tinta do tema por padrão, a cor da faixa no resultado. */
+  readonly cor = input('var(--color-abeto)');
+  /** Texto do balão no modo resultado. */
+  readonly rotulo = input('Você está aqui');
+  /** Líderes a posicionar no modo grupo. */
+  readonly pontos = input<PontoGrupo[]>([]);
 
   protected readonly id = `curva-${++sequencia}`;
   protected readonly g = computed(() => geometriaCurva(360, this.modo() === 'hero' ? 190 : 210));
+
+  /** Pontos do modo grupo: quem tem o mesmo índice fica empilhado acima da curva. */
+  protected readonly contas = computed(() => {
+    const g = this.g();
+    const repeticoes = new Map<number, number>();
+    return this.pontos().map((p) => {
+      const ordem = repeticoes.get(p.indice) ?? 0;
+      repeticoes.set(p.indice, ordem + 1);
+      const posicao = g.ponto(posicaoNaCurva(p.indice));
+      return { x: posicao.x, y: posicao.y - ordem * 13, cor: p.cor, indice: p.indice };
+    });
+  });
 
   /** Até onde (0–1) o traço já foi desenhado e onde está o ponto. */
   private readonly revelado = signal(0);
@@ -155,11 +195,11 @@ export class Curva {
         const decorrido = agora - inicio - 200;
         const modo = this.modo();
 
-        if (modo === 'hero') {
-          const p = semMovimento ? 1 : Math.max(0, Math.min(1, decorrido / 1600));
+        if (modo === 'hero' || modo === 'grupo') {
+          const p = semMovimento ? 1 : Math.max(0, Math.min(1, decorrido / (modo === 'grupo' ? 900 : 1600)));
           this.revelado.set(suavizar(p));
           if (p >= 1) {
-            this.tPonto.set(0.62);
+            if (modo === 'hero') this.tPonto.set(0.62);
             this.concluido.set(true);
             return;
           }

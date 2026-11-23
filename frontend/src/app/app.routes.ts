@@ -19,6 +19,11 @@ export const routes: Routes = [
     title: 'Seu diagnóstico de carreira',
     loadComponent: () => import('./resultado/resultado-pagina').then((m) => m.ResultadoPagina),
   },
+  // Painel administrativo (com login: ver admin/acesso/sessao.ts).
+  {
+    path: 'administrador',
+    loadChildren: () => import('./admin/admin.routes').then((m) => m.ROTAS_ADMIN),
+  },
   {
     path: '**',
     title: 'Página não encontrada',

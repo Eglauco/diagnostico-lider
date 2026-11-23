@@ -14,6 +14,7 @@ import org.hibernate.annotations.UuidGenerator;
 
 import br.com.diagnosticolider.campanha.Campanha;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
+import br.com.diagnosticolider.empresa.Cargo;
 import br.com.diagnosticolider.empresa.Empresa;
 import br.com.diagnosticolider.questionario.Dimensao;
 import br.com.diagnosticolider.questionario.FaixaResultado;
@@ -100,6 +101,21 @@ public class Diagnostico {
 	@Column(name = "concluido_em")
 	private Instant concluidoEm;
 
+	/** Cargo informado no link da empresa (nulo no link geral e em "Outro cargo"). */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "cargo_id")
+	private Cargo cargo;
+
+	@Column(name = "cargo_outro", nullable = false)
+	private boolean cargoOutro;
+
+	@Column(name = "cargo_outro_nome", length = 80)
+	private String cargoOutroNome;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "tempo_cargo", length = 20)
+	private TempoCargo tempoCargo;
+
 	protected Diagnostico() {
 	}
 
@@ -120,6 +136,26 @@ public class Diagnostico {
 	public void atualizarRespondente(Respondente respondente) {
 		exigirEmAndamento();
 		this.respondente = respondente;
+	}
+
+	/** Cargo e tempo no cargo (no link geral e em empresas sem cargos, fica tudo vazio). */
+	public void definirPerfil(PerfilCargo perfil) {
+		exigirEmAndamento();
+		this.cargo = perfil.cargo();
+		this.cargoOutro = perfil.outro();
+		this.cargoOutroNome = perfil.outro() ? perfil.outroNome() : null;
+		this.tempoCargo = perfil.tempo();
+	}
+
+	/** Como o cargo aparece no painel: o nome, "Outro: Head de vendas", "Outro cargo" ou nulo. */
+	public String cargoDescrito() {
+		if (cargo != null) {
+			return cargo.getNome();
+		}
+		if (!cargoOutro) {
+			return null;
+		}
+		return cargoOutroNome == null ? "Outro cargo" : "Outro: " + cargoOutroNome;
 	}
 
 	/**
@@ -167,6 +203,22 @@ public class Diagnostico {
 		return status == StatusDiagnostico.CONCLUIDO;
 	}
 
+	public Cargo getCargo() {
+		return cargo;
+	}
+
+	public boolean isCargoOutro() {
+		return cargoOutro;
+	}
+
+	public String getCargoOutroNome() {
+		return cargoOutroNome;
+	}
+
+	public TempoCargo getTempoCargo() {
+		return tempoCargo;
+	}
+
 	private void exigirEmAndamento() {
 		if (concluido()) {
 			throw RegraNegocioException.conflito("Este diagnóstico já foi concluído e não pode mais ser alterado.");
@@ -211,6 +263,27 @@ public class Diagnostico {
 
 	public Instant getConcluidoEm() {
 		return concluidoEm;
+	}
+
+	public Empresa getEmpresa() {
+		return empresa;
+	}
+
+	public Instant getIniciadoEm() {
+		return iniciadoEm;
+	}
+
+	public Instant getConsentimentoEm() {
+		return consentimentoEm;
+	}
+
+	public Instant getEmailEnviadoEm() {
+		return emailEnviadoEm;
+	}
+
+	/** Quantas perguntas diferentes já têm resposta. */
+	public int perguntasRespondidas() {
+		return (int) respostas.stream().map(r -> r.getPergunta().getId()).distinct().count();
 	}
 
 }

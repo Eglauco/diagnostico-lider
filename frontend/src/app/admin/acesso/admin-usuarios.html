@@ -1,0 +1,190 @@
+<main class="mx-auto max-w-4xl px-4 pt-8 pb-24 sm:px-6 sm:pt-10">
+  <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="rotulo text-brasa-escura">Acesso ao painel</p>
+      <h1 class="display mt-2 text-[40px] leading-none font-bold sm:text-[52px]">Usuários</h1>
+      <p class="mt-3 max-w-xl text-[16px] text-abeto-2">
+        Quem pode entrar no painel. Por enquanto, todo usuário acessa tudo: diagnósticos, empresas, relatórios e usuários.
+      </p>
+    </div>
+    <button type="button" class="botao-primario w-full shrink-0 sm:w-auto" (click)="abrir('novo')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round" /></svg>
+      Novo usuário
+    </button>
+  </div>
+
+  @if (usuarios.error()) {
+    <div class="cartao mt-8 p-6" role="alert">
+      <p class="font-semibold">Não foi possível carregar os usuários.</p>
+      <button type="button" class="botao-secundario mt-4" (click)="usuarios.reload()">Tentar de novo</button>
+    </div>
+  } @else if (usuarios.hasValue()) {
+    <p class="mt-8 text-[14px] text-abeto-2" aria-live="polite">
+      {{ ativos() }} {{ ativos() === 1 ? 'usuário ativo' : 'usuários ativos' }}
+    </p>
+    <ul class="cartao mt-3 divide-y divide-linha">
+      @for (u of usuarios.value(); track u.id) {
+        <li class="flex items-start gap-4 p-4 sm:p-5">
+          <span class="avatar size-11 text-[15px]" [class.avatar-inativo]="!u.ativo" aria-hidden="true">{{ iniciais(u.nome) }}</span>
+          <div class="min-w-0 flex-1">
+            <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="text-[16px] font-semibold break-words" [class.text-abeto-2]="!u.ativo">{{ u.nome }}</span>
+              @if (u.voce) {
+                <span class="rounded-full bg-nevoa px-2 py-0.5 text-[12px] font-semibold text-abeto">Você</span>
+              }
+              @if (!u.ativo) {
+                <span class="rounded-full bg-travada-suave px-2 py-0.5 text-[12px] font-semibold text-[#A52B40]">Desativado</span>
+              }
+            </p>
+            <p class="truncate text-[14px] text-abeto-2">{{ u.email }}</p>
+            <p class="mt-0.5 text-[13px] text-abeto-2">
+              <span [title]="u.ultimoAcessoEm ? dataCompleta(u.ultimoAcessoEm) : ''">{{ u.ultimoAcessoEm ? 'Último acesso: ' + quando(u.ultimoAcessoEm) : 'Ainda não entrou' }}</span>
+              <span aria-hidden="true"> · </span>
+              <span>Cadastrado {{ quando(u.criadoEm).toLowerCase() }}</span>
+            </p>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button type="button" class="chip" (click)="abrir('editar', u)" [attr.aria-label]="'Editar ' + u.nome">Editar</button>
+              @if (u.voce) {
+                <button type="button" class="chip" (click)="trocarMinhaSenha()">Trocar minha senha</button>
+              } @else {
+                <button type="button" class="chip" (click)="abrir('senha', u)" [attr.aria-label]="'Definir nova senha para ' + u.nome">Nova senha</button>
+                @if (u.ativo) {
+                  <button type="button" class="chip" (click)="mudarSituacao(u, false)" [attr.aria-label]="'Desativar o acesso de ' + u.nome">Desativar</button>
+                } @else {
+                  <button type="button" class="chip" (click)="mudarSituacao(u, true)" [attr.aria-label]="'Reativar o acesso de ' + u.nome">Reativar</button>
+                }
+              }
+            </div>
+          </div>
+        </li>
+      }
+    </ul>
+    <p class="mt-4 text-[13px] leading-relaxed text-abeto-2">
+      Desativar não apaga ninguém: a pessoa deixa de entrar na hora, e você pode reativar quando quiser.
+      As senhas ficam guardadas com criptografia: nem o painel consegue vê-las depois de salvas.
+    </p>
+  } @else {
+    <div class="cartao mt-8 space-y-px overflow-hidden" aria-hidden="true">
+      @for (i of [1, 2, 3]; track i) {
+        <div class="h-[118px] animate-pulse bg-nevoa-2/60"></div>
+      }
+    </div>
+  }
+</main>
+
+<!-- Novo usuário, editar e nova senha -->
+<dialog #dialogo class="dialogo" aria-labelledby="usuario-titulo" (close)="fechou()">
+  <div class="dialogo-corpo">
+    @if (entregue(); as e) {
+      <div class="text-center" role="status">
+        <span class="mx-auto grid size-14 place-items-center rounded-full bg-ascensao-suave text-[#17714A]" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </span>
+        <h2 id="usuario-titulo" class="display mt-4 text-[28px] font-bold">{{ e.titulo }}</h2>
+        <p class="mx-auto mt-2 max-w-sm text-[15px] text-abeto-2">{{ e.texto }}</p>
+      </div>
+      <dl class="mt-5 space-y-3 rounded-2xl bg-nevoa-2 p-4 ring-1 ring-linha/70">
+        <div>
+          <dt class="text-[12px] font-semibold tracking-[0.08em] text-abeto-2 uppercase">Pessoa</dt>
+          <dd class="text-[16px] font-semibold">{{ e.nome }}</dd>
+        </div>
+        <div>
+          <dt class="text-[12px] font-semibold tracking-[0.08em] text-abeto-2 uppercase">E-mail</dt>
+          <dd class="text-[16px] break-all">{{ e.email }}</dd>
+        </div>
+        <div>
+          <dt class="text-[12px] font-semibold tracking-[0.08em] text-abeto-2 uppercase">Senha</dt>
+          <dd class="font-mono text-[18px] font-semibold tracking-wide break-all select-all">{{ e.senha }}</dd>
+        </div>
+      </dl>
+      <p class="mt-2 min-h-5 text-[14px] font-medium text-travada" aria-live="assertive">{{ erroGeral() }}</p>
+      <div class="mt-2 flex flex-col gap-2">
+        <button type="button" class="botao-primario w-full" (click)="copiarAcesso()">
+          @if (copiado()) {
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Acesso copiado
+          } @else {
+            Copiar e-mail e senha
+          }
+        </button>
+        <button type="button" class="botao-secundario w-full" (click)="fechar()">Concluir</button>
+      </div>
+    } @else {
+      <form novalidate (submit)="salvar($event)">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <h2 id="usuario-titulo" class="display text-[28px] leading-tight font-bold break-words">{{ titulo() }}</h2>
+            <p class="mt-1.5 text-[14px] text-abeto-2">
+              @switch (modo()) {
+                @case ('novo') { A pessoa entra com este e-mail e a senha abaixo. }
+                @case ('editar') { O e-mail é o que a pessoa usa para entrar. }
+                @case ('senha') { Se a pessoa estiver logada, a sessão dela será encerrada. }
+              }
+            </p>
+          </div>
+          <button type="button" class="-mt-1 -mr-2 grid size-11 shrink-0 place-items-center rounded-full text-abeto-2 hover:bg-nevoa hover:text-abeto" aria-label="Fechar" (click)="fechar()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" /></svg>
+          </button>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          @if (modo() !== 'senha') {
+            <div>
+              <label for="usuario-nome" class="campo-rotulo">Nome</label>
+              <input id="usuario-nome" class="campo" [formField]="formulario.nome" type="text" autocomplete="off" autocapitalize="words" enterkeyhint="next" placeholder="Nome e sobrenome" [attr.aria-invalid]="!!erro('nome')" aria-describedby="usuario-nome-ajuda" (input)="editou('nome')" />
+              <p id="usuario-nome-ajuda" class="mt-1.5 min-h-5 text-[14px] font-medium text-travada" aria-live="polite">{{ erro('nome') }}</p>
+            </div>
+            <div>
+              <label for="usuario-email" class="campo-rotulo">E-mail</label>
+              <input id="usuario-email" class="campo" [formField]="formulario.email" type="email" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="next" placeholder="pessoa@empresa.com.br" [attr.aria-invalid]="!!erro('email')" aria-describedby="usuario-email-ajuda" (input)="editou('email')" />
+              <p id="usuario-email-ajuda" class="mt-1.5 min-h-5 text-[14px] font-medium text-travada" aria-live="polite">{{ erro('email') }}</p>
+            </div>
+          }
+          @if (modo() !== 'editar') {
+            <div>
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <label for="usuario-senha" class="campo-rotulo mb-0!">Senha</label>
+                <button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2 text-[14px] font-semibold text-abeto-2 hover:bg-nevoa hover:text-abeto" (click)="novaSenhaGerada()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  Gerar outra
+                </button>
+              </div>
+              <app-campo-senha [formField]="formulario.senha" idCampo="usuario-senha" descricao="usuario-senha-ajuda" autocomplete="new-password" enterkeyhint="done" [comecarVisivel]="true" [mostrarErro]="!!erro('senha')" (input)="editou('senha')" />
+              <p id="usuario-senha-ajuda" class="mt-1.5 min-h-5 text-[14px]" aria-live="polite">
+                @if (erro('senha'); as mensagem) {
+                  <span class="font-medium text-travada">{{ mensagem }}</span>
+                } @else {
+                  <span class="text-abeto-2">Já sugerimos uma senha forte. Pode trocar por outra com pelo menos 8 caracteres.</span>
+                }
+              </p>
+            </div>
+          }
+        </div>
+
+        <p class="min-h-5 text-[14px] font-medium text-travada" aria-live="assertive">{{ erroGeral() }}</p>
+        <div class="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" class="botao-secundario" (click)="fechar()">Cancelar</button>
+          <button type="submit" class="botao-primario" [attr.aria-busy]="enviando()" [disabled]="enviando()">
+            @switch (modo()) {
+              @case ('novo') { {{ enviando() ? 'Criando…' : 'Criar acesso' }} }
+              @case ('editar') { {{ enviando() ? 'Salvando…' : 'Salvar' }} }
+              @case ('senha') { {{ enviando() ? 'Salvando…' : 'Definir senha' }} }
+            }
+          </button>
+        </div>
+      </form>
+    }
+  </div>
+</dialog>
+
+<div class="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(24px,env(safe-area-inset-bottom))]" aria-live="polite">
+  @if (aviso(); as a) {
+    <div class="aparecer pointer-events-auto flex max-w-md items-center gap-3 rounded-2xl bg-abeto py-2.5 pr-2.5 pl-4 text-[15px] text-white shadow-2xl" role="status">
+      <p class="flex-1">{{ a.mensagem }}</p>
+      @if (a.desfazer) {
+        <button type="button" class="min-h-10 shrink-0 rounded-xl px-3 font-semibold text-[#FFB29F] hover:bg-white/10" (click)="desfazer()">Desfazer</button>
+      }
+    </div>
+  }
+</div>

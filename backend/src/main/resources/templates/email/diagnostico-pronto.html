@@ -6,46 +6,66 @@
 <meta name="color-scheme" content="light">
 <title>Seu diagnóstico de carreira</title>
 </head>
-<body style="margin:0;padding:0;background:#EDF2EF;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F2B26;">
+<!-- Cores em estilo inline (e-mail não aceita variáveis de CSS): paleta da empresa ou do Diagnóstico. -->
+<body th:with="t=${r.tema}" th:style="|margin:0;padding:0;background:${t.fundo};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${t.tinta};|"
+      style="margin:0;padding:0;background:#EDF2EF;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F2B26;">
 <span style="display:none;max-height:0;overflow:hidden;opacity:0;" th:text="${r.faixa.resumo}">Resumo</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EDF2EF;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo};|" style="background:#EDF2EF;">
   <tr>
     <td align="center" style="padding:32px 16px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:20px;">
         <tr>
           <td style="padding:28px 32px 0;">
             <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-              <td style="width:26px;height:26px;background:#0F2B26;border-radius:7px;"></td>
-              <td style="padding-left:10px;font-size:14px;font-weight:600;">Diagnóstico do Líder</td>
+              <th:block th:if="${r.logo != null}">
+                <td><img th:src="${r.logo.url}" th:alt="${r.empresa.nome}" alt="Empresa"
+                         th:width="${r.logo.larguraEmail}" th:height="${r.logo.alturaEmail}"
+                         th:style="|display:block;width:${r.logo.larguraEmail}px;height:${r.logo.alturaEmail}px;border:0;|"
+                         style="display:block;height:34px;width:auto;border:0;"></td>
+                <td th:if="${r.logo.pedeNome}" style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${r.empresa.nome}">Empresa</td>
+              </th:block>
+              <th:block th:if="${r.empresa != null and r.logo == null}">
+                <td th:style="|width:30px;height:30px;background:${t.acao};color:${t.sobreAcao};border-radius:8px;text-align:center;font-size:12px;font-weight:700;|"
+                    style="width:30px;height:30px;background:#0F2B26;color:#FFFFFF;border-radius:8px;text-align:center;font-size:12px;font-weight:700;"
+                    th:text="${r.empresa.sigla}">CH</td>
+                <td style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${r.empresa.nome}">Empresa</td>
+              </th:block>
+              <th:block th:if="${r.empresa == null}">
+                <td th:style="|width:26px;height:26px;background:${t.tinta};border-radius:7px;|" style="width:26px;height:26px;background:#0F2B26;border-radius:7px;"></td>
+                <td style="padding-left:10px;font-size:14px;font-weight:600;">Diagnóstico do Líder</td>
+              </th:block>
             </tr></table>
           </td>
         </tr>
         <tr>
           <td style="padding:28px 32px 0;">
-            <p style="margin:0;font-size:16px;line-height:1.5;color:#4A635C;" th:text="|Olá, ${r.primeiroNome}. Seu diagnóstico está pronto.|">Olá, Ana. Seu diagnóstico está pronto.</p>
+            <p th:style="|margin:0;font-size:16px;line-height:1.5;color:${t.tinta2};|" style="margin:0;font-size:16px;line-height:1.5;color:#4A635C;" th:text="|Olá, ${r.primeiroNome}. Seu diagnóstico está pronto.|">Olá, Ana. Seu diagnóstico está pronto.</p>
             <h1 style="margin:10px 0 0;font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-0.02em;" th:text="${r.faixa.titulo}">Carreira no platô</h1>
             <p style="margin:12px 0 0;font-size:17px;line-height:1.5;" th:text="${r.faixa.resumo}">Resumo</p>
           </td>
         </tr>
         <tr>
           <td style="padding:24px 32px 0;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F8F6;border-radius:14px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo2};border-radius:14px;|" style="background:#F5F8F6;border-radius:14px;">
               <tr>
-                <td style="padding:16px 20px;font-size:13px;color:#4A635C;">Índice de movimento da carreira</td>
-                <td align="right" style="padding:16px 20px;font-size:28px;font-weight:700;"><span th:text="${r.pontuacao}">58</span><span style="font-size:14px;color:#7D918B;font-weight:500;">/100</span></td>
+                <td th:style="|padding:16px 20px;font-size:13px;color:${t.tinta2};|" style="padding:16px 20px;font-size:13px;color:#4A635C;">Índice de movimento da carreira</td>
+                <td align="right" style="padding:16px 20px;font-size:28px;font-weight:700;"><span th:text="${r.pontuacao}">58</span><span th:style="|font-size:14px;color:${t.tinta3};font-weight:500;|" style="font-size:14px;color:#7D918B;font-weight:500;">/100</span></td>
               </tr>
             </table>
           </td>
         </tr>
         <tr>
           <td style="padding:28px 32px 0;">
-            <a th:href="${r.urlResultado}" style="display:inline-block;background:#0F2B26;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:16px;padding:15px 26px;border-radius:999px;">Ver meu diagnóstico</a>
-            <p style="margin:16px 0 0;font-size:14px;line-height:1.5;color:#4A635C;">O relatório completo, com os próximos passos recomendados, está em PDF neste e-mail.</p>
+            <a th:href="${r.urlResultado}" th:style="|display:inline-block;background:${t.acao};color:${t.sobreAcao};text-decoration:none;font-weight:600;font-size:16px;padding:15px 26px;border-radius:999px;|"
+               style="display:inline-block;background:#0F2B26;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:16px;padding:15px 26px;border-radius:999px;">Ver meu diagnóstico</a>
+            <p th:style="|margin:16px 0 0;font-size:14px;line-height:1.5;color:${t.tinta2};|" style="margin:16px 0 0;font-size:14px;line-height:1.5;color:#4A635C;">O relatório completo, com os próximos passos recomendados, está em PDF neste e-mail.</p>
           </td>
         </tr>
         <tr>
           <td style="padding:28px 32px 28px;">
-            <p style="margin:0;padding-top:18px;border-top:1px solid #D2DDD8;font-size:12px;line-height:1.5;color:#7D918B;">Você recebeu este e-mail porque respondeu ao Diagnóstico do Líder. Seus dados são usados apenas para gerar e enviar o seu diagnóstico.</p>
+            <p th:style="|margin:0;padding-top:18px;border-top:1px solid ${t.linha};font-size:12px;line-height:1.5;color:${t.tinta3};|"
+               style="margin:0;padding-top:18px;border-top:1px solid #D2DDD8;font-size:12px;line-height:1.5;color:#7D918B;"
+               th:text="${r.empresa != null} ? |Você recebeu este e-mail porque respondeu ao Diagnóstico do Líder a convite de ${r.empresa.nome}. Seus dados são usados apenas para gerar e enviar o seu diagnóstico.| : 'Você recebeu este e-mail porque respondeu ao Diagnóstico do Líder. Seus dados são usados apenas para gerar e enviar o seu diagnóstico.'">Você recebeu este e-mail porque respondeu ao Diagnóstico do Líder.</p>
           </td>
         </tr>
       </table>

@@ -11,6 +11,9 @@ import jakarta.persistence.Table;
 @Table(name = "questionario")
 public class Questionario {
 
+	/** O questionário dos links novos, enquanto houver um só. */
+	public static final String PADRAO = "carreira-lider";
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;

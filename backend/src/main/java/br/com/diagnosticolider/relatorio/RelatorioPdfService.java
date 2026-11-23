@@ -38,10 +38,23 @@ public class RelatorioPdfService {
 
 	/** HTML do relatório; útil para depurar o layout direto no navegador. */
 	public String html(RelatorioDados dados) {
+		return processar("relatorio/diagnostico", dados);
+	}
+
+	/** Relatório consolidado de uma empresa (sem nomes). */
+	public byte[] gerar(RelatorioEmpresaDados dados) {
+		return renderer.renderizar(html(dados));
+	}
+
+	public String html(RelatorioEmpresaDados dados) {
+		return processar("relatorio/empresa", dados);
+	}
+
+	private String processar(String template, Object dados) {
 		var contexto = new Context(PT_BR);
 		contexto.setVariable("r", dados);
 		contexto.setVariable("fontes", fontes);
-		return templates.process("relatorio/diagnostico", contexto);
+		return templates.process(template, contexto);
 	}
 
 	private static String fonte(String familia, String arquivo, String pesos, String larguras) {

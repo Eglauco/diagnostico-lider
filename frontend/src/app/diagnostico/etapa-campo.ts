@@ -17,7 +17,6 @@ interface ConfigCampo {
 const CONFIG: Record<Exclude<CampoId, 'whatsapp'>, ConfigCampo> = {
   nome: { tipo: 'text', inputmode: 'text', autocomplete: 'name', autocapitalize: 'words', placeholder: 'Nome e sobrenome' },
   email: { tipo: 'email', inputmode: 'email', autocomplete: 'email', autocapitalize: 'none', placeholder: 'voce@empresa.com.br' },
-  empresa: { tipo: 'text', inputmode: 'text', autocomplete: 'organization', autocapitalize: 'words', placeholder: 'Nome da empresa' },
 };
 
 let sequencia = 0;

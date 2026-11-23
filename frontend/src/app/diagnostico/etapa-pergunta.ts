@@ -63,70 +63,6 @@ const LETRAS = 'ABCDEFGHIJ';
       <p class="mt-8 hidden text-[13px] text-abeto-2 sm:block">Dica: use as teclas {{ letrasDica() }} para responder.</p>
     </div>
   `,
-  styles: `
-    .opcao {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      width: 100%;
-      min-height: 66px;
-      padding: 14px 18px 14px 14px;
-      border-radius: 20px;
-      border: 1.5px solid var(--color-linha);
-      background: #fff;
-      color: var(--color-abeto);
-      text-align: left;
-      font-size: 17px;
-      font-weight: 500;
-      line-height: 1.35;
-      box-shadow: 0 1px 0 rgb(15 43 38 / 0.04);
-      transition:
-        transform 160ms var(--ease-mola),
-        background-color 220ms,
-        border-color 220ms,
-        color 220ms,
-        box-shadow 220ms,
-        opacity 260ms;
-    }
-    @media (hover: hover) {
-      .opcao:not(.opcao-marcada):hover {
-        border-color: var(--color-abeto-3);
-        box-shadow: 0 10px 24px -18px rgb(15 43 38 / 0.6);
-        transform: translateY(-1px);
-      }
-    }
-    .opcao:active {
-      transform: scale(0.985);
-    }
-    .tecla {
-      display: grid;
-      place-items: center;
-      flex: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
-      border: 1.5px solid var(--color-linha);
-      color: var(--color-abeto-2);
-      font-size: 13px;
-      font-weight: 700;
-      transition: all 220ms var(--ease-mola);
-    }
-    .opcao-marcada {
-      background: var(--color-abeto);
-      border-color: var(--color-abeto);
-      color: #fff;
-      box-shadow: 0 16px 30px -20px rgb(15 43 38 / 0.9);
-    }
-    .opcao-marcada .tecla {
-      background: var(--color-brasa);
-      border-color: var(--color-brasa);
-      color: var(--color-abeto);
-      transform: scale(1.06);
-    }
-    .opcao-apagada {
-      opacity: 0.4;
-    }
-  `,
 })
 export class EtapaPergunta {
   readonly pergunta = input.required<Pergunta>();
@@ -161,8 +97,8 @@ export class EtapaPergunta {
 
   protected atalho(evento: KeyboardEvent) {
     if (evento.ctrlKey || evento.metaKey || evento.altKey || this.enviando()) return;
-    const alvo = evento.target as HTMLElement | null;
-    if (alvo?.closest('input, textarea, [contenteditable]')) return;
+    const alvo = evento.target;
+    if (alvo instanceof Element && alvo.closest('input, textarea, [contenteditable]')) return;
     const opcoes = this.pergunta().opcoes;
     const tecla = evento.key.toUpperCase();
     const indice = /^[1-9]$/.test(tecla) ? Number(tecla) - 1 : LETRAS.indexOf(tecla);

@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-import { DadosRespondente, Diagnostico, Problema, Resultado } from './modelos';
+import { CARGO_OUTRO, DadosRespondente, Diagnostico, PerfilLider, Problema, Resultado } from './modelos';
 
 const API = '/api/public';
 
@@ -10,12 +10,15 @@ const API = '/api/public';
 export class DiagnosticoApi {
   private readonly http = inject(HttpClient);
 
-  iniciar(campanha: string, dados: DadosRespondente): Promise<Diagnostico> {
-    return firstValueFrom(this.http.post<Diagnostico>(`${API}/campanhas/${campanha}/diagnosticos`, paraEnvio(dados)));
+  /** perfil: só no link de empresa com cargos (null nos demais). */
+  iniciar(campanha: string, dados: DadosRespondente, perfil: PerfilLider | null): Promise<Diagnostico> {
+    return firstValueFrom(
+      this.http.post<Diagnostico>(`${API}/campanhas/${campanha}/diagnosticos`, paraEnvio(dados, perfil)),
+    );
   }
 
-  atualizarRespondente(id: string, dados: DadosRespondente): Promise<Diagnostico> {
-    return firstValueFrom(this.http.put<Diagnostico>(`${API}/diagnosticos/${id}/respondente`, paraEnvio(dados)));
+  atualizarRespondente(id: string, dados: DadosRespondente, perfil: PerfilLider | null): Promise<Diagnostico> {
+    return firstValueFrom(this.http.put<Diagnostico>(`${API}/diagnosticos/${id}/respondente`, paraEnvio(dados, perfil)));
   }
 
   buscar(id: string): Promise<Diagnostico> {
@@ -35,12 +38,16 @@ export class DiagnosticoApi {
   }
 }
 
-function paraEnvio(dados: DadosRespondente): DadosRespondente {
+function paraEnvio(dados: DadosRespondente, perfil: PerfilLider | null) {
+  const outro = perfil?.cargo === CARGO_OUTRO;
   return {
     nome: dados.nome.trim(),
     email: dados.email.trim(),
     whatsapp: dados.whatsapp.replace(/\D/g, ''),
-    empresa: dados.empresa.trim(),
+    cargoId: perfil?.cargo && !outro ? Number(perfil.cargo) : null,
+    cargoOutro: outro,
+    cargoOutroNome: outro ? perfil.outroNome.trim() || null : null,
+    tempoCargo: perfil?.tempo ?? null,
   };
 }
 

@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* teclado:… vale enquanto o teclado do celular está aberto (ver compartilhado/teclado-virtual.ts). */
+@custom-variant teclado (&:where([data-teclado] *));
+
 /* ===================================================================
    Diagnóstico do Líder — tokens
    Abeto (verde profundo) como tinta, Névoa (verde-acinzentado frio) como
@@ -23,6 +26,13 @@
   --color-plato-suave: #FBF0DC;
   --color-ascensao: #1F8A5B;
   --color-ascensao-suave: #E2F2EA;
+
+  /* Ação (botões, progresso, opção marcada). No link de uma empresa com cores próprias, estes
+     tokens e os de cima (menos os das faixas) são trocados pela paleta dela: ver tema-marca.ts. */
+  --color-acao: #0F2B26;
+  --color-acao-forte: #17403A;
+  --color-sobre-acao: #FFFFFF;
+  --color-sobre-brasa: #0F2B26;
 
   --ease-mola: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-saida: cubic-bezier(0.4, 0, 1, 1);
@@ -62,14 +72,14 @@
     min-height: 58px;
     padding: 0 28px;
     border-radius: 999px;
-    background: var(--color-abeto);
-    color: #fff;
+    background: var(--color-acao);
+    color: var(--color-sobre-acao);
     font-size: 17px;
     font-weight: 600;
-    box-shadow: 0 14px 28px -16px rgb(15 43 38 / 0.75);
+    box-shadow: 0 14px 28px -16px color-mix(in srgb, var(--color-abeto) 75%, transparent);
     transition: transform 160ms var(--ease-mola), background-color 200ms, box-shadow 200ms;
   }
-  .botao-primario:hover { background: #17403A; }
+  .botao-primario:hover { background: var(--color-acao-forte); }
   .botao-primario:active { transform: scale(0.98); }
   .botao-primario[aria-busy='true'] { cursor: progress; }
   .botao-primario .seta { transition: transform 220ms var(--ease-mola); }
@@ -116,14 +126,81 @@
     -webkit-text-fill-color: var(--color-abeto);
   }
 
-  /* Barra fixa no rodapé do celular, acima do teclado e da safe area. */
+  /* Barra fixa no rodapé do celular, acima do teclado e da safe area. --teclado sobe a barra
+     no iPhone, onde o teclado cobre a página em vez de encolhê-la. */
   .rodape-fixo {
     position: sticky;
-    bottom: 0;
+    bottom: var(--teclado, 0px);
     padding-top: 28px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--color-nevoa) 62%, rgb(237 242 239 / 0));
   }
+  /* Com o teclado aberto a tela encolhe pela metade: a barra fica mais justa (a safe area está
+     embaixo do teclado). */
+  [data-teclado] .rodape-fixo {
+    padding-top: 14px;
+    padding-bottom: 10px;
+  }
+
+  /* Cartão de alternativa do questionário (perguntas, cargo e tempo no cargo). */
+  .opcao {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 66px;
+    padding: 14px 18px 14px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--color-linha);
+    background: #fff;
+    color: var(--color-abeto);
+    text-align: left;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.35;
+    box-shadow: 0 1px 0 rgb(15 43 38 / 0.04);
+    transition:
+      transform 160ms var(--ease-mola),
+      background-color 220ms,
+      border-color 220ms,
+      color 220ms,
+      box-shadow 220ms,
+      opacity 260ms;
+  }
+  @media (hover: hover) {
+    .opcao:not(.opcao-marcada):hover {
+      border-color: var(--color-abeto-3);
+      box-shadow: 0 10px 24px -18px rgb(15 43 38 / 0.6);
+      transform: translateY(-1px);
+    }
+  }
+  .opcao:active { transform: scale(0.985); }
+  .opcao .tecla {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: 1.5px solid var(--color-linha);
+    color: var(--color-abeto-2);
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 220ms var(--ease-mola);
+  }
+  .opcao-marcada {
+    background: var(--color-acao);
+    border-color: var(--color-acao);
+    color: var(--color-sobre-acao);
+    box-shadow: 0 16px 30px -20px color-mix(in srgb, var(--color-abeto) 90%, transparent);
+  }
+  .opcao-marcada .tecla {
+    background: var(--color-brasa);
+    border-color: var(--color-brasa);
+    color: var(--color-sobre-brasa);
+    transform: scale(1.06);
+  }
+  .opcao-apagada { opacity: 0.4; }
 }
 
 /* Títulos: Bricolage em tamanho óptico de display, levemente condensada. */
@@ -154,6 +231,12 @@
 /* Troca de etapa: a nova entra na direção em que o líder está indo. */
 .palco { display: grid; }
 .etapa-cheia { min-height: calc(100dvh - 4rem); }
+/* No iPhone o teclado cobre a página: a etapa ganha a altura dele no fim, para dar espaço de rolar
+   o campo e o botão para cima do teclado em telas baixas (no Android --teclado é 0). */
+[data-teclado] .etapa-cheia {
+  min-height: calc(100dvh - 4rem + var(--teclado, 0px));
+  padding-bottom: var(--teclado, 0px);
+}
 .palco > * { grid-area: 1 / 1; min-width: 0; }
 
 @keyframes entrar-frente { from { opacity: 0; transform: translate3d(32px, 0, 0); } }

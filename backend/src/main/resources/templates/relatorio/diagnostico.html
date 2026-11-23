@@ -118,21 +118,52 @@
   .rodape { margin-top: auto; padding-top: 24px; display: flex; justify-content: space-between; gap: 24px; font-size: 11px; color: var(--abeto-3); border-top: 1px solid var(--linha); }
   .rodape a { color: var(--abeto-2); text-decoration: none; }
   .rodape p { max-width: 420px; }
+
+  .marca img.logo { display: block; height: 30px; width: auto; max-width: 190px; object-fit: contain; }
+
+  /* Monograma da empresa (o "logo" enquanto não há logo enviado). */
+  .monograma {
+    width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    background: var(--acao); color: var(--sobre-acao); font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  }
+</style>
+<!-- Paleta: a da empresa do link ou a do Diagnóstico do Líder (PaletaMarca). -->
+<style th:inline="css">
+  :root {
+    --abeto: [(${r.tema.tinta})]; --abeto-2: [(${r.tema.tinta2})]; --abeto-3: [(${r.tema.tinta3})];
+    --nevoa: [(${r.tema.fundo})]; --nevoa-2: [(${r.tema.fundo2})]; --linha: [(${r.tema.linha})];
+    --brasa: [(${r.tema.destaque})]; --acao: [(${r.tema.acao})]; --sobre-acao: [(${r.tema.sobreAcao})];
+  }
 </style>
 </head>
 <body th:classappend="|faixa-${r.faixa.codigo}|">
 
 <!-- ======================= Página 1 ======================= -->
-<section class="pagina">
-  <header class="topo">
-    <div class="marca">
+<!-- Marca no topo: a empresa em destaque (com o Diagnóstico discreto) ou o Diagnóstico sozinho. -->
+<div th:remove="all">
+  <div class="marca" th:fragment="marca">
+    <th:block th:if="${r.logo != null}">
+      <img class="logo" th:src="${r.logo.dataUri}" th:alt="${r.empresa.nome}" alt="Empresa">
+      <span th:if="${r.logo.pedeNome}" th:text="${r.empresa.nome}">Empresa</span>
+    </th:block>
+    <th:block th:if="${r.empresa != null and r.logo == null}">
+      <span class="monograma" th:text="${r.empresa.sigla}">CH</span>
+      <span th:text="${r.empresa.nome}">Empresa</span>
+    </th:block>
+    <th:block th:if="${r.empresa == null}">
       <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
         <rect width="26" height="26" rx="7" fill="#0F2B26"/>
         <path d="M5 19 C 9 19, 9 8, 13 8 S 17 8, 21 12" fill="none" stroke="#FF5B37" stroke-width="2.4" stroke-linecap="round"/>
       </svg>
       Diagnóstico do Líder
-    </div>
-    <time th:text="${r.data}">22 de novembro de 2026</time>
+    </th:block>
+  </div>
+</div>
+
+<section class="pagina">
+  <header class="topo">
+    <div th:replace="~{:: marca}"></div>
+    <time th:text="${r.empresa != null} ? |Diagnóstico do Líder · ${r.data}| : ${r.data}">22 de novembro de 2026</time>
   </header>
 
   <p class="quem">Diagnóstico de carreira de <strong th:text="${r.nome}">Ana Souza</strong></p>
@@ -145,21 +176,21 @@
     <svg th:attr="viewBox=|0 0 ${c.largura} ${c.altura}|" role="img" aria-label="Curva da carreira com a sua posição">
       <defs>
         <linearGradient id="preenchimento" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#FF5B37" stop-opacity="0.16"/>
-          <stop offset="1" stop-color="#FF5B37" stop-opacity="0"/>
+          <stop offset="0" th:attr="stop-color=${r.tema.destaque}" stop-opacity="0.16"/>
+          <stop offset="1" th:attr="stop-color=${r.tema.destaque}" stop-opacity="0"/>
         </linearGradient>
       </defs>
-      <line x1="10" th:attr="x2=${c.largura - 10},y1=${c.base},y2=${c.base}" stroke="#D2DDD8" stroke-width="1"/>
+      <line x1="10" th:attr="x2=${c.largura - 10},y1=${c.base},y2=${c.base},stroke=${r.tema.linha}" stroke-width="1"/>
       <path th:attr="d=${c.area}" fill="url(#preenchimento)"/>
-      <path th:attr="d=${c.proximaCurva}" fill="none" stroke="#0F2B26" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity="0.55"/>
+      <path th:attr="d=${c.proximaCurva},stroke=${r.tema.tinta}" fill="none" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity="0.55"/>
       <text class="proxima" text-anchor="end" th:attr="x=${c.largura - 30},y=14">Sua próxima curva ↗</text>
-      <path th:attr="d=${c.curva}" fill="none" stroke="#FF5B37" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path th:attr="d=${c.curva},stroke=${r.tema.destaque}" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 
       <g th:with="x=${c.voce.x},y=${c.voce.y}">
-        <line th:attr="x1=${x},x2=${x},y1=${y},y2=${c.base}" stroke="#0F2B26" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>
+        <line th:attr="x1=${x},x2=${x},y1=${y},y2=${c.base},stroke=${r.tema.tinta}" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>
         <circle th:attr="cx=${x},cy=${y}" r="15" fill="var(--faixa)" opacity="0.16"/>
         <circle th:attr="cx=${x},cy=${y}" r="8" fill="var(--faixa)" stroke="#fff" stroke-width="3"/>
-        <rect th:attr="x=${x - 56},y=${y - 46}" width="112" height="26" rx="13" fill="#0F2B26"/>
+        <rect th:attr="x=${x - 56},y=${y - 46},fill=${r.tema.tinta}" width="112" height="26" rx="13"/>
         <text class="balao" text-anchor="middle" th:attr="x=${x},y=${y - 28.5}">Você está aqui</text>
       </g>
 
@@ -194,13 +225,7 @@
 <!-- ======================= Página 2 ======================= -->
 <section class="pagina">
   <header class="topo">
-    <div class="marca">
-      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
-        <rect width="26" height="26" rx="7" fill="#0F2B26"/>
-        <path d="M5 19 C 9 19, 9 8, 13 8 S 17 8, 21 12" fill="none" stroke="#FF5B37" stroke-width="2.4" stroke-linecap="round"/>
-      </svg>
-      Diagnóstico do Líder
-    </div>
+    <div th:replace="~{:: marca}"></div>
     <time th:text="${r.nome}">Ana Souza</time>
   </header>
 

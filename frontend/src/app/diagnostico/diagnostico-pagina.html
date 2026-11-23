@@ -21,7 +21,7 @@
         <section class="flex flex-col" [class.etapa-cheia]="etapa.tipo !== 'inicio'" animate.enter="etapa-entrar" animate.leave="etapa-sair">
           @if (etapa.tipo === 'inicio') {
             <app-boas-vindas
-              [empresa]="empresaDaCampanha()"
+              [empresa]="marca()"
               [totalPerguntas]="grupos()[1]"
               [retomada]="retomada()"
               (comecar)="comecar()"
@@ -42,6 +42,41 @@
               (editou)="editou(etapa.campo)"
               (continuar)="continuarCampo(etapa)"
             />
+          } @else if (etapa.tipo === 'perfil') {
+            <app-etapa-escolha
+              sobretitulo="Sobre você"
+              [titulo]="tituloPerfil(etapa.perfil)"
+              [ajuda]="ajudaPerfil(etapa.perfil)"
+              [opcoes]="etapa.perfil === 'cargo' ? opcoesCargo() : opcoesTempo()"
+              [selecionada]="perfil()[etapa.perfil]"
+              [erro]="erroPerfil(etapa.perfil)"
+              [enviando]="enviando()"
+              [ultimo]="etapa.ultimo"
+              (escolher)="escolherPerfil(etapa, $event)"
+              (avancar)="avancarPerfil(etapa)"
+            >
+              @if (etapa.perfil === 'cargo' && perfil().cargo === CARGO_OUTRO) {
+                <div class="aparecer mt-7">
+                  <label for="cargo-outro" class="block text-[17px] font-semibold">
+                    Qual é o seu cargo? <span class="font-normal text-abeto-2">(opcional)</span>
+                  </label>
+                  <input
+                    #campoOutro
+                    id="cargo-outro"
+                    class="entrada-grande mt-2"
+                    type="text"
+                    maxlength="80"
+                    autocomplete="organization-title"
+                    autocapitalize="words"
+                    enterkeyhint="next"
+                    placeholder="Ex.: Head de vendas"
+                    [value]="perfil().outroNome"
+                    (input)="editouOutroNome(campoOutro.value)"
+                    (keydown.enter)="avancarPerfil(etapa)"
+                  />
+                </div>
+              }
+            </app-etapa-escolha>
           } @else if (etapa.tipo === 'pergunta') {
             <app-etapa-pergunta
               [pergunta]="etapa.pergunta"
@@ -61,8 +96,8 @@
   </div>
 }
 
-<!-- Avisos de erro: ficam acima do rodapé fixo, perto do polegar. -->
-<div class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[max(96px,calc(env(safe-area-inset-bottom)+88px))]" aria-live="assertive">
+<!-- Avisos de erro: ficam acima do rodapé fixo (e do teclado), perto do polegar. -->
+<div class="pointer-events-none fixed inset-x-0 bottom-[var(--teclado,0px)] z-30 flex justify-center px-4 pb-[max(96px,calc(env(safe-area-inset-bottom)+88px))] teclado:pb-[92px]" aria-live="assertive">
   @if (erro(); as mensagem) {
     <div class="aparecer pointer-events-auto flex max-w-md items-start gap-3 rounded-2xl bg-abeto px-4 py-3.5 text-[15px] text-white shadow-2xl" role="alert">
       <svg class="mt-0.5 shrink-0 text-brasa" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">

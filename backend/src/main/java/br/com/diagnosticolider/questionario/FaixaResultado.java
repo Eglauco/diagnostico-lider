@@ -56,7 +56,27 @@ public class FaixaResultado {
 	@Column(name = "texto", nullable = false)
 	private List<String> recomendacoes = new ArrayList<>();
 
+	/** Como a faixa é descrita para a empresa (o resumo e a descrição falam com o líder). */
+	@Column(name = "leitura_empresa")
+	private String leituraEmpresa;
+
+	/** O que a empresa pode fazer pelos líderes desta faixa (relatório consolidado). */
+	@ElementCollection
+	@CollectionTable(name = "faixa_acao_empresa", joinColumns = @JoinColumn(name = "faixa_id"))
+	@OrderColumn(name = "ordem", nullable = false)
+	@ListIndexBase(1)
+	@Column(name = "texto", nullable = false)
+	private List<String> acoesEmpresa = new ArrayList<>();
+
 	protected FaixaResultado() {
+	}
+
+	public String getLeituraEmpresa() {
+		return leituraEmpresa;
+	}
+
+	public List<String> getAcoesEmpresa() {
+		return acoesEmpresa;
 	}
 
 	public boolean contem(int pontuacao) {

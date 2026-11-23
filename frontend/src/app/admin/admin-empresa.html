@@ -1,0 +1,261 @@
+<main class="mx-auto max-w-6xl px-4 pt-6 pb-20 sm:px-6">
+  <a
+    routerLink="/administrador/empresas"
+    class="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-[15px] font-semibold text-abeto-2 transition-colors hover:text-abeto"
+  >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+      <path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+    Empresas
+  </a>
+
+  @if (empresa.error()) {
+    <div class="cartao mt-6 p-8 text-center" role="alert">
+      <p class="text-[18px] font-semibold">Não encontramos esta empresa.</p>
+      <a routerLink="/administrador/empresas" class="botao-secundario mt-5">Ver todas as empresas</a>
+    </div>
+  } @else if (empresa.hasValue()) {
+    @if (empresa.value(); as e) {
+      @if (confirmacao(); as c) {
+        <div class="surgir mt-3 flex items-start gap-3 rounded-2xl bg-ascensao-suave px-4 py-3.5 text-[15px] text-[#17714A]" role="status">
+          <svg class="mt-0.5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          @if (c === 'criada') {
+            <p><strong class="font-semibold">Empresa cadastrada.</strong> O link já está no ar: copie e envie para os líderes.</p>
+          } @else {
+            <p><strong class="font-semibold">Alterações salvas.</strong> O questionário, os PDFs e o QR Code já mostram a marca atualizada.</p>
+          }
+        </div>
+      }
+
+      <header class="mt-4 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
+          @if (e.logo; as logo) {
+            <span class="mb-4 inline-flex rounded-2xl bg-white px-4 py-3 ring-1 ring-linha">
+              <img [src]="logo.url" class="block h-10 w-auto max-w-[220px] object-contain" [alt]="'Logomarca de ' + e.nome" />
+            </span>
+          }
+          <p class="rotulo text-brasa-escura">Empresa</p>
+          <h1 class="display mt-2 text-[40px] leading-[1] font-bold break-words sm:text-[54px]">{{ e.nome }}</h1>
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-abeto-2">
+            <span>Cadastrada em {{ dataDeCadastro(e.criadaEm) }}</span>
+            @if (e.cores.primaria; as primaria) {
+              <span class="inline-flex items-center gap-2">
+                <span class="flex" aria-hidden="true">
+                  <i class="block size-5 rounded-full ring-2 ring-nevoa" [style.background]="primaria"></i>
+                  @if (e.cores.secundaria; as secundaria) {
+                    <i class="-ml-1.5 block size-5 rounded-full ring-2 ring-nevoa" [style.background]="secundaria"></i>
+                  }
+                </span>
+                <span>Cores da marca: {{ primaria }}{{ e.cores.secundaria ? ' e ' + e.cores.secundaria : '' }}</span>
+              </span>
+            } @else {
+              <span>Cores do Diagnóstico do Líder</span>
+            }
+          </div>
+        </div>
+        <a [routerLink]="['editar']" class="botao-secundario shrink-0">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Editar marca e cargos
+        </a>
+      </header>
+
+      @if (e.link; as l) {
+        <!-- No celular: link, QR Code, convite, respostas. No computador: duas colunas. -->
+        <div class="mt-8 flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+          <div class="contents lg:flex lg:flex-col lg:gap-4">
+            <section class="cartao order-1 p-5 sm:p-6" aria-labelledby="titulo-link">
+              <h2 id="titulo-link" class="text-[17px] font-semibold">Link para os líderes</h2>
+              <p class="mt-1 text-[14px] text-abeto-2">Quem abrir este link responde já vinculado a {{ e.nome }}.</p>
+              <p class="mt-4 rounded-2xl bg-nevoa-2 px-4 py-3.5 text-[17px] leading-snug font-semibold break-all ring-1 ring-linha/70 select-all">
+                {{ l.url }}
+              </p>
+              <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <button type="button" class="botao-primario" (click)="copiar(l.url, 'link')">
+                  @if (copiado() === 'link') {
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    Link copiado
+                  } @else {
+                    Copiar link
+                  }
+                </button>
+                <a class="botao-secundario" [href]="whatsapp()" target="_blank" rel="noopener">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19l1.2-3.6A7.5 7.5 0 1 1 9 18.3L5 19z" stroke-linejoin="round" /></svg>
+                  Enviar no WhatsApp<span class="sr-only"> (abre o WhatsApp com o convite)</span>
+                </a>
+              </div>
+              <a [href]="l.url" target="_blank" rel="noopener" class="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-abeto-2 hover:text-abeto">
+                Abrir como o líder vê <span aria-hidden="true">↗</span><span class="sr-only">(abre em nova aba)</span>
+              </a>
+            </section>
+
+            <section class="cartao order-3 p-5 sm:p-6" aria-labelledby="titulo-convite">
+              <h2 id="titulo-convite" class="text-[17px] font-semibold">Mensagem de convite</h2>
+              <p class="mt-1 text-[14px] text-abeto-2">Envie para o RH repassar aos líderes, junto com o QR Code.</p>
+              <p class="mt-4 rounded-2xl bg-nevoa-2 p-4 text-[15px] leading-relaxed whitespace-pre-line">{{ convite() }}</p>
+              <button type="button" class="botao-secundario mt-3 w-full sm:w-auto" (click)="copiar(convite(), 'convite')">
+                {{ copiado() === 'convite' ? 'Mensagem copiada' : 'Copiar mensagem' }}
+              </button>
+            </section>
+
+            <section class="cartao order-4 p-5 sm:p-6" aria-labelledby="titulo-respostas">
+              <div class="flex items-center justify-between gap-3">
+                <h2 id="titulo-respostas" class="text-[17px] font-semibold">Respostas</h2>
+                @if (e.indicadores.total) {
+                  <a routerLink="/administrador" [queryParams]="{ campanha: l.codigo }" class="inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-abeto hover:underline">
+                    Ver no painel <span aria-hidden="true">→</span>
+                  </a>
+                }
+              </div>
+              @if (e.indicadores.total) {
+                <dl class="mt-4 grid grid-cols-3 gap-3">
+                  <div>
+                    <dt class="text-[13px] font-semibold text-abeto-2">Diagnósticos</dt>
+                    <dd class="display mt-1 text-[34px] leading-none font-bold tabular-nums">{{ e.indicadores.total }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-[13px] font-semibold text-abeto-2">Concluídos</dt>
+                    <dd class="display mt-1 text-[34px] leading-none font-bold tabular-nums">{{ e.indicadores.concluidos }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-[13px] font-semibold text-abeto-2">Índice médio</dt>
+                    <dd class="display mt-1 text-[34px] leading-none font-bold tabular-nums">{{ e.indicadores.indiceMedio ?? '—' }}</dd>
+                  </div>
+                </dl>
+                @if (e.indicadores.concluidos) {
+                  <div class="mt-5 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-nevoa" aria-hidden="true">
+                    @for (d of distribuicao(); track d.codigo) {
+                      <span class="h-full" [style.width.%]="d.percentual" [style.background]="d.cor"></span>
+                    }
+                  </div>
+                  <ul class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
+                    @for (d of distribuicao(); track d.codigo) {
+                      <li class="flex items-center gap-2">
+                        <i class="block size-2.5 rounded-full" [style.background]="d.cor"></i>{{ d.rotulo }}
+                        <strong class="tabular-nums">{{ d.quantidade }}</strong>
+                      </li>
+                    }
+                  </ul>
+                }
+              } @else {
+                <p class="mt-3 rounded-2xl bg-nevoa-2 px-4 py-6 text-center text-[15px] text-abeto-2">
+                  Ninguém respondeu ainda. Os números aparecem aqui assim que o primeiro líder começar.
+                </p>
+              }
+
+              <!-- Relatório consolidado para enviar à empresa -->
+              <div class="mt-5 rounded-2xl bg-nevoa-2 p-4 ring-1 ring-linha/70 sm:p-5">
+                <div class="flex items-start gap-3">
+                  <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-abeto text-white" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1-1.5z" stroke-linejoin="round" />
+                      <path d="M9 16v-2.5M12 16v-5M15 16v-3.5" stroke="#FF5B37" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                  <div class="min-w-0">
+                    <h3 class="text-[16px] font-semibold">Relatório consolidado</h3>
+                    <p class="mt-0.5 text-[14px] text-abeto-2">
+                      PDF para enviar à empresa, sem nomes: o grupo na curva, faixas, cargos, dimensões, cada pergunta e o que fazer com cada grupo.
+                    </p>
+                  </div>
+                </div>
+                @if (faltamParaRelatorio() === 0) {
+                  <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button type="button" class="botao-primario" [attr.aria-busy]="gerandoRelatorio()" [disabled]="gerandoRelatorio()" (click)="baixarRelatorio()">
+                      @if (gerandoRelatorio()) {
+                        <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+                        Gerando o relatório…
+                      } @else {
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                          <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Baixar relatório (PDF)
+                      }
+                    </button>
+                    <a [href]="urlRelatorio() + '?visualizar=true'" target="_blank" rel="noopener" class="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 text-[15px] font-semibold text-abeto-2 hover:text-abeto">
+                      Abrir em nova aba <span aria-hidden="true">↗</span>
+                    </a>
+                  </div>
+                } @else {
+                  <div class="mt-4">
+                    <div class="h-2 overflow-hidden rounded-full bg-white ring-1 ring-linha/70" aria-hidden="true">
+                      <span class="block h-full rounded-full bg-abeto transition-[width] duration-700" [style.width.%]="(e.indicadores.concluidos / e.minimoRelatorio) * 100"></span>
+                    </div>
+                    <p class="mt-2 text-[14px] text-abeto-2">
+                      Fica disponível com <strong class="text-abeto">{{ e.minimoRelatorio }} diagnósticos concluídos</strong>, para que nenhum líder seja identificado.
+                      {{ faltamParaRelatorio() === 1 ? 'Falta 1.' : 'Faltam ' + faltamParaRelatorio() + '.' }}
+                    </p>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <section class="cartao order-5 p-5 sm:p-6" aria-labelledby="titulo-cargos">
+              <div class="flex items-center justify-between gap-3">
+                <h2 id="titulo-cargos" class="text-[17px] font-semibold">Cargos dos líderes</h2>
+                <a [routerLink]="['editar']" fragment="cargos-secao" class="inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-abeto hover:underline">
+                  {{ e.cargos.length ? 'Editar' : 'Cadastrar' }} <span aria-hidden="true">→</span>
+                </a>
+              </div>
+              @if (e.cargos.length) {
+                <p class="mt-1 text-[14px] text-abeto-2">Do nível mais alto (em cima) ao primeiro nível de liderança (embaixo). O líder escolhe um deles no link ou diz que o cargo não está na lista.</p>
+                <ol class="mt-4" reversed>
+                  @for (c of cargosNaEscada(); track c.id) {
+                    <li class="flex min-h-12 items-center gap-3 border-t border-linha first:border-t-0">
+                      <span class="grid size-7 shrink-0 place-items-center rounded-lg bg-nevoa-2 text-[13px] font-bold text-abeto-2 tabular-nums" aria-hidden="true">{{ c.nivel }}</span>
+                      <span class="min-w-0 flex-1 truncate text-[15px] font-semibold">{{ c.nome }}</span>
+                      @if (c.diagnosticos) {
+                        <a
+                          routerLink="/administrador"
+                          [queryParams]="{ campanha: l.codigo, cargo: c.id }"
+                          class="inline-flex min-h-11 shrink-0 items-center gap-1 text-[14px] font-semibold text-abeto-2 tabular-nums hover:text-abeto"
+                          [attr.aria-label]="'Ver os ' + c.diagnosticos + ' diagnósticos de ' + c.nome + ' no painel'"
+                        >
+                          {{ c.diagnosticos }} {{ c.diagnosticos === 1 ? 'líder' : 'líderes' }} <span aria-hidden="true">→</span>
+                        </a>
+                      } @else {
+                        <span class="shrink-0 text-[14px] text-abeto-3">nenhum ainda</span>
+                      }
+                    </li>
+                  }
+                </ol>
+              } @else {
+                <p class="mt-3 rounded-2xl bg-nevoa-2 px-4 py-5 text-[15px] text-abeto-2">
+                  Sem cargos, o líder não informa o cargo e o relatório fica sem a análise por cargo e por tempo no cargo.
+                </p>
+              }
+            </section>
+          </div>
+
+          <div class="order-2 lg:sticky lg:top-24">
+            <app-kit-qr [url]="l.url" [codigo]="l.codigo" [empresa]="e.nome" [tema]="e.tema" [logo]="e.logo" />
+          </div>
+        </div>
+      } @else {
+        <div class="cartao mt-8 p-6">
+          <p class="font-semibold">Esta empresa ainda não tem link.</p>
+        </div>
+      }
+    }
+  } @else {
+    <div class="mt-6 space-y-3" aria-hidden="true">
+      <div class="h-14 w-2/3 animate-pulse rounded-2xl bg-white/70"></div>
+      <div class="grid gap-4 lg:grid-cols-2">
+        <div class="cartao h-72 animate-pulse"></div>
+        <div class="cartao h-96 animate-pulse"></div>
+      </div>
+    </div>
+  }
+</main>
+
+<div class="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(24px,env(safe-area-inset-bottom))]" aria-live="assertive">
+  @if (erro(); as mensagem) {
+    <div class="aparecer pointer-events-auto flex max-w-md items-start gap-3 rounded-2xl bg-abeto px-4 py-3.5 text-[15px] text-white shadow-2xl" role="alert">
+      <p class="flex-1">{{ mensagem }}</p>
+      <button type="button" class="-my-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10" aria-label="Fechar aviso" (click)="erro.set(null)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" /></svg>
+      </button>
+    </div>
+  }
+</div>

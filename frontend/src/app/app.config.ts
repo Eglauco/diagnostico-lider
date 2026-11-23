@@ -1,9 +1,11 @@
-import { ApplicationConfig, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { ApplicationConfig, LOCALE_ID, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
 
+import { sessaoExpiradaInterceptor } from './admin/acesso/sessao';
+import { acompanharTeclado } from './compartilhado/teclado-virtual';
 import { routes } from './app.routes';
 
 registerLocaleData(localePt);
@@ -11,12 +13,15 @@ registerLocaleData(localePt);
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(withFetch()),
+    // XSRF fica ligado (padrão): o Angular copia o cookie XSRF-TOKEN no cabeçalho X-XSRF-TOKEN.
+    provideHttpClient(withFetch(), withInterceptors([sessaoExpiradaInterceptor])),
     provideRouter(
       routes,
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
     ),
     { provide: LOCALE_ID, useValue: 'pt-BR' },
+    // Rodapé com o botão principal sempre acima do teclado do celular (inclusive no iPhone).
+    provideAppInitializer(acompanharTeclado),
   ],
 };

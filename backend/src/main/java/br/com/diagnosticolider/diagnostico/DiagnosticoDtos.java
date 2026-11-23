@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import br.com.diagnosticolider.empresa.MarcaEmpresa;
 import br.com.diagnosticolider.questionario.Opcao;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -19,12 +20,18 @@ public final class DiagnosticoDtos {
 	private DiagnosticoDtos() {
 	}
 
+	/**
+	 * Cargo e tempo no cargo só valem no link de uma empresa que tem cargos cadastrados: aí são
+	 * obrigatórios. "Outro cargo": cargoOutro = true, sem cargoId, e o nome (opcional) em cargoOutroNome.
+	 */
 	public record IniciarRequest(
 			@NotBlank(message = "Informe seu nome.") @Size(max = 160, message = "Use até 160 caracteres.") String nome,
 			@NotBlank(message = "Informe seu e-mail.") @Email(message = "Informe um e-mail válido.")
 			@Size(max = 254, message = "E-mail muito longo.") String email,
 			@NotBlank(message = "Informe seu WhatsApp.") @Size(max = 20, message = "WhatsApp inválido.") String whatsapp,
-			@Size(max = 160, message = "Use até 160 caracteres.") String empresa) {
+			Long cargoId, Boolean cargoOutro,
+			@Size(max = 80, message = "Use até 80 caracteres no nome do cargo.") String cargoOutroNome,
+			TempoCargo tempoCargo) {
 	}
 
 	public record ResponderRequest(@NotEmpty(message = "Escolha uma opção.") List<@NotNull Long> opcoes) {
@@ -44,8 +51,10 @@ public final class DiagnosticoDtos {
 
 	}
 
+	/** "empresa" (com a paleta) vem quando o diagnóstico foi feito pelo link de uma empresa. */
 	public record ResultadoDto(UUID id, String nome, String primeiroNome, Instant concluidoEm, int pontuacao,
-			FaixaDto faixa, List<DimensaoDto> dimensoes, String emailMascarado, StatusEmail statusEmail) {
+			FaixaDto faixa, List<DimensaoDto> dimensoes, String emailMascarado, StatusEmail statusEmail,
+			MarcaEmpresa empresa) {
 
 		public record FaixaDto(String codigo, String titulo, String resumo, String descricao,
 				List<String> recomendacoes) {
@@ -54,7 +63,7 @@ public final class DiagnosticoDtos {
 		public record DimensaoDto(String codigo, String nome, String descricao, int pontuacao) {
 		}
 
-		static ResultadoDto de(Diagnostico d) {
+		static ResultadoDto de(Diagnostico d, MarcaEmpresa empresa) {
 			var f = d.getFaixa();
 			var faixa = new FaixaDto(f.getCodigo(), f.getTitulo(), f.getResumo(), f.getDescricao(),
 					List.copyOf(f.getRecomendacoes()));
@@ -65,7 +74,7 @@ public final class DiagnosticoDtos {
 				.toList();
 			var r = d.getRespondente();
 			return new ResultadoDto(d.getId(), r.getNome(), r.primeiroNome(), d.getConcluidoEm(), d.getPontuacao(),
-					faixa, dimensoes, r.emailMascarado(), d.getStatusEmail());
+					faixa, dimensoes, r.emailMascarado(), d.getStatusEmail(), empresa);
 		}
 
 	}

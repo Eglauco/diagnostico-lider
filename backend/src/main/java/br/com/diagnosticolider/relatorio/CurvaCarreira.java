@@ -50,12 +50,30 @@ public final class CurvaCarreira {
 		return T_INDICE_0 - (indice / 100.0) * (T_INDICE_0 - T_INDICE_100);
 	}
 
+	private static final double MARGEM_X = 10;
+
+	private static final double MARGEM_TOPO = 14;
+
+	private static final double MARGEM_BASE = 26;
+
+	private static DoubleUnaryOperator escalaX(double largura) {
+		return t -> MARGEM_X + t * (largura - 2 * MARGEM_X);
+	}
+
+	private static DoubleUnaryOperator escalaY(double altura) {
+		return v -> altura - MARGEM_BASE - (v / ALTURA_MAXIMA) * (altura - MARGEM_TOPO - MARGEM_BASE);
+	}
+
+	/** Onde um índice fica no desenho de {@link #desenhar}: usado para pôr vários líderes na mesma curva. */
+	public static Ponto ponto(double largura, double altura, int indice) {
+		double t = posicao(indice);
+		return new Ponto(escalaX(largura).applyAsDouble(t), escalaY(altura).applyAsDouble(altura(t)));
+	}
+
 	public static Desenho desenhar(double largura, double altura, int indice) {
-		double margemX = 10;
-		double margemTopo = 14;
-		double margemBase = 26;
-		DoubleUnaryOperator x = t -> margemX + t * (largura - 2 * margemX);
-		DoubleUnaryOperator y = v -> altura - margemBase - (v / ALTURA_MAXIMA) * (altura - margemTopo - margemBase);
+		double margemBase = MARGEM_BASE;
+		DoubleUnaryOperator x = escalaX(largura);
+		DoubleUnaryOperator y = escalaY(altura);
 
 		String curva = caminho(0, 1, CurvaCarreira::altura, x, y);
 		String proximaCurva = caminho(0.55, 1, CurvaCarreira::proxima, x, y);

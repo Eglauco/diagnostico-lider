@@ -1,0 +1,260 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.6);
+  box-shadow: inset 0 0 0 1px var(--color-linha);
+  color: var(--color-abeto-2);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 180ms,
+    color 180ms,
+    box-shadow 180ms;
+}
+.chip:hover {
+  background: #fff;
+  color: var(--color-abeto);
+}
+.chip[aria-pressed='true'] {
+  background: var(--color-abeto);
+  box-shadow: none;
+  color: #fff;
+}
+.chip-novo {
+  border: 1.5px dashed var(--color-abeto-3);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-abeto);
+}
+.chip .contagem {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.cartao {
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgb(210 221 216 / 0.7);
+}
+
+.kpi {
+  padding: 18px 20px;
+}
+.kpi dt {
+  color: var(--color-abeto-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.kpi dd {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 96;
+  font-stretch: 84%;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi p {
+  margin-top: 6px;
+  color: var(--color-abeto-2);
+  font-size: 13px;
+}
+
+/* Linha inteira clicável, mantendo o botão de PDF independente. */
+tbody tr {
+  position: relative;
+}
+.linha-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* Duas opções lado a lado (ex.: formato do QR Code). */
+.segmentado {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-nevoa);
+}
+.segmentado button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--color-abeto-2);
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background-color 180ms,
+    color 180ms,
+    box-shadow 180ms;
+}
+.segmentado button:hover {
+  color: var(--color-abeto);
+}
+.segmentado button[aria-pressed='true'] {
+  background: #fff;
+  color: var(--color-abeto);
+  box-shadow:
+    0 1px 2px rgb(15 43 38 / 0.12),
+    0 0 0 1px rgb(210 221 216 / 0.8);
+}
+
+/* Onde a imagem do QR Code aparece antes de copiar ou baixar. */
+.palco-qr {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  padding: 24px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 1px 1px, rgb(15 43 38 / 0.09) 1px, transparent 0) 0 0 / 14px 14px,
+    var(--color-nevoa-2);
+  transition: background-color 300ms;
+}
+.palco-qr-cartao {
+  padding: 20px;
+}
+.imagem-qr {
+  width: min(100%, 260px);
+  aspect-ratio: 1;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgb(210 221 216 / 0.9),
+    0 18px 40px -24px rgb(15 43 38 / 0.45);
+  transition: opacity 200ms;
+}
+.imagem-qr-cartao {
+  width: min(100%, 300px);
+  aspect-ratio: 1080 / 1350;
+  border-radius: 18px;
+}
+
+/* Campos de formulário do painel. */
+/* Sem "display" aqui: estes estilos vencem as classes do Tailwind (ex.: flex). */
+.campo {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 18px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--color-linha);
+  color: var(--color-abeto);
+  font-size: 17px;
+  font-weight: 500;
+  caret-color: var(--color-brasa);
+  outline: none;
+  transition: box-shadow 160ms;
+}
+.campo::placeholder {
+  color: var(--color-abeto-3);
+  font-weight: 400;
+}
+.campo:focus,
+.campo:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-abeto);
+}
+.campo:focus-visible {
+  outline: none;
+}
+.campo[aria-invalid='true'],
+.campo:has([aria-invalid='true']) {
+  box-shadow: inset 0 0 0 2px var(--color-travada);
+}
+.campo input {
+  outline: none;
+}
+.campo-rotulo {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cartao-empresa {
+  transition: box-shadow 200ms;
+}
+.cartao-empresa:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--color-abeto-3),
+    0 18px 40px -28px rgb(15 43 38 / 0.5);
+}
+
+/* Acesso ------------------------------------------------------------------ */
+.lado-marca {
+  background:
+    radial-gradient(120% 90% at 15% -10%, #2e6b5f 0%, rgb(15 43 38 / 0) 60%),
+    var(--color-abeto);
+}
+.rotulo-curva {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  fill: rgb(237 242 239 / 0.55);
+}
+
+/* Diálogo: folha que sobe do rodapé no celular, cartão centralizado no computador. */
+.dialogo {
+  width: 100%;
+  max-width: 100%;
+  max-height: 92dvh;
+  margin: auto auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+  color: var(--color-abeto);
+  box-shadow: 0 -20px 60px -30px rgb(15 43 38 / 0.5);
+  overscroll-behavior: contain;
+}
+.dialogo[open] {
+  animation: folha 320ms var(--ease-mola);
+}
+.dialogo::backdrop {
+  background: rgb(15 43 38 / 0.45);
+  backdrop-filter: blur(2px);
+}
+.dialogo-corpo {
+  padding: 22px 20px max(20px, env(safe-area-inset-bottom));
+}
+@keyframes folha {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (min-width: 640px) {
+  .dialogo {
+    max-width: 30rem;
+    margin: auto;
+    border-radius: 24px;
+    box-shadow: 0 30px 80px -30px rgb(15 43 38 / 0.55);
+  }
+  .dialogo-corpo {
+    padding: 28px;
+  }
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-abeto);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.avatar-inativo {
+  background: var(--color-linha);
+  color: var(--color-abeto-2);
+}

@@ -1,6 +1,9 @@
 spring:
   application:
     name: diagnostico-lider
+  # Local: variáveis em backend/.env (fora do Git), como ADMIN_EMAIL e ADMIN_SENHA. No Railway não existe.
+  config:
+    import: optional:file:.env[.properties]
   # No Railway, as variáveis PG* vêm do serviço Postgres (referência ${{Postgres.PGHOST}} etc.).
   datasource:
     url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:diagnostico_lider}
@@ -22,11 +25,25 @@ spring:
       enabled: true
   thymeleaf:
     cache: ${THYMELEAF_CACHE:true}
+  # Upload da logomarca (o painel já reduz a imagem antes de enviar).
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 3MB
 
 server:
   port: ${PORT:8080}
   shutdown: graceful
   forward-headers-strategy: framework
+  servlet:
+    session:
+      # Sessão do painel: cai depois de 12 h sem uso. Cookie HttpOnly e SameSite=Lax;
+      # em HTTPS (Railway) sai também com Secure.
+      timeout: 12h
+      cookie:
+        name: SESSAO_PAINEL
+        http-only: true
+        same-site: lax
   compression:
     enabled: true
     mime-types: application/json,text/html,text/css,application/javascript,image/svg+xml
@@ -54,3 +71,19 @@ app:
     provedor: ${EMAIL_PROVEDOR:log}
     remetente: ${EMAIL_REMETENTE:Diagnóstico do Líder <onboarding@resend.dev>}
     resend-api-key: ${RESEND_API_KEY:}
+  # Logomarcas das empresas. No Railway: bucket "logomarcas" (S3_* por referência de variável) e
+  # ARMAZENAMENTO_PREFIXO=producao. Localmente: pasta "desenvolvimento"; sem S3_*, fica em disco.
+  armazenamento:
+    prefixo: ${ARMAZENAMENTO_PREFIXO:desenvolvimento}
+    endpoint: ${S3_ENDPOINT:}
+    bucket: ${S3_BUCKET:}
+    regiao: ${S3_REGION:auto}
+    chave: ${S3_ACCESS_KEY_ID:}
+    segredo: ${S3_SECRET_ACCESS_KEY:}
+    estilo-caminho: ${S3_PATH_STYLE:false}
+    pasta-local: ${ARMAZENAMENTO_PASTA:.arquivos}
+  # Primeiro usuário do painel: criado na subida só se a tabela de usuários estiver vazia.
+  acesso-inicial:
+    nome: ${ADMIN_NOME:Administrador}
+    email: ${ADMIN_EMAIL:}
+    senha: ${ADMIN_SENHA:}

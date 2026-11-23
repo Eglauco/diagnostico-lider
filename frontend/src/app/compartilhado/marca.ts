@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 
 @Component({
   selector: 'app-marca',
@@ -14,7 +14,10 @@ import { Component } from '@angular/core';
         stroke-linecap="round"
       />
     </svg>
-    <span>Diagnóstico do Líder</span>
+    <span [class]="compacta() ? 'sr-only sm:not-sr-only' : ''">Diagnóstico do Líder</span>
   `,
 })
-export class Marca {}
+export class Marca {
+  /** No celular mostra só o símbolo (o nome continua disponível para leitores de tela). */
+  readonly compacta = input(false);
+}
