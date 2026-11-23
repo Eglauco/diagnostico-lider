@@ -5,19 +5,21 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Gera o PDF com o Chrome/Edge instalado na máquina (modo headless). Pensado para
- * desenvolvimento local sem Docker; em produção use o Gotenberg.
+ * Gera o PDF (e a imagem de prévia do link) com o Chrome/Edge instalado na máquina, em modo
+ * headless. Pensado para desenvolvimento local sem Docker; em produção use o Gotenberg.
  */
 class ChromePdfRenderer implements PdfRenderer {
 
@@ -44,30 +46,44 @@ class ChromePdfRenderer implements PdfRenderer {
 
 	@Override
 	public byte[] renderizar(String html) {
+		return executar(html, "relatorio.pdf", List.of("--no-pdf-header-footer"), saida -> "--print-to-pdf=" + saida);
+	}
+
+	@Override
+	public byte[] capturar(String html, int largura, int altura) {
+		return executar(html, "previa.png",
+				List.of("--hide-scrollbars", "--force-device-scale-factor=1", "--window-size=" + largura + "," + altura),
+				saida -> "--screenshot=" + saida);
+	}
+
+	private byte[] executar(String html, String arquivoSaida, List<String> opcoes,
+			Function<Path, String> destino) {
 		Path chrome = executavel.orElseThrow(() -> new IllegalStateException(
-				"Chrome/Edge não encontrado para gerar o PDF. Defina CHROME_PATH ou use PDF_MOTOR=gotenberg."));
+				"Chrome/Edge não encontrado para gerar o arquivo. Defina CHROME_PATH ou use PDF_MOTOR=gotenberg."));
 		simultaneos.acquireUninterruptibly();
 		Path pasta = null;
 		try {
 			pasta = Files.createTempDirectory("relatorio-");
 			Path entrada = pasta.resolve("index.html");
-			Path saida = pasta.resolve("relatorio.pdf");
+			Path saida = pasta.resolve(arquivoSaida);
 			Files.writeString(entrada, html, StandardCharsets.UTF_8);
 
-			Process processo = new ProcessBuilder(chrome.toString(), "--headless", "--disable-gpu", "--no-sandbox",
-					"--no-first-run", "--no-default-browser-check", "--disable-extensions", "--no-pdf-header-footer",
-					"--user-data-dir=" + pasta.resolve("perfil"), "--print-to-pdf=" + saida,
-					entrada.toUri().toString())
-				.redirectErrorStream(true)
+			var comando = new ArrayList<>(List.of(chrome.toString(), "--headless", "--disable-gpu",
+					"--no-sandbox", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+					"--user-data-dir=" + pasta.resolve("perfil")));
+			comando.addAll(opcoes);
+			comando.add(destino.apply(saida));
+			comando.add(entrada.toUri().toString());
+			Process processo = new ProcessBuilder(comando).redirectErrorStream(true)
 				.redirectOutput(ProcessBuilder.Redirect.DISCARD)
 				.start();
 
 			if (!processo.waitFor(60, TimeUnit.SECONDS)) {
 				processo.destroyForcibly();
-				throw new IllegalStateException("O Chrome não gerou o PDF em 60 segundos.");
+				throw new IllegalStateException("O Chrome não gerou o arquivo em 60 segundos.");
 			}
 			if (!Files.exists(saida)) {
-				throw new IllegalStateException("O Chrome terminou sem gerar o PDF (código " + processo.exitValue() + ").");
+				throw new IllegalStateException("O Chrome terminou sem gerar o arquivo (código " + processo.exitValue() + ").");
 			}
 			return Files.readAllBytes(saida);
 		}
@@ -76,7 +92,7 @@ class ChromePdfRenderer implements PdfRenderer {
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			throw new IllegalStateException("Geração do PDF interrompida.", e);
+			throw new IllegalStateException("Geração interrompida.", e);
 		}
 		finally {
 			simultaneos.release();

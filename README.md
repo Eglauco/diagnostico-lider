@@ -93,6 +93,7 @@ Links de exemplo: `/` (link geral) e `/c/demo` (vinculado à "Empresa Demonstra�
 | POST   | `/api/public/diagnosticos/{id}/finalizar`            | Calcula o resultado (idempotente)           |
 | GET    | `/api/public/diagnosticos/{id}/resultado`            | Resultado                                   |
 | GET    | `/api/public/diagnosticos/{id}/relatorio.pdf`        | PDF (`?visualizar=true` abre no navegador)  |
+| GET    | `/api/public/campanhas/{codigo}/previa-{versao}.jpg` | Imagem da prévia do link (1200×630)         |
 
 Erros seguem `application/problem+json` (RFC 9457); validação traz o mapa `campos`.
 
@@ -242,6 +243,27 @@ pergunta (quantos escolheram cada alternativa) e o que a empresa pode fazer por 
   e `faixa_acao_empresa` por faixa, `acao_empresa` por dimensão. Os textos atuais são de exemplo.
 - Template: `templates/relatorio/empresa.html` (páginas A4 de tamanho fixo; perguntas e dimensões
   são paginadas no `RelatorioEmpresaService`).
+
+### Prévia do link no WhatsApp
+
+Quando o RH manda o link (`/c/{codigo}` ou `/`), o WhatsApp, o LinkedIn, o Telegram e o iMessage
+mostram uma prévia com imagem: a curva da carreira com "Você está aqui?", a pergunta do
+diagnóstico e, no link de uma empresa, a logo (ou o monograma) e as cores dela.
+
+- **Por que o backend serve o `index.html` desses links:** quem monta a prévia não roda
+  JavaScript, só lê as tags Open Graph do HTML. O `PreviaLinkController` devolve o mesmo
+  `index.html` do Angular, trocando as tags `og:*`, `twitter:*` e `description` pelas do link
+  (convite com o nome da empresa e o endereço absoluto da imagem). As outras rotas do front seguem
+  pelo `SpaWebConfig`.
+- **A imagem** sai do template `templates/previa/link.html` pelo mesmo motor do PDF (Chrome local
+  ou rota de screenshot do Gotenberg) e é convertida em JPEG (~80 KB; o WhatsApp não mostra
+  imagens grandes). Fica em memória por versão: o endereço muda quando o nome, as cores ou a logo
+  da empresa mudam (ou `PreviaLinkService.DESENHO`, quando o desenho muda), e o app busca a nova.
+- **Testar localmente:** o `ng serve` (porta 4200) não passa por aqui. Gere o front
+  (`npm --prefix frontend run build`), copie `frontend/dist/frontend/browser/*` para
+  `backend/target/classes/static/` e abra `http://localhost:8080/c/demo`.
+- **O WhatsApp guarda a prévia** de cada endereço por um tempo. Para ver uma mudança no celular,
+  mande o link com um parâmetro novo (ex.: `/c/demo?v=2`).
 
 ## Deploy no Railway
 
