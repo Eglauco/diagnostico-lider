@@ -260,6 +260,13 @@
 .palco[data-direcao='frente'] > .etapa-sair   { animation: sair-frente 200ms var(--ease-saida) both; pointer-events: none; }
 .palco[data-direcao='tras']   > .etapa-sair   { animation: sair-tras 200ms var(--ease-saida) both; pointer-events: none; }
 
+/* Pede um segundo toque (ex.: o PDF ficou pronto depois que o navegador liberou o compartilhar). */
+@keyframes chamar-toque {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-acao) 35%, transparent); }
+  50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-acao) 0%, transparent); }
+}
+.chamar-toque { animation: chamar-toque 1.4s var(--ease-mola) 3; }
+
 /* Elementos de uma etapa chegam em cascata: style="--i: 0..n". */
 @keyframes surgir { from { opacity: 0; transform: translate3d(0, 14px, 0); } }
 .surgir { animation: surgir 560ms var(--ease-mola) both; animation-delay: calc(var(--i, 0) * 55ms + 140ms); }

@@ -102,22 +102,73 @@
       <p class="-mt-2 px-5 pb-6 sm:px-8"><app-credito-diagnostico class="inline-flex" /></p>
     }
 
-    <!-- Ação principal no polegar. -->
+    <!-- Ação principal no polegar. No celular: compartilhar o PDF (WhatsApp, e-mail, Arquivos) e,
+         ao lado, baixar. No computador: baixar. -->
     <div class="rodape-fixo z-10 px-5 sm:px-8">
-      <button type="button" class="botao-primario w-full" [attr.aria-busy]="baixando()" (click)="baixarPdf()">
-        @if (baixando()) {
-          <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
-          Gerando o seu PDF…
-        } @else {
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-            <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-          Baixar diagnóstico em PDF
-        }
-      </button>
+      @if (podeCompartilhar) {
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="botao-primario min-w-0 flex-1 px-5 whitespace-nowrap"
+            [class.chamar-toque]="tocarDeNovo()"
+            [attr.aria-busy]="preparando()"
+            (click)="compartilharPdf()"
+          >
+            @if (preparando()) {
+              <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+              Preparando o PDF…
+            } @else {
+              <!-- O ícone de compartilhar que cada sistema usa: a caixa com a seta (iPhone) ou os três pontos ligados (Android). -->
+              @if (android) {
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                  <circle cx="18" cy="5.5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="18.5" r="2.5" />
+                  <path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1" stroke-linecap="round" />
+                </svg>
+              } @else {
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                  <path d="M12 14.5V3.5m0 0L8 7.5m4-4l4 4M8.5 10.5H7a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              }
+              {{ tocarDeNovo() ? 'Toque de novo' : 'Compartilhar PDF' }}
+            }
+          </button>
+          <button
+            type="button"
+            class="grid size-[58px] shrink-0 place-items-center rounded-full bg-white text-abeto ring-[1.5px] ring-linha transition-shadow ring-inset hover:ring-abeto-3"
+            aria-label="Baixar o PDF"
+            [attr.aria-busy]="baixando()"
+            (click)="baixarPdf()"
+          >
+            @if (baixando()) {
+              <span class="size-5 animate-spin rounded-full border-2 border-abeto/25 border-t-abeto" aria-hidden="true"></span>
+            } @else {
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            }
+          </button>
+        </div>
+      } @else {
+        <button type="button" class="botao-primario w-full" [attr.aria-busy]="baixando()" (click)="baixarPdf()">
+          @if (baixando()) {
+            <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+            Gerando o seu PDF…
+          } @else {
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Baixar diagnóstico em PDF
+          }
+        </button>
+      }
       <p class="mt-3 min-h-5 text-center text-[13px] text-abeto-2" aria-live="polite">
         @if (erroPdf(); as mensagem) {
           <span class="font-medium text-travada">{{ mensagem }}</span>
+        } @else if (compartilhado()) {
+          <span class="aparecer inline-flex items-center gap-1.5 font-medium text-abeto">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" class="text-ascensao" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            PDF compartilhado
+          </span>
         } @else {
           @switch (r.statusEmail) {
             @case ('ENVIADO') {
