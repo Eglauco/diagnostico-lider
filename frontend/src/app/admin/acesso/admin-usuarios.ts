@@ -1,9 +1,10 @@
 import { Component, computed, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { HttpClient, httpResource } from '@angular/common/http';
-import { email, form, FormField, maxLength, required, validate } from '@angular/forms/signals';
+import { form, FormField, maxLength, required, validate } from '@angular/forms/signals';
 import { firstValueFrom } from 'rxjs';
 
 import { problemaDe } from '../../api/diagnostico-api';
+import { problemaEmail } from '../../compartilhado/email';
 import { dataCompleta, quando } from '../../compartilhado/formatos';
 import { CampoSenha } from './campo-senha';
 import { iniciais, SessaoPainel } from './sessao';
@@ -64,7 +65,10 @@ export class AdminUsuarios {
     required(c.nome, { message: 'Escreva o nome.', when: () => this.modo() !== 'senha' });
     maxLength(c.nome, 120, { message: 'Use até 120 caracteres.' });
     required(c.email, { message: 'Escreva o e-mail.', when: () => this.modo() !== 'senha' });
-    email(c.email, { message: 'Confira o e-mail: parece faltar o @ ou o domínio.' });
+    validate(c.email, ({ value }) => {
+      const problema = problemaEmail(value());
+      return problema ? { kind: 'email', message: problema } : null;
+    });
     validate(c.senha, ({ value }) => {
       if (this.modo() === 'editar') return null;
       if (!value()) return { kind: 'senha', message: 'Defina uma senha.' };

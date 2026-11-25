@@ -248,8 +248,9 @@ public class AcompanhamentoService {
 						enviado.responderam(), enviado.total(), true, enviado.assunto(), autor, emailId));
 			});
 			log.info("Relatório {} da empresa {} enviado para {} gestor(es)", tipo, empresaId, para.size());
-			return new Envio(true, tipo.name(), fim ? "O relatório final foi enviado aos gestores."
-					: "O relatório de participação foi enviado aos gestores.");
+			String aQuem = para.size() == 1 ? "ao gestor" : "aos " + para.size() + " gestores";
+			return new Envio(true, tipo.name(), fim ? "O relatório final foi enviado " + aQuem + "."
+					: "O relatório de participação foi enviado " + aQuem + ".");
 		}
 		catch (EmailSender.FalhaEnvio e) {
 			log.warn("O relatório {} da empresa {} não saiu: {}", tipo, empresaId, e.getMessage());
@@ -393,7 +394,7 @@ public class AcompanhamentoService {
 			String titulo = r.total() == 1 ? "O líder convidado respondeu" : "Todos os %d líderes responderam".formatted(r.total());
 			return new Textos("%s: todos os líderes responderam. Veja o resultado".formatted(empresa), rotulo, titulo,
 					"A participação está completa. Em anexo, o resultado da " + empresa + ".", null,
-					encerraEm == null ? null : "A avaliação ia até " + Datas.porExtenso(encerraEm, agora) + ".");
+					encerraEm == null ? null : "Todos responderam antes do prazo (" + Datas.porExtenso(encerraEm, agora) + ").");
 		}
 		String titulo = r.total() == 0 ? "A avaliação terminou"
 				: "A avaliação terminou: %d de %d %s".formatted(r.responderam(), r.total(),

@@ -33,6 +33,7 @@ export class AdminConvites {
   private readonly sanitizador = inject(DomSanitizer);
   private readonly arquivo = viewChild<ElementRef<HTMLInputElement>>('arquivo');
   private readonly dialogoEmail = viewChild<ElementRef<HTMLDialogElement>>('dialogoEmail');
+  private readonly caixaEnvio = viewChild<ElementRef<HTMLDialogElement>>('dialogoEnvio');
 
   readonly id = input.required<string>();
 
@@ -113,13 +114,18 @@ export class AdminConvites {
 
   protected readonly pendentesDeEnvio = computed(() => this.dados()?.resumo.aguardandoEnvio ?? 0);
 
-  /** Convites cujo último e-mail não saiu, com o motivo (um só, quando todos falharam pelo mesmo). */
+  /**
+   * Convites cujo último e-mail não chegou. Os que dá para mandar de novo (falha do provedor, ou
+   * e-mail já corrigido) ficam em ids; os que voltaram ou marcaram spam no mesmo endereço, não.
+   */
   protected readonly naoSairam = computed(() => {
-    const falhas = (this.dados()?.convites ?? []).filter((c) => c.falhaEnvio);
-    const motivos = [...new Set(falhas.map((c) => c.falhaEnvio))];
+    const convites = this.dados()?.convites ?? [];
+    const repetir = convites.filter((c) => c.falhaEnvio && !c.bloqueio);
+    const motivos = [...new Set(repetir.map((c) => c.falhaEnvio))];
     return {
-      ids: falhas.map((c) => c.id),
-      motivo: motivos.length === 1 ? motivos[0] : falhas.length ? 'Os motivos estão no histórico de cada líder.' : null,
+      ids: repetir.map((c) => c.id),
+      motivo: motivos.length === 1 ? motivos[0] : repetir.length ? 'Os motivos estão no histórico de cada líder.' : null,
+      bloqueados: convites.filter((c) => c.bloqueio).length,
     };
   });
   protected readonly conviteSelecionado = computed<ConviteItem | null>(
@@ -127,6 +133,8 @@ export class AdminConvites {
   );
 
   protected ultimaAtividade(c: ConviteItem): string {
+    if (c.bloqueio === 'SPAM') return 'Marcou o convite como spam';
+    if (c.bloqueio) return 'O e-mail voltou';
     if (c.falhaEnvio) return 'O e-mail não chegou';
     if (c.concluidoEm) return `Concluiu ${quando(c.concluidoEm).toLowerCase()}`;
     if (c.ultimoAcessoEm) return `Abriu ${quando(c.ultimoAcessoEm).toLowerCase()}`;
@@ -240,6 +248,36 @@ export class AdminConvites {
     } finally {
       this.baixando.set(false);
     }
+  }
+
+  /**
+   * O botão do topo: confirma antes, porque o lote sai na hora para todo mundo e gasta a cota de
+   * e-mails do dia. Sem nada aguardando, explica como reenviar para um líder só.
+   */
+  protected confirmarEnvio() {
+    const d = this.dados();
+    if (!d) return;
+    if (!d.emailAtivo) {
+      void this.enviar();
+      return;
+    }
+    if (!this.pendentesDeEnvio()) {
+      this.aviso.set({
+        tipo: 'info',
+        texto: 'Todos os convites já saíram. Para mandar de novo a um líder, abra o nome dele e use "Enviar convite por e-mail".',
+      });
+      return;
+    }
+    this.caixaEnvio()?.nativeElement.showModal();
+  }
+
+  protected confirmouEnvio() {
+    this.caixaEnvio()?.nativeElement.close();
+    void this.enviar();
+  }
+
+  protected fecharEnvio() {
+    this.caixaEnvio()?.nativeElement.close();
   }
 
   /** Sem ids: todos que aguardam envio. Com ids: só esses (ex.: os que não saíram). */

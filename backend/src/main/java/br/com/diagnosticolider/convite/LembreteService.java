@@ -18,7 +18,11 @@ public class LembreteService {
 
 	private final TransactionTemplate transacao;
 
-	LembreteService(ConviteRepository convites, EnvioConvitesService envio, TransactionTemplate transacao) {
+	private final BloqueioDeEnvio bloqueios;
+
+	LembreteService(ConviteRepository convites, EnvioConvitesService envio, TransactionTemplate transacao,
+			BloqueioDeEnvio bloqueios) {
+		this.bloqueios = bloqueios;
 		this.convites = convites;
 		this.envio = envio;
 		this.transacao = transacao;
@@ -26,11 +30,15 @@ public class LembreteService {
 
 	/** chamada: "Faltam 3 dias para responder", "Amanhã é o último dia para responder"… */
 	public ResultadoLembrete lembrar(Long empresaId, String chamada) {
-		List<Long> ids = transacao.execute(status -> convites.daEmpresa(empresaId)
-			.stream()
-			.filter(c -> !c.inativo() && EnvioConvitesService.LEMBRAVEIS.contains(c.status()))
-			.map(Convite::getId)
-			.toList());
+		List<Long> ids = transacao.execute(status -> {
+			List<Convite> lembraveis = convites.daEmpresa(empresaId)
+				.stream()
+				.filter(c -> !c.inativo() && EnvioConvitesService.LEMBRAVEIS.contains(c.status()))
+				.toList();
+			// Quem voltou ou marcou spam no mesmo endereço não recebe lembrete (só pioraria a reputação).
+			var bloqueados = bloqueios.de(lembraveis);
+			return lembraveis.stream().map(Convite::getId).filter(id -> !bloqueados.containsKey(id)).toList();
+		});
 		return ids == null || ids.isEmpty() ? new ResultadoLembrete(0, 0, null) : envio.lembrar(ids, chamada);
 	}
 

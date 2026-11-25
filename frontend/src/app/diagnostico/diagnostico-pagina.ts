@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, input, linkedSignal, signal, untra
 import { httpResource } from '@angular/common/http';
 import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { email, form, maxLength, required, validate } from '@angular/forms/signals';
+import { form, maxLength, required, validate } from '@angular/forms/signals';
 
 import {
   CampanhaPublica,
@@ -16,6 +16,7 @@ import {
 } from '../api/modelos';
 import { DiagnosticoApi, problemaDe } from '../api/diagnostico-api';
 import { armazenamento, esperar, vibrar } from '../compartilhado/util';
+import { problemaEmail } from '../compartilhado/email';
 import { formatarTelefone, problemaTelefone } from '../compartilhado/entrada-telefone';
 import { prazoPorExtenso } from '../compartilhado/formatos';
 import { aplicarTema } from '../compartilhado/tema-marca';
@@ -137,7 +138,10 @@ export class DiagnosticoPagina {
       value().trim().length === 1 ? { kind: 'nome-curto', message: 'Escreva o seu nome completo.' } : null,
     );
     required(c.email, { message: 'Escreva o seu e-mail para continuar.' });
-    email(c.email, { message: 'Confira o e-mail: parece faltar o @ ou o domínio.' });
+    validate(c.email, ({ value }) => {
+      const problema = problemaEmail(value());
+      return problema ? { kind: 'email', message: problema } : null;
+    });
     required(c.whatsapp, { message: 'Escreva o seu WhatsApp para continuar.' });
     validate(c.whatsapp, ({ value }) => {
       const problema = problemaTelefone(value());

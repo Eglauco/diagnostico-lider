@@ -23,6 +23,8 @@ interface Avaliada {
   linha: LinhaRevisao;
   fora: string | null;
   problemas: Problema[];
+  /** Tirada da lista nesta revisão: aparece no lugar, com "Desfazer". */
+  removida?: boolean;
 }
 
 /**
@@ -49,14 +51,14 @@ interface Avaliada {
         </header>
 
         <div class="flex gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:px-7" role="group" aria-label="Mostrar">
-          <button type="button" class="chip" [attr.aria-pressed]="filtro() === 'todas'" (click)="filtro.set('todas')">
+          <button type="button" class="chip" [attr.aria-pressed]="filtro() === 'todas'" (click)="mostrar('todas')">
             Todas <span class="contagem">{{ linhas().length }}</span>
           </button>
-          <button type="button" class="chip" [attr.aria-pressed]="filtro() === 'ajustar'" (click)="filtro.set('ajustar')">
+          <button type="button" class="chip" [attr.aria-pressed]="filtro() === 'ajustar'" (click)="mostrar('ajustar')">
             Para ajustar <span class="contagem">{{ comErro().length }}</span>
           </button>
           @if (fora().length) {
-            <button type="button" class="chip" [attr.aria-pressed]="filtro() === 'fora'" (click)="filtro.set('fora')">
+            <button type="button" class="chip" [attr.aria-pressed]="filtro() === 'fora'" (click)="mostrar('fora')">
               Ficam de fora <span class="contagem">{{ fora().length }}</span>
             </button>
           }
@@ -65,6 +67,15 @@ interface Avaliada {
         <ol class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-4 sm:px-7">
           @for (a of visiveis(); track a.linha.chave) {
             @let l = a.linha;
+            @if (a.removida) {
+              <!-- Fica no lugar: a lista não pula, e dá para voltar atrás. -->
+              <li class="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-linha px-4 py-1.5 text-[14px] text-abeto-2">
+                <span class="min-w-0 truncate">{{ l.nome || 'Linha ' + l.linha }} saiu da lista.</span>
+                <button type="button" class="inline-flex min-h-11 shrink-0 items-center rounded-full px-3 font-semibold text-abeto hover:bg-nevoa-2" (click)="desfazer(l.chave)">
+                  Desfazer
+                </button>
+              </li>
+            } @else {
             <li class="rounded-2xl px-4 py-3 ring-1" [class]="a.fora ? 'bg-nevoa-2 ring-linha/70' : a.problemas.length ? 'bg-[#FFF6F7] ring-[#F0C7CE]' : 'bg-white ring-linha'">
               <div class="flex items-start gap-3">
                 <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-white" [class]="a.fora ? 'bg-abeto-3' : a.problemas.length ? 'bg-travada' : 'bg-ascensao'" aria-hidden="true">
@@ -146,6 +157,7 @@ interface Avaliada {
                 </div>
               </div>
             </li>
+            }
           } @empty {
             <li class="rounded-2xl bg-nevoa-2 px-4 py-6 text-center text-[15px] text-abeto-2">
               {{ filtro() === 'ajustar' ? 'Nenhuma linha precisa de ajuste.' : 'Nada para mostrar aqui.' }}
@@ -238,24 +250,43 @@ export class RevisaoImportacao {
   protected readonly prontas = computed(() => this.avaliadas().filter((a) => !a.fora && !a.problemas.length));
   protected readonly comErro = computed(() => this.avaliadas().filter((a) => !a.fora && a.problemas.length));
   protected readonly fora = computed(() => this.avaliadas().filter((a) => a.fora));
-  protected readonly visiveis = computed(() => {
-    switch (this.filtro()) {
-      case 'ajustar':
-        return this.comErro();
-      case 'fora':
-        return this.fora();
-      default:
-        return this.avaliadas();
-    }
+  /** A ordem da planilha: removidas e corrigidas continuam no mesmo lugar. */
+  private readonly ordem = signal<string[]>([]);
+  /**
+   * Quem estava em "Para ajustar" quando a pessoa abriu o filtro. A linha corrigida fica ali, já
+   * como pronta, até trocar de filtro: nada sobe de repente e o próximo clique cai onde ela mira.
+   */
+  private readonly fotoAjustar = signal<string[]>([]);
+  private readonly removidas = signal<ReadonlyMap<string, LinhaRevisao>>(new Map());
+
+  protected readonly visiveis = computed<Avaliada[]>(() => {
+    const filtro = this.filtro();
+    if (filtro === 'fora') return this.fora();
+    const porChave = new Map(this.avaliadas().map((a) => [a.linha.chave, a]));
+    const removidas = this.removidas();
+    const chaves = filtro === 'ajustar' ? this.fotoAjustar() : this.ordem();
+    return chaves.flatMap((chave): Avaliada[] => {
+      const a = porChave.get(chave);
+      if (a) return [a];
+      const linha = removidas.get(chave);
+      return linha ? [{ linha, fora: null, problemas: [], removida: true }] : [];
+    });
   });
 
   constructor() {
     afterNextRender(() => {
-      this.linhas.set(this.importacao().linhas.map(linhaDeRevisao));
+      const linhas = this.importacao().linhas.map(linhaDeRevisao);
+      this.linhas.set(linhas);
+      this.ordem.set(linhas.map((l) => l.chave));
       // Com algo para ajustar, abre direto nelas: é por onde a pessoa vai começar.
-      if (this.comErro().length) this.filtro.set('ajustar');
+      if (this.comErro().length) this.mostrar('ajustar');
       this.dialogo().nativeElement.showModal();
     });
+  }
+
+  protected mostrar(filtro: Filtro) {
+    if (filtro === 'ajustar') this.fotoAjustar.set(this.comErro().map((a) => a.linha.chave));
+    this.filtro.set(filtro);
   }
 
   protected nomeDoCargo(id: number): string {
@@ -284,8 +315,26 @@ export class RevisaoImportacao {
   }
 
   protected remover(chave: string) {
+    const linha = this.linhas().find((l) => l.chave === chave);
+    if (!linha) return;
+    this.removidas.update((mapa) => new Map(mapa).set(chave, linha));
     this.linhas.update((lista) => lista.filter((l) => l.chave !== chave));
     if (this.editando() === chave) this.editando.set(null);
+  }
+
+  /** Volta a linha removida para a lista, na posição da planilha. */
+  protected desfazer(chave: string) {
+    const linha = this.removidas().get(chave);
+    if (!linha) return;
+    this.removidas.update((mapa) => {
+      const novo = new Map(mapa);
+      novo.delete(chave);
+      return novo;
+    });
+    const ordem = this.ordem();
+    this.linhas.update((lista) =>
+      [...lista, linha].sort((a, b) => ordem.indexOf(a.chave) - ordem.indexOf(b.chave)),
+    );
   }
 
   protected async convidar() {

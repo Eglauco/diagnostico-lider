@@ -180,6 +180,13 @@ export interface ConviteItem {
   diagnosticoId: string | null;
   /** Por que o último e-mail não saiu. Some quando um envio der certo ou o líder abrir o link. */
   falhaEnvio: string | null;
+  /**
+   * O último e-mail voltou, foi marcado como spam ou o Resend bloqueou o endereço: outro envio
+   * para o mesmo e-mail não sai (só pioraria a reputação). Corrigir o e-mail libera.
+   */
+  bloqueio: 'DEVOLVIDO' | 'SPAM' | 'BLOQUEADO' | null;
+  /** O que fazer, para mostrar ao lado do botão de envio. */
+  bloqueioMotivo: string | null;
 }
 
 /** O funil: cada número conta quem chegou pelo menos até ali (inativos à parte, fora dos cálculos). */

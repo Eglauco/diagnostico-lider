@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +27,7 @@ import br.com.diagnosticolider.admin.EmpresaDtos.PreviaTema;
 import br.com.diagnosticolider.campanha.Campanha;
 import br.com.diagnosticolider.campanha.CampanhaRepository;
 import br.com.diagnosticolider.campanha.CodigoCampanha;
+import br.com.diagnosticolider.compartilhado.Emails;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.config.AppProperties;
@@ -53,8 +53,6 @@ public class AdminEmpresaService {
 	static final int MAXIMO_GESTORES = 20;
 
 	/** A mesma regra dos convites: algo@dominio.algo, sem espaços. */
-	private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-
 	private final EmpresaRepository empresas;
 
 	private final CampanhaRepository campanhas;
@@ -180,8 +178,9 @@ public class AdminEmpresaService {
 			if (email.isEmpty()) {
 				continue;
 			}
-			if (email.length() > 254 || !EMAIL.matcher(email).matches()) {
-				throw new RegraNegocioException("Confira este e-mail: falta o @ ou o domínio.").noCampo("gestores." + i);
+			var problema = Emails.problema(email);
+			if (problema.isPresent()) {
+				throw new RegraNegocioException(problema.get()).noCampo("gestores." + i);
 			}
 			validos.add(email);
 		}

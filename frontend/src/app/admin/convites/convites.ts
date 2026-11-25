@@ -1,3 +1,4 @@
+import { problemaEmail } from '../../compartilhado/email';
 import { mascararTelefone, problemaTelefone } from '../../compartilhado/entrada-telefone';
 import { LinhaImportada, NovoConvite, StatusConvite, TipoEventoConvite } from '../admin-modelos';
 
@@ -66,8 +67,6 @@ export interface Problema {
   mensagem: string;
 }
 
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
 export function linhaDeRevisao(l: LinhaImportada, i: number): LinhaRevisao {
   return {
     chave: `l${i}-${l.linha}`,
@@ -98,7 +97,7 @@ export function problemas(l: LinhaRevisao, repetidos: Set<string>, temCargos: bo
   else if (nome.length > 160) lista.push({ campo: 'nome', mensagem: 'Use até 160 caracteres.' });
   const email = l.email.trim().toLowerCase();
   if (!email) lista.push({ campo: 'email', mensagem: 'Escreva o e-mail.' });
-  else if (!EMAIL.test(email) || email.length > 254) lista.push({ campo: 'email', mensagem: 'Confira o e-mail: parece faltar o @ ou o domínio.' });
+  else if (problemaEmail(email)) lista.push({ campo: 'email', mensagem: problemaEmail(email)! });
   else if (repetidos.has(email)) lista.push({ campo: 'email', mensagem: 'E-mail repetido nesta lista.' });
   const whatsapp = problemaTelefone(l.whatsapp);
   if (whatsapp) lista.push({ campo: 'whatsapp', mensagem: whatsapp });

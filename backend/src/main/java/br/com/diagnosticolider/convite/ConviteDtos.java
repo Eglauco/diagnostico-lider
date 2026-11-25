@@ -52,7 +52,8 @@ public final class ConviteDtos {
 
 	public record ConviteItem(Long id, String nome, String email, String whatsapp, Long cargoId, boolean cargoOutro,
 			String cargo, StatusConvite status, Instant criadoEm, Instant enviadoEm, int envios,
-			Instant ultimoAcessoEm, int acessos, Instant concluidoEm, String link, UUID diagnosticoId, String falhaEnvio) {
+			Instant ultimoAcessoEm, int acessos, Instant concluidoEm, String link, UUID diagnosticoId, String falhaEnvio,
+			String bloqueio, String bloqueioMotivo) {
 	}
 
 	/** O funil: cada número conta quem chegou pelo menos até ali (inativos à parte, fora dos cálculos). */

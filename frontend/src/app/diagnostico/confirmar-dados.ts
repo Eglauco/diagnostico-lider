@@ -42,7 +42,7 @@ export interface ErrosConfirmacao {
           @if (!editando()) {
             <dl class="divide-y divide-linha">
               <div class="dado"><dt>Nome</dt><dd>{{ controles().nome().value() || '—' }}</dd></div>
-              <div class="dado"><dt>E-mail</dt><dd class="break-all">{{ controles().email().value() || '—' }}</dd></div>
+              <div class="dado"><dt>E-mail</dt><dd class="[overflow-wrap:anywhere]">@if (partesEmail(); as e) { {{ e.antes }}<wbr />{{ e.depois }} } @else { — }</dd></div>
               @if (whatsappNaLinha()) {
                 <!-- Não veio da planilha: o campo já aparece aberto, sem precisar de "Corrigir". -->
                 <div class="px-3.5 py-3">
@@ -129,10 +129,13 @@ export interface ErrosConfirmacao {
     </form>
   `,
   styles: `
+    /* Valor curto fica ao lado do rótulo; valor longo (um e-mail comprido) desce para a linha de
+       baixo e usa a largura toda, quebrando antes do @ em vez de no meio de uma palavra. */
     .dado {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
-      gap: 16px;
+      gap: 2px 16px;
       padding: 14px 14px;
       font-size: 16px;
     }
@@ -142,6 +145,7 @@ export interface ErrosConfirmacao {
     }
     .dado dd {
       min-width: 0;
+      margin-left: auto;
       text-align: right;
       font-weight: 600;
     }
@@ -212,6 +216,14 @@ export class ConfirmarDados implements OnInit {
   ngOnInit() {
     this.whatsappNaLinha.set(!this.controles().whatsapp().value());
   }
+  /** O e-mail quebra antes do @ ("ana.souza" / "@empresa.com.br"), nunca no meio do domínio. */
+  protected readonly partesEmail = computed(() => {
+    const email = this.controles().email().value();
+    if (!email) return null;
+    const arroba = email.indexOf('@');
+    return arroba <= 0 ? { antes: email, depois: '' } : { antes: email.slice(0, arroba), depois: email.slice(arroba) };
+  });
+
   protected readonly nomeCargo = computed(() => {
     const c = this.cargo();
     if (c === CARGO_OUTRO) return this.outroNome().trim() || 'Outro cargo';

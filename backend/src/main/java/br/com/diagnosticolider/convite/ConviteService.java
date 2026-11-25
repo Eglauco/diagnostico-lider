@@ -28,6 +28,7 @@ import br.com.diagnosticolider.campanha.CampanhaRepository;
 import br.com.diagnosticolider.campanha.CampanhaService;
 import br.com.diagnosticolider.compartilhado.Datas;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
+import br.com.diagnosticolider.compartilhado.Emails;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.compartilhado.Telefones;
 import br.com.diagnosticolider.config.AppProperties;
@@ -75,8 +76,6 @@ public class ConviteService {
 	static final Set<TipoEvento> PROBLEMAS_DE_ENTREGA = EnumSet.of(TipoEvento.FALHA_ENVIO, TipoEvento.EMAIL_DEVOLVIDO,
 			TipoEvento.EMAIL_SPAM);
 
-	private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-
 	private static final String ALFABETO = "23456789abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
 
 	private static final int TAMANHO_TOKEN = 10;
@@ -109,6 +108,8 @@ public class ConviteService {
 
 	private final QuemEsta quemEsta;
 
+	private final BloqueioDeEnvio bloqueios;
+
 	private final Clock clock;
 
 	private final String urlPublica;
@@ -117,7 +118,8 @@ public class ConviteService {
 			CampanhaService campanhaService, EmpresaRepository empresas, CargoService cargos,
 			DiagnosticoService diagnosticos, DiagnosticoRepository diagnosticoRepositorio, PlanilhaConvites planilha,
 			EnvioConvitesService envio, EmailSender email, EmailEnviadoRepository emailsEnviados, QuemEsta quemEsta,
-			Clock clock, AppProperties propriedades) {
+			BloqueioDeEnvio bloqueios, Clock clock, AppProperties propriedades) {
+		this.bloqueios = bloqueios;
 		this.emailsEnviados = emailsEnviados;
 		this.quemEsta = quemEsta;
 		this.diagnosticoRepositorio = diagnosticoRepositorio;
@@ -141,7 +143,10 @@ public class ConviteService {
 		Empresa empresa = empresa(empresaId);
 		List<Convite> daEmpresa = convites.daEmpresa(empresaId);
 		Map<Long, EventoConvite> falhas = problemasDeEntrega(daEmpresa);
-		List<ConviteItem> itens = daEmpresa.stream().map(c -> item(c, falhas.get(c.getId()))).toList();
+		Map<Long, BloqueioDeEnvio.Bloqueio> bloqueados = bloqueios.de(daEmpresa);
+		List<ConviteItem> itens = daEmpresa.stream()
+			.map(c -> item(c, falhas.get(c.getId()), bloqueados.get(c.getId())))
+			.toList();
 		return new Convites(email.ativo(), empresa.getEncerraEm(), empresa.encerrada(agora()), resumo(itens), itens,
 				opcoes(empresaId));
 	}
@@ -336,14 +341,17 @@ public class ConviteService {
 			throw RegraNegocioException.conflito("A avaliação desta empresa já foi encerrada: os convites não saem mais.");
 		}
 		Set<Long> pedidos = pedido == null || pedido.ids() == null ? Set.of() : Set.copyOf(pedido.ids());
-		List<Long> ids = convites.daEmpresa(empresaId)
+		List<Convite> escolhidos = convites.daEmpresa(empresaId)
 			.stream()
 			.filter(c -> pedidos.isEmpty() ? c.status() == StatusConvite.AGUARDANDO_ENVIO
 					: pedidos.contains(c.getId()) && podeReceber(c))
-			.map(Convite::getId)
 			.toList();
+		Map<Long, BloqueioDeEnvio.Bloqueio> bloqueados = bloqueios.de(escolhidos);
+		List<Long> ids = escolhidos.stream().map(Convite::getId).filter(i -> !bloqueados.containsKey(i)).toList();
 		if (ids.isEmpty()) {
-			throw RegraNegocioException.conflito("Não há convites para enviar.");
+			throw RegraNegocioException.conflito(bloqueados.isEmpty() ? "Não há convites para enviar."
+					: "Esses convites não saem de novo: o e-mail voltou ou foi marcado como spam. "
+							+ "Corrija o endereço de cada líder ou mande o link pessoal por WhatsApp.");
 		}
 		envio.enviar(ids, quemEsta.nome());
 		return new EnvioIniciado(ids.size());
@@ -369,6 +377,10 @@ public class ConviteService {
 		}
 		if (convite.getCampanha().encerrada(agora())) {
 			throw RegraNegocioException.conflito("A avaliação desta empresa já foi encerrada: o convite não sai mais.");
+		}
+		var bloqueio = bloqueios.de(convite);
+		if (bloqueio.isPresent()) {
+			throw RegraNegocioException.conflito(bloqueio.get().texto());
 		}
 		try {
 			envio.enviarAgora(id, quemEsta.nome());
@@ -425,9 +437,8 @@ public class ConviteService {
 		else {
 			// Voltou ao link: a mesma linha da linha do tempo conta as visitas.
 			eventos.findFirstByConviteIdAndTipoOrderByIdDesc(convite.getId(), TipoEvento.ABERTO)
-				.ifPresent(e -> e.atualizarDetalhe(primeiraFrase(e.getDetalhe()) + "Abriu " + convite.getAcessos()
-						+ " vezes; a última em " + Datas.porExtenso(agora, agora)
-						+ (aparelho == null ? "" : ", pelo " + aparelho) + "."));
+				.ifPresent(e -> e.atualizarDetalhe(
+						visitas(convite.getAcessos(), Datas.porExtenso(agora, agora), aparelho, e.getDetalhe())));
 		}
 	}
 
@@ -478,14 +489,14 @@ public class ConviteService {
 	// ================================================================== apoio
 
 	private ConviteItem item(Convite c) {
-		return item(c, problemasDeEntrega(List.of(c)).get(c.getId()));
+		return item(c, problemasDeEntrega(List.of(c)).get(c.getId()), bloqueios.de(c).orElse(null));
 	}
 
 	/**
 	 * ultimaFalha: a falha de envio mais recente do convite. A lista mostra o motivo enquanto o
 	 * e-mail não sair (um envio depois da falha, ou o líder já ter aberto o link, apaga o aviso).
 	 */
-	private ConviteItem item(Convite c, EventoConvite ultimaFalha) {
+	private ConviteItem item(Convite c, EventoConvite ultimaFalha, BloqueioDeEnvio.Bloqueio bloqueio) {
 		StatusConvite status = c.status();
 		boolean semEnvioDepois = ultimaFalha != null
 				&& (c.getEnviadoEm() == null || ultimaFalha.getQuando().isAfter(c.getEnviadoEm()));
@@ -497,7 +508,9 @@ public class ConviteService {
 		return new ConviteItem(c.getId(), c.getNome(), c.getEmail(), c.getWhatsapp(),
 				c.getCargo() == null ? null : c.getCargo().getId(), c.isCargoOutro(), cargo, c.status(),
 				c.getCriadoEm(), c.getEnviadoEm(), c.getEnvios(), c.getUltimoAcessoEm(), c.getAcessos(), concluidoEm,
-				link(c), c.getDiagnostico() == null ? null : c.getDiagnostico().getId(), falhaEnvio);
+				link(c), c.getDiagnostico() == null ? null : c.getDiagnostico().getId(), falhaEnvio,
+				bloqueio == null || !podeReceber(c) ? null : bloqueio.motivo().name(),
+				bloqueio == null || !podeReceber(c) ? null : bloqueio.texto());
 	}
 
 	/**
@@ -515,13 +528,30 @@ public class ConviteService {
 		return ultimas;
 	}
 
-	/** "Pelo celular. Abriu 3 vezes…" vira "Pelo celular. " (o resto é recontado a cada visita). */
-	private static String primeiraFrase(String detalhe) {
-		if (detalhe == null || detalhe.isBlank() || detalhe.startsWith("Abriu ")) {
-			return "";
+	/** O aparelho que a linha do tempo já guardou: "Pelo celular.", "sempre pelo celular" ou "A primeira foi pelo celular". */
+	private static final Pattern APARELHO_ANTERIOR = Pattern
+		.compile("^Pelo (celular|computador)\\.|sempre pelo (celular|computador)|A primeira foi pelo (celular|computador)");
+
+	/**
+	 * A linha "Abriu o link", recontada a cada visita sem repetir o aparelho:
+	 * "Abriu 2 vezes, sempre pelo celular; a última em 25 de novembro, às 9h." ou, se trocou,
+	 * "Abriu 3 vezes; a última em 25 de novembro, às 9h, pelo computador. A primeira foi pelo celular."
+	 * anterior: o texto que a linha tinha antes desta visita (é dele que sai o primeiro aparelho).
+	 */
+	static String visitas(int vezes, String ultimaEm, String aparelho, String anterior) {
+		String primeiro = null;
+		boolean sempreIgual = false;
+		var achou = anterior == null ? null : APARELHO_ANTERIOR.matcher(anterior);
+		if (achou != null && achou.find()) {
+			sempreIgual = achou.group(3) == null;
+			primeiro = achou.group(1) != null ? achou.group(1) : achou.group(2) != null ? achou.group(2) : achou.group(3);
 		}
-		int fim = detalhe.indexOf(". ");
-		return (fim < 0 ? detalhe : detalhe.substring(0, fim + 1)) + " ";
+		if (aparelho != null && sempreIgual && aparelho.equals(primeiro)) {
+			return "Abriu " + vezes + " vezes, sempre pelo " + aparelho + "; a última em " + ultimaEm + ".";
+		}
+		String texto = "Abriu " + vezes + " vezes; a última em " + ultimaEm + (aparelho == null ? "" : ", pelo " + aparelho)
+				+ ".";
+		return primeiro == null ? texto : texto + " A primeira foi pelo " + primeiro + ".";
 	}
 
 	String link(Convite convite) {
@@ -572,8 +602,9 @@ public class ConviteService {
 		if (email.isEmpty()) {
 			throw new RegraNegocioException("Escreva o e-mail do líder.").noCampo("email");
 		}
-		if (email.length() > 254 || !EMAIL.matcher(email).matches()) {
-			throw new RegraNegocioException("Confira o e-mail: parece faltar o @ ou o domínio.").noCampo("email");
+		var problemaEmail = Emails.problema(email);
+		if (problemaEmail.isPresent()) {
+			throw new RegraNegocioException(problemaEmail.get()).noCampo("email");
 		}
 		String whatsapp = whatsapp(n.whatsapp());
 		var problemaWhatsapp = Telefones.problema(whatsapp);

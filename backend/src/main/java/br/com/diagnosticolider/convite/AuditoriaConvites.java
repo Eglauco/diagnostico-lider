@@ -78,7 +78,9 @@ public class AuditoriaConvites {
 			};
 			boolean spam = email.situacao() == EmailEnviado.Situacao.SPAM;
 			eventos.save(new EventoConvite(c, spam ? TipoEvento.EMAIL_SPAM : TipoEvento.EMAIL_DEVOLVIDO, email.quando(),
-					(spam ? qual + " foi marcado como spam. " : qual + " não chegou. ") + email.detalhe(), null,
+					spam ? qual + " foi marcado como spam pelo líder. Novos e-mails para este endereço não saem."
+							: qual + " não chegou. " + email.detalhe(),
+					null,
 					email.id()));
 		});
 	}

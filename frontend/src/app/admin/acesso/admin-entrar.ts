@@ -2,9 +2,10 @@ import { Component, computed, DestroyRef, ElementRef, inject, input, signal, vie
 import { HttpErrorResponse } from '@angular/common/http';
 import { Meta } from '@angular/platform-browser';
 import { Router } from '@angular/router';
-import { email, form, FormField, required } from '@angular/forms/signals';
+import { form, FormField, required, validate } from '@angular/forms/signals';
 
 import { geometriaCurva, posicaoNaCurva } from '../../compartilhado/curva-carreira';
+import { problemaEmail } from '../../compartilhado/email';
 import { FAIXAS } from '../../compartilhado/faixas';
 import { CampoSenha } from './campo-senha';
 import { destinoSeguro, SessaoPainel } from './sessao';
@@ -32,7 +33,10 @@ export class AdminEntrar {
   protected readonly modelo = signal({ email: '', senha: '' });
   protected readonly formulario = form(this.modelo, (c) => {
     required(c.email, { message: 'Escreva o seu e-mail.' });
-    email(c.email, { message: 'Confira o e-mail: parece faltar o @ ou o domínio.' });
+    validate(c.email, ({ value }) => {
+      const problema = problemaEmail(value());
+      return problema ? { kind: 'email', message: problema } : null;
+    });
     required(c.senha, { message: 'Escreva a sua senha.' });
   });
 

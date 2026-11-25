@@ -94,6 +94,7 @@
   .lider .contato { margin-top: 1px; font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lider .direita { text-align: right; max-width: 82mm; }
   .lider .detalhe { font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; }
+  .lider .detalhe.alerta { color: #C2364B; font-weight: 600; }
   .lider .link { display: inline-flex; align-items: center; gap: 4px; margin-top: 1px; font-size: 10.5px; font-weight: 600; color: var(--abeto); text-decoration: none; white-space: nowrap; }
   .lider .link svg { flex-shrink: 0; }
 </style>
@@ -162,7 +163,7 @@
           <p class="contato" th:text="${l.contato}">ana.souza@empresa.com · (11) 98765-4321</p>
         </div>
         <div class="direita">
-          <p class="detalhe" th:if="${l.detalhe != null}" th:text="${l.detalhe}">Último acesso em 22 de novembro, às 14h</p>
+          <p class="detalhe" th:if="${l.detalhe != null}" th:classappend="${l.alerta} ? 'alerta'" th:text="${l.detalhe}">Último acesso em 22 de novembro, às 14h</p>
           <a class="link" th:if="${l.link != null}" th:href="${l.link}" href="#">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1 1M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1-1" stroke-linecap="round"/></svg>
             <th:block th:text="${l.linkVisivel}">diagnostico.app/i/Ab3dE5fG7h</th:block>

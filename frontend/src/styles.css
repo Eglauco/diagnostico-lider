@@ -154,9 +154,11 @@
   .rodape-fixo {
     position: sticky;
     bottom: 0;
-    padding-top: 28px;
+    padding-top: 22px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
-    background: linear-gradient(to top, var(--color-nevoa) 62%, rgb(237 242 239 / 0));
+    /* Fundo cheio até perto do botão e um degradê curto: o texto que passa por baixo some
+       inteiro, em vez de aparecer cortado ao meio atrás do botão (o "44/100" do resultado). */
+    background: linear-gradient(to top, var(--color-nevoa) 80%, transparent);
   }
 
   /* Cartão de alternativa do questionário (perguntas, cargo e tempo no cargo). */

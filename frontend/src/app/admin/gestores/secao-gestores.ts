@@ -1,6 +1,6 @@
 import { Component, computed, input, model, output, signal } from '@angular/core';
 
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+import { problemaEmail } from '../../compartilhado/email';
 
 /** O primeiro problema da lista (índice e mensagem), ou null. Linhas vazias são ignoradas. */
 export function problemaGestores(emails: string[]): { indice: number; mensagem: string } | null {
@@ -8,7 +8,8 @@ export function problemaGestores(emails: string[]): { indice: number; mensagem: 
   for (const [indice, bruto] of emails.entries()) {
     const email = bruto.trim().toLowerCase();
     if (!email) continue;
-    if (email.length > 254 || !EMAIL.test(email)) return { indice, mensagem: 'Confira este e-mail: falta o @ ou o domínio.' };
+    const problema = problemaEmail(email);
+    if (problema) return { indice, mensagem: problema };
     if (vistos.has(email)) return { indice, mensagem: 'Esse e-mail já está na lista.' };
     vistos.add(email);
   }

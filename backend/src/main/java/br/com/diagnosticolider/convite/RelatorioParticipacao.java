@@ -32,13 +32,15 @@ public record RelatorioParticipacao(String empresa, String sigla, String logo, b
 	public record Grupo(String codigo, String titulo, String dica, int quantidade) {
 	}
 
-	public record Linha(String nome, String cargo, String contato, String detalhe, String link, String linkVisivel) {
+	/** alerta: o e-mail voltou ou foi marcado como spam (o detalhe vira o aviso, em vermelho). */
+	public record Linha(String nome, String cargo, String contato, String detalhe, String link, String linkVisivel,
+			boolean alerta) {
 	}
 
 	/** Um líder com tudo que a planilha precisa (datas de verdade, para filtrar e ordenar). */
 	record Lider(String nome, String cargo, String email, String whatsapp, SituacaoParticipacao situacao,
 			Instant enviadoEm, int envios, Instant primeiroAcessoEm, Instant ultimoAcessoEm, int acessos,
-			Instant respondeuEm, String link) {
+			Instant respondeuEm, String link, String alerta) {
 	}
 
 }

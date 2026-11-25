@@ -23,6 +23,8 @@ Visão geral, estrutura, API e deploy: ver `README.md`. Regras do Angular: `fron
   `backend/.../relatorio/CurvaCarreira.java`: mude as duas juntas.
 - A regra do WhatsApp (DDD, 9 do celular, tamanho e mensagens) também é dupla:
   `frontend/src/app/compartilhado/entrada-telefone.ts` e `backend/.../compartilhado/Telefones.java`.
+- A regra do e-mail (o que falta: @, domínio, final `.com.br`) também: `frontend/src/app/compartilhado/email.ts`
+  e `backend/.../compartilhado/Emails.java`.
 
 ## Rodando nesta máquina
 

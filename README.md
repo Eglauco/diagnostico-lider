@@ -367,8 +367,15 @@ Na linha do tempo de cada convite: quem fez cada ação no painel (criar, editar
 depois, enviar, inativar, reativar, baixar o PDF individual), cada e-mail com a entrega, as
 visitas ao link (com o aparelho), quantas perguntas respondeu, se viu o resultado e se
 compartilhou ou baixou o PDF. Passos que se repetem atualizam a mesma linha, com a contagem.
-E-mail devolvido ou marcado como spam aparece em vermelho na lista e no relatório diário ao
-gestor. A planilha de participação traz a aba **Auditoria** com tudo de todos os líderes.
+E-mail devolvido ou marcado como spam aparece em vermelho na lista, no relatório diário ao
+gestor e no PDF/Excel de participação ("O e-mail voltou: mande o link por WhatsApp"). A planilha
+de participação traz a aba **Auditoria** com tudo de todos os líderes.
+
+**Sem insistir no endereço que falhou** (`BloqueioDeEnvio`): se o último convite ou lembrete
+voltou, foi marcado como spam ou o Resend bloqueou, nenhum envio sai de novo para o mesmo
+e-mail (botão do detalhe, "Enviar de novo" da lista e lembretes automáticos). Outra devolução
+ou outra queixa de spam derruba a reputação do domínio. Corrigir o e-mail do líder libera o
+envio para o endereço novo. O envio em lote pede confirmação antes de sair.
 
 No Resend: Webhooks → Add endpoint com a URL de produção e os eventos `email.delivered`,
 `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.failed` e `email.suppressed`.

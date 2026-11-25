@@ -19,7 +19,9 @@ import br.com.diagnosticolider.convite.RelatorioParticipacao.Pagina;
 class ParticipacaoTest {
 
 	private static List<Linha> linhas(int n) {
-		return IntStream.range(0, n).mapToObj(i -> new Linha("Líder " + i, null, "l" + i + "@a.com", null, null, null)).toList();
+		return IntStream.range(0, n)
+			.mapToObj(i -> new Linha("Líder " + i, null, "l" + i + "@a.com", null, null, null, false))
+			.toList();
 	}
 
 	private static double altura(Pagina p) {
@@ -57,11 +59,11 @@ class ParticipacaoTest {
 		Instant agora = Instant.parse("2026-11-23T15:00:00Z");
 		var lideres = List.of(
 				new Lider("Ana", "Gerente", "ana@a.com", "(11) 98765-4321", SituacaoParticipacao.COMECOU, null, 0, agora,
-						agora, 2, null, "https://app/i/abc"),
+						agora, 2, null, "https://app/i/abc", null),
 				new Lider("Bruno", null, "bruno@a.com", null, SituacaoParticipacao.NAO_ABRIU, null, 0, null, null, 0, null,
-						"https://app/i/def"),
+						"https://app/i/def", "O e-mail voltou"),
 				new Lider("Carla", "Diretor", "carla@a.com", null, SituacaoParticipacao.RESPONDEU, agora, 1, agora, agora, 3,
-						agora, null));
+						agora, null, null));
 		byte[] xlsx = new PlanilhaParticipacao().gerar("ACME", "Atualizado agora", null, lideres, 1);
 
 		try (var pasta = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
@@ -76,6 +78,9 @@ class ParticipacaoTest {
 			assertThat(aba.getRow(7).getCell(4).getStringCellValue()).isEqualTo("Começou, não terminou");
 			assertThat(aba.getRow(7).getCell(8).getHyperlink().getAddress()).isEqualTo("https://app/i/abc");
 			assertThat(aba.getRow(9).getCell(8).getStringCellValue()).isEmpty();
+			// Quem teve o e-mail devolvido aparece com o aviso, e a conta do resumo continua certa.
+			assertThat(aba.getRow(8).getCell(4).getStringCellValue()).isEqualTo("Não abriu o link · O e-mail voltou");
+			assertThat(resumo.getCell(3).getCellFormula()).contains("\"Não abriu o link*\"");
 			assertThat(aba.getRow(1).getCell(0).getStringCellValue()).contains("1 inativo fica fora da lista");
 		}
 	}

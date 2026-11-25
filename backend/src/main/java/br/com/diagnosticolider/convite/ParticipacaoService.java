@@ -77,9 +77,12 @@ public class ParticipacaoService {
 
 	private final EmailEnviadoRepository emailsEnviados;
 
+	private final BloqueioDeEnvio bloqueios;
+
 	ParticipacaoService(ConviteRepository convites, EmpresaRepository empresas, ConviteService conviteService,
 			LogomarcaService logomarcas, RelatorioPdfService pdf, PlanilhaParticipacao planilha, Clock clock,
-			EventoConviteRepository eventos, EmailEnviadoRepository emailsEnviados) {
+			EventoConviteRepository eventos, EmailEnviadoRepository emailsEnviados, BloqueioDeEnvio bloqueios) {
+		this.bloqueios = bloqueios;
 		this.eventos = eventos;
 		this.emailsEnviados = emailsEnviados;
 		this.convites = convites;
@@ -271,14 +274,15 @@ public class ParticipacaoService {
 	private List<Lider> lideres(List<Convite> todos) {
 		Collator alfabetica = Collator.getInstance(PT_BR);
 		alfabetica.setStrength(Collator.PRIMARY);
+		var bloqueados = bloqueios.de(todos);
 		return todos.stream()
-			.map(this::lider)
+			.map(c -> lider(c, bloqueados.get(c.getId())))
 			.filter(Objects::nonNull)
 			.sorted(Comparator.comparing(Lider::situacao).thenComparing(Lider::nome, alfabetica))
 			.toList();
 	}
 
-	private Lider lider(Convite c) {
+	private Lider lider(Convite c, BloqueioDeEnvio.Bloqueio bloqueio) {
 		SituacaoParticipacao situacao = SituacaoParticipacao.de(c.status());
 		if (situacao == null) {
 			return null;
@@ -287,7 +291,12 @@ public class ParticipacaoService {
 		Instant respondeuEm = c.getDiagnostico() == null ? null : c.getDiagnostico().getConcluidoEm();
 		return new Lider(c.getNome(), cargo, c.getEmail(), c.getWhatsapp(), situacao, c.getEnviadoEm(), c.getEnvios(),
 				c.getPrimeiroAcessoEm(), c.getUltimoAcessoEm(), c.getAcessos(), respondeuEm,
-				situacao.pendente() ? conviteService.link(c) : null);
+				situacao.pendente() ? conviteService.link(c) : null,
+				bloqueio == null || !situacao.pendente() ? null : switch (bloqueio.motivo()) {
+					case DEVOLVIDO -> "O e-mail voltou";
+					case SPAM -> "Marcou o convite como spam";
+					case BLOQUEADO -> "E-mail bloqueado";
+				});
 	}
 
 	private static Linha linha(Lider l, Instant agora) {
@@ -303,8 +312,12 @@ public class ParticipacaoService {
 					: "Convite enviado em " + Datas.porExtenso(l.enviadoEm(), agora)
 							+ (l.envios() > 1 ? " · " + l.envios() + " envios" : "");
 		};
+		if (l.alerta() != null) {
+			// Sem e-mail que chegue: o RH precisa mandar o link por outro canal.
+			detalhe = l.alerta() + ": mande o link por WhatsApp";
+		}
 		String visivel = l.link() == null ? null : l.link().replaceFirst("^https?://", "");
-		return new Linha(l.nome(), l.cargo(), contato, detalhe, l.link(), visivel);
+		return new Linha(l.nome(), l.cargo(), contato, detalhe, l.link(), visivel, l.alerta() != null);
 	}
 
 	/**

@@ -88,10 +88,10 @@ class PlanilhaParticipacao {
 			valores.setHeightInPoints(30);
 			String[][] resumo = {
 					{ "Líderes", "COUNTA(" + nomes + ")" },
-					{ "Responderam", "COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.RESPONDEU.rotulo() + "\")" },
+					{ "Responderam", "COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.RESPONDEU.rotulo() + "*\")" },
 					{ "Abriram e não terminaram", "COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.COMECOU.rotulo()
-							+ "\")+COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.ABRIU.rotulo() + "\")" },
-					{ "Não abriram o link", "COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.NAO_ABRIU.rotulo() + "\")" },
+							+ "*\")+COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.ABRIU.rotulo() + "*\")" },
+					{ "Não abriram o link", "COUNTIF(" + situacoes + ",\"" + SituacaoParticipacao.NAO_ABRIU.rotulo() + "*\")" },
 					{ "Já responderam", "IF(A5=0,0,B5/A5)" } };
 			for (int i = 0; i < resumo.length; i++) {
 				celula(rotulos, i, resumo[i][0], e.rotuloResumo);
@@ -113,7 +113,9 @@ class PlanilhaParticipacao {
 				celula(linha, 1, l.cargo(), e.texto);
 				celula(linha, 2, l.email(), e.texto);
 				celula(linha, 3, l.whatsapp(), e.texto);
-				celula(linha, COLUNA_SITUACAO, l.situacao().rotulo(), e.situacao.get(l.situacao()));
+				celula(linha, COLUNA_SITUACAO,
+						l.alerta() == null ? l.situacao().rotulo() : l.situacao().rotulo() + " · " + l.alerta(),
+						e.situacao.get(l.situacao()));
 				data(linha, 5, l.enviadoEm(), e);
 				data(linha, 6, l.ultimoAcessoEm(), e);
 				data(linha, 7, l.respondeuEm(), e);

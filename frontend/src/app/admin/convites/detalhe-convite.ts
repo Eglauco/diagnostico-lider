@@ -1,4 +1,4 @@
-import { afterNextRender, Component, computed, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { HttpClient, httpResource } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -264,11 +264,15 @@ export class DetalheConvite {
   protected readonly erroEnvio = signal<string | null>(null);
   /** Quem ainda pode receber: ativo e sem diagnóstico concluído. */
   protected readonly podeEnviar = computed(() => !this.inativo() && this.convite().status !== 'CONCLUIDO');
-  protected readonly envioBloqueado = computed(() => !this.emailAtivo() || this.encerrada());
+  /** Servidor sem e-mail, avaliação encerrada ou endereço que voltou/marcou spam (corrigir libera). */
+  protected readonly envioBloqueado = computed(() => !this.emailAtivo() || this.encerrada() || !!this.convite().bloqueio);
   /** A linha ao lado do botão: o resultado do clique ou como está o envio deste líder. */
   protected readonly situacaoEnvio = computed<{ texto: string; tom: keyof typeof TOM_ENVIO }>(() => {
     const erro = this.erroEnvio();
     if (erro) return { texto: erro, tom: 'erro' };
+    // O bloqueio vem antes: se o envio de agora voltar, o aviso de entrega é substituído pelo motivo.
+    const bloqueio = this.convite().bloqueioMotivo;
+    if (bloqueio) return { texto: bloqueio, tom: 'erro' };
     const para = this.enviadoPara();
     if (para) return { texto: `Enviado agora para ${para}. A entrega aparece na linha do tempo.`, tom: 'ok' };
     if (!this.emailAtivo()) return { texto: 'O envio por e-mail está desligado neste servidor.', tom: 'neutro' };
@@ -279,8 +283,11 @@ export class DetalheConvite {
     return { texto: `Enviado ${vezes}. Último envio: ${quando(c.enviadoEm)}.`, tom: 'neutro' };
   });
 
+  private esperas: ReturnType<typeof setTimeout>[] = [];
+
   constructor() {
     afterNextRender(() => this.dialogo().nativeElement.showModal());
+    inject(DestroyRef).onDestroy(() => this.pararAcompanhamento());
   }
 
   protected corEvento(ev: EventoConvite): string {
@@ -373,12 +380,32 @@ export class DetalheConvite {
       const feito = await firstValueFrom(this.http.post<{ para: string }>(`${API_ADMIN}/convites/${this.convite().id}/enviar`, null));
       this.enviadoPara.set(feito.para);
       this.mudou.emit();
+      this.acompanharEntrega();
     } catch (erro) {
       this.erroEnvio.set(problemaDe(erro).detail ?? 'O convite não saiu. Tente de novo em instantes.');
     } finally {
       this.enviando.set(false);
       this.eventos.reload();
     }
+  }
+
+  /**
+   * O Resend avisa a entrega (ou a devolução) segundos depois: a linha do tempo recarrega algumas
+   * vezes para o "aguardando o aviso de entrega" virar "Entregue" sem fechar o detalhe.
+   */
+  private acompanharEntrega() {
+    this.pararAcompanhamento();
+    this.esperas = [5000, 12000, 25000].map((ms) =>
+      setTimeout(() => {
+        this.eventos.reload();
+        this.mudou.emit();
+      }, ms),
+    );
+  }
+
+  private pararAcompanhamento() {
+    this.esperas.forEach(clearTimeout);
+    this.esperas = [];
   }
 
   protected async copiar() {
