@@ -125,19 +125,20 @@ public class AdminService {
 			.filter(c -> c.isAtivo() || totais.containsKey(c.getId()))
 			.map(c -> new CargoFiltro(String.valueOf(c.getId()), c.getNome(), totais.getOrDefault(c.getId(), 0L)))
 			.toList());
-		long outros = diagnosticos.countByCampanhaCodigoAndCargoOutroTrue(codigo);
+		long outros = diagnosticos.countByCampanhaCodigoAndCargoOutroTrueAndInativadoEmIsNull(codigo);
 		if (outros > 0) {
 			lista.add(new CargoFiltro(OUTRO, "Outro cargo", outros));
 		}
 		return lista;
 	}
 
+	/** inativos: false mostra os que entram nos cálculos; true, só os inativados. */
 	public Pagina<ItemLista> listar(String busca, StatusDiagnostico status, String faixa, String campanha, String cargo,
-			int pagina, int tamanho) {
+			boolean inativos, int pagina, int tamanho) {
 		var pedido = PageRequest.of(Math.max(0, pagina), Math.clamp(tamanho, 1, TAMANHO_MAXIMO),
 				Sort.by(Sort.Direction.DESC, "iniciadoEm"));
 		FiltroCargo filtroCargo = vazio(campanha) ? null : FiltroCargo.de(cargo);
-		Page<Diagnostico> resultado = diagnosticos.findAll(filtro(busca, status, faixa, campanha, filtroCargo), pedido);
+		Page<Diagnostico> resultado = diagnosticos.findAll(filtro(busca, status, faixa, campanha, filtroCargo, inativos), pedido);
 		List<ItemLista> itens = resultado.getContent().stream().map(AdminService::item).toList();
 		return new Pagina<>(itens, resultado.getTotalElements(), resultado.getNumber(), resultado.getSize(),
 				resultado.getTotalPages());
@@ -186,7 +187,7 @@ public class AdminService {
 				new Detalhe.Lider(r.getNome(), r.getEmail(), r.getWhatsapp(), r.getEmpresaInformada(), d.cargoDescrito(),
 						d.getTempoCargo() == null ? null : d.getTempoCargo().texto()),
 				origem,
-				resultado, respostas);
+				resultado, respostas, d.getInativadoEm());
 	}
 
 	private static ItemLista item(Diagnostico d) {
@@ -201,9 +202,10 @@ public class AdminService {
 
 	/** Busca por nome, e-mail ou empresa (sem diferenciar maiúsculas) e filtros exatos. */
 	private static Specification<Diagnostico> filtro(String busca, StatusDiagnostico status, String faixa,
-			String campanha, FiltroCargo cargo) {
+			String campanha, FiltroCargo cargo, boolean inativos) {
 		return (raiz, consulta, cb) -> {
 			List<Predicate> condicoes = new ArrayList<>();
+			condicoes.add(inativos ? cb.isNotNull(raiz.get("inativadoEm")) : cb.isNull(raiz.get("inativadoEm")));
 			if (!vazio(busca)) {
 				String termo = "%" + escaparLike(busca.strip().toLowerCase(Locale.ROOT)) + "%";
 				var respondente = raiz.get("respondente");

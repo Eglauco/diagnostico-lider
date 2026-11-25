@@ -25,6 +25,7 @@ backend/   Spring Boot (pacote por funcionalidade)
   diagnostico/   respostas, cálculo do índice (0–100) e API pública
   relatorio/     PDF (template Thymeleaf + Chromium) e a geometria da curva
   notificacao/   envio do PDF por e-mail após a conclusão (assíncrono)
+  acompanhamento/ relatórios automáticos ao gestor e lembretes aos líderes (agendador de 5 em 5 min)
   empresa/       empresa, paleta de cores, logomarca e cargos
   arquivos/      onde ficam os arquivos: bucket S3 ou disco local
   db/migration/  Flyway (V2 traz o questionário de exemplo)
@@ -62,7 +63,18 @@ cd frontend; npm install; npm start
 
 Abra http://localhost:4200. O Angular faz proxy de `/api` para `localhost:8080`.
 O PDF local usa o Chrome/Edge instalado (`CHROME_PATH` para outro caminho).
-O e-mail em dev não sai: o log mostra o que seria enviado e o caminho do HTML gerado
+O e-mail em dev sai de verdade pelo Resend, como em produção, mas desviado: com estas linhas no
+`backend/.env`, todo e-mail (convite, lembrete, resultado, relatório do gestor) vai para um endereço
+só, com o destinatário original no assunto ("[Teste → ana@empresa.com.br] ..."). Assim os testes
+não escrevem para os endereços de teste do banco, que voltariam e pesariam na reputação do domínio.
+A linha do tempo do painel continua mostrando o destinatário original.
+
+```properties
+EMAIL_PROVEDOR=resend
+EMAIL_DESVIAR_PARA=voce@gmail.com
+```
+
+Sem `EMAIL_PROVEDOR`, o e-mail não sai: o log mostra o que seria enviado e o caminho do HTML gerado
 (`%TEMP%\diagnostico-lider\ultimo-email.html`), para abrir no navegador.
 
 As logomarcas vão para o disco (`backend/.arquivos/desenvolvimento`, fora do git) até você
@@ -94,6 +106,9 @@ Links de exemplo: `/` (link geral) e `/c/demo` (vinculado à "Empresa Demonstra�
 | GET    | `/api/public/diagnosticos/{id}/resultado`            | Resultado                                   |
 | GET    | `/api/public/diagnosticos/{id}/relatorio.pdf`        | PDF (`?visualizar=true` abre no navegador)  |
 | GET    | `/api/public/campanhas/{codigo}/previa-{versao}.jpg` | Imagem da prévia do link (1200×630)         |
+| GET    | `/api/public/convites/{token}`                       | Link pessoal: dados para confirmar, link da empresa e diagnóstico |
+| POST   | `/api/public/convites/{token}/acesso`                | A página abriu no aparelho do líder (auditoria) |
+| POST   | `/api/public/convites/{token}/diagnosticos`          | Confirma (ou corrige) os dados e começa/atualiza o diagnóstico |
 
 Erros seguem `application/problem+json` (RFC 9457); validação traz o mapa `campos`.
 
@@ -142,7 +157,7 @@ todo usuário acessa tudo, inclusive a gestão de usuários em `/administrador/u
 | Método | Caminho                                         | O que faz                                                   |
 |--------|-------------------------------------------------|-------------------------------------------------------------|
 | GET    | `/api/admin/painel?campanha=&cargo=`            | Indicadores, pontos da curva, totais por link e os cargos do link |
-| GET    | `/api/admin/diagnosticos?busca=&status=&faixa=&campanha=&cargo=&pagina=&tamanho=` | Lista paginada (mais recentes primeiro) |
+| GET    | `/api/admin/diagnosticos?busca=&status=&faixa=&campanha=&cargo=&inativos=&pagina=&tamanho=` | Lista paginada (mais recentes primeiro); `inativos=true` mostra só os inativados |
 | GET    | `/api/admin/diagnosticos/{id}`                  | Detalhe completo: líder, origem, resultado, todas as respostas |
 | GET    | `/api/admin/diagnosticos/{id}/relatorio.pdf`    | PDF do diagnóstico                                          |
 | GET    | `/api/admin/empresas`                           | Empresas com o link e quantos diagnósticos cada uma recebeu |
@@ -151,6 +166,27 @@ todo usuário acessa tudo, inclusive a gestão de usuários em `/administrador/u
 | GET    | `/api/admin/empresas/disponibilidade?codigo=`   | Confere se o endereço do link está livre (e sugere outro)   |
 | GET    | `/api/admin/empresas/{id}/relatorio.pdf`        | Relatório consolidado sem nomes (`?visualizar=true` abre no navegador) |
 | GET    | `/api/admin/empresas/{id}/relatorio.html`       | O mesmo relatório em HTML, para ajustar o layout            |
+| GET    | `/api/admin/empresas/{id}/convites`             | Convites da empresa, o funil e se o e-mail está ligado      |
+| GET    | `/api/admin/empresas/{id}/convites/modelo.xlsx` | Planilha modelo com os cargos da empresa                    |
+| POST   | `/api/admin/empresas/{id}/convites/importar`    | Lê a planilha (`arquivo`, .xlsx ou .csv) para revisão; não grava |
+| POST   | `/api/admin/empresas/{id}/convites`             | Cria os convites revisados (`{ convites: [...] }`; erros por linha) |
+| POST   | `/api/admin/empresas/{id}/convites/enviar`      | Dispara os e-mails (`{ ids }`; vazio: os não enviados). 409 sem e-mail ou encerrada |
+| GET    | `/api/admin/empresas/{id}/convites/email-previa`| O e-mail de convite em HTML                                 |
+| PUT    | `/api/admin/convites/{id}`                      | Corrige os dados de um convite (vai para a auditoria)       |
+| POST   | `/api/admin/convites/{id}/enviar`               | Envia o convite de um líder na hora (`{ para }`); 409 com o motivo se não sair |
+| POST   | `/api/admin/convites/{id}/inativar`             | Inativa o líder: o link fecha e ele sai dos cálculos        |
+| POST   | `/api/admin/convites/{id}/reativar`             | Reativa o líder (link e cálculos de volta)                  |
+| POST   | `/api/admin/diagnosticos/{id}/inativar`         | Tira o diagnóstico dos cálculos (e inativa o convite dele)  |
+| POST   | `/api/admin/diagnosticos/{id}/reativar`         | Devolve o diagnóstico aos cálculos                          |
+| GET    | `/api/admin/convites/{id}/eventos`              | Linha do tempo (auditoria) do convite                       |
+| GET    | `/api/admin/empresas/{id}/convites/participacao.pdf`  | Relatório de participação (quem falta, com o link pessoal) |
+| GET    | `/api/admin/empresas/{id}/convites/participacao.xlsx` | A participação em Excel, com filtro e resumo             |
+| GET    | `/api/admin/empresas/{id}/convites/participacao.html` | O PDF em HTML, para ajustar o layout                     |
+| GET    | `/api/admin/empresas/{id}/convites/lembrete-previa`   | O lembrete aos líderes em HTML                           |
+| GET    | `/api/admin/empresas/{id}/acompanhamento`             | Relatórios ao gestor: situação, lembretes e histórico    |
+| POST   | `/api/admin/empresas/{id}/acompanhamento/enviar`      | "Enviar agora" (o do dia, ou o final). 409 sem gestor/e-mail |
+| PUT    | `/api/admin/empresas/{id}/acompanhamento/pausa`       | Pausa ou retoma o diário (`{ pausado }`)                 |
+| GET    | `/api/admin/empresas/{id}/acompanhamento/email-previa`| O e-mail que sairia agora, em HTML                       |
 
 ### Cores da marca por empresa
 
@@ -191,9 +227,12 @@ empresa, no PDF individual, no e-mail do líder, no relatório consolidado e no 
   e o mesmo endereço é reaproveitado por 6, para o cache do navegador funcionar
   (`S3Armazenamento.urlDireta`). Na subida, o app garante no bucket uma regra de CORS só de
   leitura (GET/HEAD), para o painel desenhar a logo no QR Code.
-- **Onde o backend ainda lê a logo:** os PDFs embutem a imagem (data URI, com cache em memória)
-  e o e-mail usa o endereço permanente do backend, porque um endereço assinado expiraria na
-  caixa de entrada do líder. Em dev sem bucket, o backend serve tudo.
+- **Onde o backend ainda lê a logo:** os PDFs embutem a imagem (data URI, com cache em memória).
+  O e-mail também leva a logo dentro dele (imagem embutida, `cid:`, em `LogoEmbutida`), na hora
+  de enviar: o Outlook corporativo bloqueia imagem de fora até o leitor clicar em "Baixar
+  imagens", e o Gmail não alcança o localhost do dev. Os templates e as prévias do painel usam o
+  endereço permanente do backend, que também fica de reserva se a logo não puder ser lida no
+  envio. Em dev sem bucket, o backend serve tudo.
 - **Armazenamento** (`arquivos/`): `S3Armazenamento` quando há credenciais do bucket,
   `DiscoArmazenamento` em dev. O prefixo separa os ambientes (`desenvolvimento`, `producao`).
 
@@ -244,6 +283,96 @@ pergunta (quantos escolheram cada alternativa) e o que a empresa pode fazer por 
 - Template: `templates/relatorio/empresa.html` (páginas A4 de tamanho fixo; perguntas e dimensões
   são paginadas no `RelatorioEmpresaService`).
 
+### Encerramento da avaliação
+
+No cadastro da empresa, "Encerramento da avaliação" (data e hora, com atalhos de 7, 15 e 30 dias)
+fecha tudo de uma vez quando chega: os links da empresa e os links pessoais deixam de aceitar
+respostas (`CampanhaService.exigirAberta`, erro 409 com `encerrada: true`), os convites e lembretes
+param de sair e o relatório consolidado passa a dizer "resultado final" (antes: "resultado parcial").
+Quem já concluiu continua vendo o próprio resultado. Sem data, a avaliação fica aberta.
+
+### Convites nominais
+
+O RH manda a lista de líderes numa planilha e cada um recebe por e-mail um link pessoal
+(`/i/{token}`, 10 caracteres aleatórios), já com os dados preenchidos.
+
+- **Planilha:** o painel gera o modelo com os cargos da empresa numa lista suspensa
+  (`PlanilhaConvites`, Apache POI). Na importação, as colunas são achadas pelo cabeçalho (aceita
+  .xlsx e .csv com ponto e vírgula ou vírgula); a linha de exemplo do modelo é ignorada.
+- **Revisão:** antes de gravar, uma janela mostra todas as linhas: e-mail inválido ou repetido,
+  WhatsApp errado, cargo fora da lista (com a sugestão mais parecida, ex.: "Gerente Comercial"
+  → Gerente) e quem já tem convite. Dá para editar e remover ali mesmo.
+- **Link pessoal:** a primeira tela é "Confira seus dados" (um toque em "Está tudo certo" ou
+  corrigir ali). Depois vêm o tempo no cargo e as perguntas. Os convites entram no link principal
+  da empresa, então os diagnósticos aparecem no relatório dela como os do link aberto.
+- **Adicionar e corrigir:** quem ficou de fora da planilha entra por "Adicionar líder" (mesmas
+  regras da importação). Corrigir os dados de quem já respondeu vale também no diagnóstico dele,
+  então o cargo certo entra nos relatórios (as respostas e o resultado não mudam).
+- **Inativar:** tira o líder da lista e de todos os cálculos (painel, funil, relatório da empresa
+  e média geral; `diagnostico.inativado_em`), fecha o link pessoal e não apaga nada. Dá para
+  reativar. Também vale para quem respondeu pelo link aberto, no detalhe do diagnóstico.
+- **Auditoria:** cada convite guarda a linha do tempo: criado, editado, enviado (ou falha), abriu
+  (com o aparelho), confirmou ou corrigiu os dados (com o que mudou), concluiu, inativado e reativado. O
+  "abriu" é registrado pela própria página: o WhatsApp também abre o link para montar a prévia,
+  mas não roda o JavaScript.
+- **WhatsApp:** máscara `(11) 98765-4321` em todos os campos (no máximo 11 números; o 55 do país
+  é aceito e descartado) e uma regra só, no front (`entrada-telefone.ts`) e no servidor
+  (`Telefones.java`): DDD que existe, celular com o 9 depois do DDD, 10 ou 11 números. Mude as
+  duas juntas. No painel o erro aparece ao sair do campo (DDD inexistente, já durante a digitação).
+- **Relatório de participação** (PDF e Excel), para a empresa cobrar quem falta, já que ela não
+  acessa o painel. Separa os líderes em "começaram e não terminaram", "abriram e não começaram",
+  "ainda não abriram" e "já responderam", com o contato e o link pessoal de quem falta; nenhuma
+  resposta individual, e os inativos ficam de fora. O PDF leva a marca da empresa e é paginado no
+  servidor (`ParticipacaoService.paginar`, peças de altura fixa em `participacao.html`); o Excel
+  (`PlanilhaParticipacao`) traz filtro, datas de verdade e um resumo com fórmulas já calculadas.
+  No celular, o painel abre a folha de compartilhar com o PDF.
+- **E-mail:** o disparo usa o mesmo `EmailSender` do diagnóstico. Enquanto `EMAIL_PROVEDOR=log`,
+  ele fica desligado no painel ("Envio por e-mail desligado neste servidor"), e nada é marcado
+  como enviado.
+- **Falhas de envio:** o `ResendEmailSender` repete o que é passageiro (limite por segundo,
+  Resend instável, rede) com a mesma `Idempotency-Key`, para o líder não receber dois e-mails,
+  e traduz o resto em `FalhaEnvio` com o motivo em português. Cota do plano, chave inválida ou
+  domínio não verificado valem para todos: o lote para e os que faltam ficam com o motivo, sem
+  chamar a Resend de novo. O painel mostra "N convites não saíram", o motivo e "Enviar de novo".
+
+### Relatórios ao gestor e lembretes aos líderes
+
+A empresa tem uma lista de gestores (nenhum, um ou vários; cadastro e edição). O pacote
+`acompanhamento` roda a cada 5 minutos e a `Agenda` decide o que sai, sem repetir:
+
+- **Diário:** dias úteis, a partir das 8h (Brasília), um por dia, para todos os gestores num
+  e-mail só, com o relatório de participação em PDF e Excel anexos. O corpo traz o placar, o
+  que mudou desde o último relatório e quem ainda não respondeu (os 15 primeiros). Começa
+  quando sai o primeiro convite e sai mesmo sem novidade. O administrador pode pausar.
+- **Final:** assim que todos os convidados respondem ou o prazo vence (mesmo pausado e em
+  qualquer dia/hora), com o consolidado, a participação e o Excel. Com menos de
+  `MINIMO_LIDERES` concluídos, vai só a participação e o aviso. Se a avaliação reabrir (prazo
+  novo, líder novo), o diário volta e o final sai de novo no fim. A empresa que só usa o link
+  geral recebe o consolidado no prazo.
+- **Lembretes aos líderes:** 3 dias e 1 dia antes do prazo, a partir das 8h, para quem recebeu
+  o convite e não concluiu (o mesmo template do convite, com a chamada do prazo). Zeram se o
+  prazo mudar.
+- Nada sai depois das 20h, e um envio ao gestor que falha é tentado até 3 vezes no dia.
+  O histórico (`envio_acompanhamento`) mostra o que saiu, quando e para quem.
+
+### Auditoria (linha do tempo do líder)
+
+Todo e-mail sai pelo `Correio` e fica em `email_enviado` com o id do Resend. O Resend avisa o
+que aconteceu em `POST /api/public/webhooks/resend` (assinatura Svix conferida com
+`RESEND_WEBHOOK_SECRET`; aviso repetido ou com mais de 5 min é ignorado): entregue, atrasado,
+devolvido, spam, bloqueado ou falhou. **Sem pixel de abertura nem rastreio de clique**: e-mail
+corporativo entrega melhor sem rastreio. O "abriu o link" já mostra o engajamento.
+
+Na linha do tempo de cada convite: quem fez cada ação no painel (criar, editar com o antes e
+depois, enviar, inativar, reativar, baixar o PDF individual), cada e-mail com a entrega, as
+visitas ao link (com o aparelho), quantas perguntas respondeu, se viu o resultado e se
+compartilhou ou baixou o PDF. Passos que se repetem atualizam a mesma linha, com a contagem.
+E-mail devolvido ou marcado como spam aparece em vermelho na lista e no relatório diário ao
+gestor. A planilha de participação traz a aba **Auditoria** com tudo de todos os líderes.
+
+No Resend: Webhooks → Add endpoint com a URL de produção e os eventos `email.delivered`,
+`email.delivery_delayed`, `email.bounced`, `email.complained`, `email.failed` e `email.suppressed`.
+
 ### Prévia do link no WhatsApp
 
 Quando o RH manda o link (`/c/{codigo}` ou `/`), o WhatsApp, o LinkedIn, o Telegram e o iMessage
@@ -284,7 +413,10 @@ Variáveis do serviço **app**:
 | `APP_URL_PUBLICA`  | domínio público do app (links do e-mail)      |
 | `EMAIL_PROVEDOR`   | `log` (padrão) ou `resend`                    |
 | `RESEND_API_KEY`   | chave da Resend, quando `EMAIL_PROVEDOR=resend` |
-| `EMAIL_REMETENTE`  | ex.: `Diagnóstico do Líder <diagnostico@seudominio.com.br>` |
+| `EMAIL_REMETENTE`  | padrão `Diagnóstico do Líder <diagnostico@terasoftware.com.br>` |
+| `RESEND_WEBHOOK_SECRET` | segredo do webhook do Resend (`whsec_…`): entrega, devolução e spam de cada e-mail |
+| `EMAIL_RESPONDER_PARA` | para onde vão as respostas dos líderes (reply-to; o remetente não tem caixa de entrada) |
+| `EMAIL_DESVIAR_PARA` | **só em desenvolvimento** (`backend/.env`): todo e-mail vai para este endereço. Nunca no Railway |
 | `ADMIN_EMAIL`      | e-mail do primeiro acesso ao painel (só vale enquanto não houver usuários) |
 | `ADMIN_SENHA`      | senha desse primeiro acesso (8+ caracteres); depois, troque em "Trocar minha senha" |
 | `ADMIN_NOME`       | nome exibido (opcional, padrão "Administrador") |
@@ -292,3 +424,7 @@ Variáveis do serviço **app**:
 | `ARMAZENAMENTO_PREFIXO` | `producao` (pasta do ambiente dentro do bucket) |
 
 O Railway só libera SMTP no plano Pro, por isso o e-mail usa a API HTTP da Resend.
+
+O domínio `terasoftware.com.br` está na Resend (região São Paulo) e no DNS do Registro.br em
+modo avançado: TXT `resend._domainkey` (DKIM), CNAME `send` e `rsend` (envio) e TXT `_dmarc`
+(`v=DMARC1; p=none;`). No plano gratuito da Resend a cota é de 100 e-mails por dia e 3.000 por mês.

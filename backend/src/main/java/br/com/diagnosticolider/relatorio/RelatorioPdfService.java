@@ -45,6 +45,15 @@ public class RelatorioPdfService {
 		return processar("relatorio/empresa", dados);
 	}
 
+	/** Outro relatório (ex.: participação dos convites): o template recebe os dados em "r". */
+	public byte[] gerar(String template, Object dados) {
+		return renderer.renderizar(processar(template, dados));
+	}
+
+	public String html(String template, Object dados) {
+		return processar(template, dados);
+	}
+
 	private String processar(String template, Object dados) {
 		var contexto = new Context(PT_BR);
 		contexto.setVariable("r", dados);

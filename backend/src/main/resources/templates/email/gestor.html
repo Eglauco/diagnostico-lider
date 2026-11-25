@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title th:text="${g.titulo}">Participação no Diagnóstico do Líder</title>
+</head>
+<!-- Relatório ao gestor da empresa: o diário (participação, quem falta, PDF e Excel anexos) e o final
+     (resultado consolidado). Estilos inline e tabelas: é o que todo cliente de e-mail entende. -->
+<body th:with="t=${g.tema}" th:style="|margin:0;padding:0;background:${t.fundo};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${t.tinta};|"
+      style="margin:0;padding:0;background:#EDF2EF;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F2B26;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;" th:text="|${g.titulo}. ${g.novidade ?: g.subtitulo}|">Resumo.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo};|" style="background:#EDF2EF;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:20px;">
+        <!-- Marca da empresa -->
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <th:block th:if="${g.logo != null}">
+                <td><img th:src="${g.logo.url}" th:alt="${g.empresa}" alt="Empresa"
+                         th:width="${g.logo.largura}" th:height="${g.logo.altura}"
+                         th:style="|display:block;width:${g.logo.largura}px;height:${g.logo.altura}px;border:0;|"
+                         style="display:block;height:34px;width:auto;border:0;"></td>
+                <td th:if="${g.logo.pedeNome}" style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${g.empresa}">Empresa</td>
+              </th:block>
+              <th:block th:if="${g.logo == null}">
+                <td th:style="|width:30px;height:30px;background:${t.acao};color:${t.sobreAcao};border-radius:8px;text-align:center;font-size:12px;font-weight:700;|"
+                    style="width:30px;height:30px;background:#0F2B26;color:#FFFFFF;border-radius:8px;text-align:center;font-size:12px;font-weight:700;"
+                    th:text="${g.sigla}">CH</td>
+                <td style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${g.empresa}">Empresa</td>
+              </th:block>
+            </tr></table>
+          </td>
+        </tr>
+
+        <!-- Título -->
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <p th:style="|margin:0;font-size:12px;line-height:1.4;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${t.tinta3};|"
+               style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#7D918B;" th:text="${g.rotulo}">Acompanhamento da participação</p>
+            <h1 style="margin:10px 0 0;font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-0.02em;" th:text="${g.titulo}">12 de 30 líderes responderam</h1>
+            <p th:if="${g.novidade != null}" style="margin:12px 0 0;font-size:16px;line-height:1.5;font-weight:600;" th:text="${g.novidade}">+3 respostas desde o último relatório.</p>
+            <p th:style="|margin:8px 0 0;font-size:16px;line-height:1.55;color:${t.tinta2};|" style="margin:8px 0 0;font-size:16px;line-height:1.55;color:#4A635C;" th:text="${g.subtitulo}">Faltam 18 líderes.</p>
+          </td>
+        </tr>
+
+        <!-- Barra da participação e legenda -->
+        <tr th:if="${!g.placar.isEmpty()}">
+          <td style="padding:22px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:999px;overflow:hidden;">
+              <tr>
+                <td th:each="p : ${g.placar}" th:width="|${p.percentual}%|"
+                    th:style="|height:12px;font-size:0;line-height:0;background:${p.cor};|" style="height:12px;font-size:0;line-height:0;background:#1F8A5B;">&nbsp;</td>
+              </tr>
+            </table>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
+              <tr th:each="p : ${g.placar}">
+                <td style="padding:4px 0;font-size:15px;line-height:1.4;">
+                  <span th:style="|display:inline-block;width:10px;height:10px;border-radius:999px;background:${p.cor};margin-right:8px;vertical-align:middle;|"
+                        style="display:inline-block;width:10px;height:10px;border-radius:999px;background:#1F8A5B;margin-right:8px;"></span><span th:text="${p.rotulo}">Responderam</span>
+                </td>
+                <td align="right" style="padding:4px 0;font-size:15px;line-height:1.4;font-weight:700;white-space:nowrap;">
+                  <span th:text="${p.quantidade}">12</span>
+                  <span th:style="|font-weight:400;color:${t.tinta3};|" style="font-weight:400;color:#7D918B;" th:text="|(${p.percentual}%)|">(40%)</span>
+                </td>
+              </tr>
+            </table>
+            <p th:if="${g.prazo != null}" style="margin:14px 0 0;font-size:15px;line-height:1.5;font-weight:600;" th:text="${g.prazo}">A avaliação vai até 26 de novembro, às 22h: faltam 2 dias.</p>
+          </td>
+        </tr>
+        <tr th:if="${g.placar.isEmpty() and g.prazo != null}">
+          <td style="padding:16px 32px 0;">
+            <p style="margin:0;font-size:15px;line-height:1.5;font-weight:600;" th:text="${g.prazo}">O prazo terminou.</p>
+          </td>
+        </tr>
+
+        <!-- Final: o resultado do grupo -->
+        <tr th:if="${g.consolidado != null}">
+          <td style="padding:24px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo2};border-radius:14px;|" style="background:#F5F8F6;border-radius:14px;">
+              <tr>
+                <td style="padding:18px 20px;">
+                  <p th:style="|margin:0;font-size:13px;line-height:1.4;color:${t.tinta2};|" style="margin:0;font-size:13px;color:#4A635C;"
+                     th:text="|Índice médio do grupo · ${g.consolidado.lideres} ${g.consolidado.lideres == 1 ? 'líder' : 'líderes'}|">Índice médio do grupo</p>
+                  <p style="margin:4px 0 0;font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-0.02em;">
+                    <span th:text="${g.consolidado.indiceMedio}">62</span><span th:style="|font-size:15px;font-weight:400;color:${t.tinta3};|" style="font-size:15px;font-weight:400;color:#7D918B;">/100</span>
+                  </p>
+                  <p th:if="${g.consolidado.faixa != null}" th:style="|margin:6px 0 0;font-size:15px;line-height:1.4;font-weight:700;color:${g.consolidado.corFaixa};|"
+                     style="margin:6px 0 0;font-size:15px;font-weight:700;color:#A86A00;" th:text="${g.consolidado.faixa}">Carreira em platô</p>
+                </td>
+              </tr>
+            </table>
+            <p th:style="|margin:14px 0 0;font-size:15px;line-height:1.55;color:${t.tinta2};|" style="margin:14px 0 0;font-size:15px;line-height:1.55;color:#4A635C;">
+              O relatório consolidado em anexo traz as faixas, as dimensões mais frágeis e o que fazer a seguir. Só números do grupo: nenhuma resposta individual.</p>
+          </td>
+        </tr>
+        <tr th:if="${g.aviso != null}">
+          <td style="padding:24px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF3DA;border-radius:14px;">
+              <tr>
+                <td style="padding:16px 20px;font-size:15px;line-height:1.5;color:#7A4D00;" th:text="${g.aviso}">O relatório consolidado precisa de pelo menos 3 diagnósticos concluídos.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Diário: quem ainda não respondeu -->
+        <tr th:if="${!g.pendentes.isEmpty()}">
+          <td style="padding:26px 32px 0;">
+            <p style="margin:0;font-size:17px;line-height:1.3;font-weight:700;">Quem ainda não respondeu</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+              <tr th:each="p : ${g.pendentes}">
+                <td th:style="|padding:10px 0;border-top:1px solid ${t.linha};|" style="padding:10px 0;border-top:1px solid #D2DDD8;">
+                  <p style="margin:0;font-size:15px;line-height:1.35;font-weight:600;" th:text="${p.nome}">Ana Souza</p>
+                  <p th:style="|margin:2px 0 0;font-size:13px;line-height:1.4;color:${t.tinta2};|" style="margin:2px 0 0;font-size:13px;color:#4A635C;"
+                     th:text="${p.cargo != null} ? |${p.cargo} · ${p.situacao}| : ${p.situacao}">Coordenação · Não abriu o link</p>
+                </td>
+              </tr>
+            </table>
+            <p th:if="${g.outrosPendentes > 0}" th:style="|margin:8px 0 0;font-size:14px;line-height:1.5;color:${t.tinta2};|" style="margin:8px 0 0;font-size:14px;color:#4A635C;"
+               th:text="|E mais ${g.outrosPendentes}: a lista completa está no PDF e no Excel.|">E mais 3.</p>
+          </td>
+        </tr>
+
+        <!-- Diário: e-mails que voltaram (endereço errado, filtro da empresa, spam) -->
+        <tr th:if="${!g.devolvidos.isEmpty()}">
+          <td style="padding:26px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FDEDEF;border-radius:14px;">
+              <tr>
+                <td style="padding:16px 20px;">
+                  <p style="margin:0;font-size:16px;line-height:1.35;font-weight:700;color:#9E2238;"
+                     th:text="${g.devolvidos.size() == 1} ? 'O e-mail de 1 líder não chegou' : |O e-mail de ${g.devolvidos.size()} líderes não chegou|">O e-mail de 2 líderes não chegou</p>
+                  <p style="margin:4px 0 0;font-size:14px;line-height:1.5;color:#7A2232;">Confira o endereço com o RH. Enquanto isso, o link pessoal de cada um está no PDF para mandar pelo WhatsApp.</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+                    <tr th:each="d : ${g.devolvidos}">
+                      <td style="padding:8px 0;border-top:1px solid #F3C9D0;">
+                        <p style="margin:0;font-size:15px;line-height:1.35;font-weight:600;color:#0F2B26;" th:text="${d.nome}">Ana Souza</p>
+                        <p style="margin:2px 0 0;font-size:13px;line-height:1.4;color:#7A2232;word-break:break-all;" th:text="${d.email}">ana@empresa.com.br</p>
+                        <p style="margin:2px 0 0;font-size:13px;line-height:1.4;color:#4A635C;" th:text="${d.motivo}">O endereço não existe.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Anexos -->
+        <tr th:if="${!g.anexos.isEmpty()}">
+          <td style="padding:24px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo2};border-radius:14px;|" style="background:#F5F8F6;border-radius:14px;">
+              <tr>
+                <td th:style="|padding:16px 20px;font-size:14px;line-height:1.6;color:${t.tinta2};|" style="padding:16px 20px;font-size:14px;line-height:1.6;color:#4A635C;">
+                  <strong th:style="|color:${t.tinta};|" style="color:#0F2B26;">Em anexo</strong><br>
+                  <th:block th:each="a, i : ${g.anexos}"><span th:text="${a}">Relatório de participação (PDF)</span><br th:unless="${i.last}"></th:block>
+                  <th:block th:unless="${g.fim}"><br>No PDF vai o link pessoal de cada líder: dá para mandar direto pelo WhatsApp.</th:block>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Rodapé -->
+        <tr>
+          <td style="padding:28px 32px 28px;">
+            <p th:style="|margin:0;padding-top:18px;border-top:1px solid ${t.linha};font-size:12px;line-height:1.5;color:${t.tinta3};|"
+               style="margin:0;padding-top:18px;border-top:1px solid #D2DDD8;font-size:12px;line-height:1.5;color:#7D918B;"
+               th:text="${g.rodape}">Você recebe este relatório todo dia útil às 8h.</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

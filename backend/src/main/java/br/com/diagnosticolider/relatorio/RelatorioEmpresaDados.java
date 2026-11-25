@@ -13,7 +13,13 @@ public record RelatorioEmpresaDados(String empresa, String emitidoEm, String per
 		List<FaixaResumo> faixas, List<Destaque> destaques, CurvaGrupo curva, List<Coluna> histograma,
 		Limites limites, List<List<DimensaoResumo>> paginasDimensoes, DimensaoResumo maisFragil,
 		List<List<PerguntaResumo>> paginasPerguntas, String notaVersoes, int minimoLideres, Paginacao paginas,
-		String nomeArquivo, PaletaMarca.Tema tema, String sigla, String logo, boolean logoPedeNome, PorCargo porCargo) {
+		String nomeArquivo, PaletaMarca.Tema tema, String sigla, String logo, boolean logoPedeNome, PorCargo porCargo,
+		Situacao situacao) {
+
+	/** Resultado final (avaliação encerrada) ou parcial (ainda aberta); null sem data de encerramento. */
+	public record Situacao(String rotulo, String explicacao) {
+	}
+
 
 	/** Quantos começaram, quantos terminaram e quanto tempo levaram. */
 	public record Participacao(int iniciaram, int concluiram, int emAndamento, int taxaConclusao,
@@ -45,7 +51,14 @@ public record RelatorioEmpresaDados(String empresa, String emitidoEm, String per
 	public record Destaque(String codigo, String titulo, String texto) {
 	}
 
-	public record CurvaGrupo(CurvaCarreira.Desenho desenho, List<PontoLider> pontos, double raio) {
+	public record CurvaGrupo(CurvaCarreira.Desenho desenho, List<PontoLider> pontos, double raio, EtiquetaMedia media) {
+	}
+
+	/**
+	 * A etiqueta "Média do grupo" (140 × 22, centro em x, topo em y) e a linha pontilhada que a liga
+	 * à curva (de linhaDe até linhaAte).
+	 */
+	public record EtiquetaMedia(double x, double y, double linhaDe, double linhaAte) {
 	}
 
 	public record PontoLider(double x, double y, String faixa) {

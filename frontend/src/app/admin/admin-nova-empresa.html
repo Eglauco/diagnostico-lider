@@ -114,6 +114,10 @@
 
         <app-secao-cargos [(cargos)]="cargos" [erro]="erroDoServidor('cargos')" (editou)="editou('cargos')" />
 
+        <app-secao-encerramento [(valor)]="encerraEm" />
+
+        <app-secao-gestores [(emails)]="gestores" [erros]="errosGestores()" [tentou]="tentou()" (editou)="errosGestores.set({}); erro.set(null)" />
+
         <app-secao-cores
           [(primaria)]="corPrimaria"
           [(secundaria)]="corSecundaria"

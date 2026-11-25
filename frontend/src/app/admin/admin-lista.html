@@ -173,6 +173,7 @@
           <button type="button" class="chip" [attr.aria-pressed]="!status()" (click)="filtrar({ status: null, pagina: null })">Todos</button>
           <button type="button" class="chip" [attr.aria-pressed]="status() === 'CONCLUIDO'" (click)="filtrar({ status: 'CONCLUIDO', pagina: null })">Concluídos</button>
           <button type="button" class="chip" [attr.aria-pressed]="status() === 'EM_ANDAMENTO'" (click)="filtrar({ status: 'EM_ANDAMENTO', pagina: null })">Em andamento</button>
+          <button type="button" class="chip" [attr.aria-pressed]="status() === 'INATIVO'" (click)="filtrar({ status: 'INATIVO', pagina: null })">Inativos</button>
         </div>
       </div>
     </div>

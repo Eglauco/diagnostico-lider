@@ -1,7 +1,8 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { httpResource } from '@angular/common/http';
+import { HttpClient, httpResource } from '@angular/common/http';
 import { Location, LowerCasePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
 import { Curva } from '../compartilhado/curva';
 import { baixarArquivo } from '../compartilhado/download';
@@ -20,6 +21,7 @@ import { SeloStatus } from './selos';
 export class AdminDetalhe {
   private readonly location = inject(Location);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
 
   readonly id = input.required<string>();
 
@@ -42,6 +44,23 @@ export class AdminDetalhe {
   protected readonly letras = 'ABCDEFGHIJ';
 
   /** Volta para a lista preservando busca e filtros; se abriu direto, vai para o painel. */
+  protected readonly confirmandoInativacao = signal(false);
+  protected readonly mudandoAtivo = signal(false);
+
+  /** Inativa (tira dos cálculos) ou reativa; o convite do líder, se houver, acompanha. */
+  protected async mudarAtivo(d: Detalhe, acao: 'inativar' | 'reativar') {
+    this.mudandoAtivo.set(true);
+    try {
+      await firstValueFrom(this.http.post(`${API_ADMIN}/diagnosticos/${d.id}/${acao}`, null));
+      this.confirmandoInativacao.set(false);
+      this.detalhe.reload();
+    } catch {
+      this.erro.set('Não foi possível concluir agora. Tente de novo.');
+    } finally {
+      this.mudandoAtivo.set(false);
+    }
+  }
+
   protected voltar() {
     const estado = this.location.getState() as { navigationId?: number } | null;
     if ((estado?.navigationId ?? 1) > 1) this.location.back();

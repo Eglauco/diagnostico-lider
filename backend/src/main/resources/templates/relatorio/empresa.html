@@ -311,7 +311,7 @@
 
     <div th:if="${r.logo != null}" class="logo-capa"><img th:src="${r.logo}" th:alt="${r.empresa}" alt="Empresa"></div>
     <div th:if="${r.logo == null}" class="monograma-capa" th:text="${r.sigla}">CH</div>
-    <p class="sobre">Relatório consolidado de carreira</p>
+    <p class="sobre" th:text="${r.situacao != null} ? |Relatório consolidado · ${r.situacao.rotulo}| : 'Relatório consolidado de carreira'">Relatório consolidado de carreira</p>
     <h1 class="display" th:classappend="${#strings.length(r.empresa) > 24} ? 'longo'" th:text="${r.empresa}">Empresa</h1>
     <p class="meta" th:text="|${r.lideres} líderes concluíram o diagnóstico ${r.periodo}|">12 líderes</p>
 
@@ -327,10 +327,11 @@
         <path th:attr="d=${c.area}" fill="url(#brilho)"/>
         <path th:attr="d=${c.curva},stroke=${r.tema.destaqueSobreTinta}" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 
-        <g th:with="x=${c.voce.x}">
-          <line th:attr="x1=${x},x2=${x},y2=${c.base},stroke=${r.tema.fundo}" y1="20" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.7"/>
-          <rect th:attr="x=${x - 70},fill=${r.tema.fundo}" y="0" width="140" height="22" rx="11"/>
-          <text class="pilula" text-anchor="middle" th:attr="x=${x}" y="15" th:text="|Média do grupo: ${r.indice.media}|">Média do grupo: 62</text>
+        <!-- Média do grupo: linha da curva até a base e a etiqueta (posição calculada em RelatorioEmpresaService.curva). -->
+        <g th:with="m=${r.curva.media}">
+          <line th:attr="x1=${c.voce.x},x2=${c.voce.x},y1=${m.linhaDe},y2=${m.linhaAte},stroke=${r.tema.fundo}" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.7"/>
+          <rect th:attr="x=${m.x - 70},y=${m.y},fill=${r.tema.fundo}" width="140" height="22" rx="11"/>
+          <text class="pilula" text-anchor="middle" th:attr="x=${m.x},y=${m.y + 15}" th:text="|Média do grupo: ${r.indice.media}|">Média do grupo: 62</text>
         </g>
 
         <circle th:each="p : ${r.curva.pontos}" th:class="|ponto p-${p.faixa}|"
@@ -705,6 +706,7 @@
       <h4>Base deste relatório</h4>
       <p th:text="|${r.lideres} diagnósticos concluídos pelo link da empresa ${r.periodo}. Questionário: ${r.questionario}.|">Base</p>
       <p>Quem começou e não terminou entra só na taxa de conclusão.</p>
+      <p th:if="${r.situacao != null}" th:text="${r.situacao.explicacao}">Situação</p>
       <p th:if="${r.notaVersoes}" th:text="${r.notaVersoes}">Nota</p>
     </section>
     <section th:if="${r.porCargo != null}">

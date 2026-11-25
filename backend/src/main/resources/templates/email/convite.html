@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Convite para o Diagnóstico de Carreira do Líder</title>
+</head>
+<!-- Convite nominal: marca da empresa, o link pessoal do líder e o prazo. Estilos inline (e-mail).
+     Com c.lembrete, é o lembrete antes do prazo: a chamada vira o título e o botão retoma quem já começou. -->
+<body th:with="t=${c.tema}" th:style="|margin:0;padding:0;background:${t.fundo};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${t.tinta};|"
+      style="margin:0;padding:0;background:#EDF2EF;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F2B26;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;" th:if="${c.lembrete == null}">Leva 2 minutos. Seus dados já estão preenchidos: é só conferir e responder.</span>
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;" th:if="${c.lembrete != null}"
+      th:text="|${c.lembrete}. ${c.continuar ? 'O link continua de onde você parou.' : 'Leva 2 minutos e seus dados já estão preenchidos.'}|">Lembrete.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo};|" style="background:#EDF2EF;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:20px;">
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <th:block th:if="${c.logo != null}">
+                <td><img th:src="${c.logo.url}" th:alt="${c.empresa}" alt="Empresa"
+                         th:width="${c.logo.largura}" th:height="${c.logo.altura}"
+                         th:style="|display:block;width:${c.logo.largura}px;height:${c.logo.altura}px;border:0;|"
+                         style="display:block;height:34px;width:auto;border:0;"></td>
+                <td th:if="${c.logo.pedeNome}" style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${c.empresa}">Empresa</td>
+              </th:block>
+              <th:block th:if="${c.logo == null}">
+                <td th:style="|width:30px;height:30px;background:${t.acao};color:${t.sobreAcao};border-radius:8px;text-align:center;font-size:12px;font-weight:700;|"
+                    style="width:30px;height:30px;background:#0F2B26;color:#FFFFFF;border-radius:8px;text-align:center;font-size:12px;font-weight:700;"
+                    th:text="${c.sigla}">CH</td>
+                <td style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${c.empresa}">Empresa</td>
+              </th:block>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <p th:style="|margin:0;font-size:16px;line-height:1.5;color:${t.tinta2};|" style="margin:0;font-size:16px;line-height:1.5;color:#4A635C;"
+               th:text="|Olá, ${c.primeiroNome}.|">Olá, Ana.</p>
+            <h1 style="margin:10px 0 0;font-size:30px;line-height:1.12;font-weight:700;letter-spacing:-0.02em;"
+                th:text="${c.lembrete} ?: 'Em que ponto da curva está a sua carreira?'">Em que ponto da curva está a sua carreira?</h1>
+            <p th:if="${c.lembrete == null}" style="margin:14px 0 0;font-size:17px;line-height:1.55;"
+               th:text="|${c.empresa} convidou você para o Diagnóstico de Carreira do Líder. Em 2 minutos você descobre se a sua carreira está subindo, no platô ou travada, e o que fazer a seguir.|">
+              Convite.</p>
+            <p th:if="${c.lembrete != null}" style="margin:14px 0 0;font-size:17px;line-height:1.55;"
+               th:text="|${c.empresa} convidou você para o Diagnóstico de Carreira do Líder e a sua resposta ainda não chegou. ${c.continuar ? 'Você já começou: o link continua de onde parou.' : 'Leva 2 minutos e você descobre em que ponto da curva está a sua carreira.'}|">
+              Lembrete.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <a th:href="${c.link}" th:style="|display:inline-block;background:${t.acao};color:${t.sobreAcao};text-decoration:none;font-weight:600;font-size:16px;padding:15px 26px;border-radius:999px;|"
+               style="display:inline-block;background:#0F2B26;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:16px;padding:15px 26px;border-radius:999px;"
+               th:text="${c.continuar} ? 'Continuar de onde parei' : (${c.lembrete != null} ? 'Responder agora' : 'Começar meu diagnóstico')">Começar meu diagnóstico</a>
+            <p th:if="${c.prazo != null}" th:style="|margin:16px 0 0;font-size:15px;line-height:1.5;color:${t.tinta};font-weight:600;|"
+               style="margin:16px 0 0;font-size:15px;line-height:1.5;font-weight:600;" th:text="|Responda até ${c.prazo}.|">Responda até 30 de novembro, às 18h.</p>
+            <p th:style="|margin:8px 0 0;font-size:14px;line-height:1.5;color:${t.tinta2};|" style="margin:8px 0 0;font-size:14px;line-height:1.5;color:#4A635C;">
+              O link é só seu e já vem com os seus dados: é só conferir e responder. O resultado aparece na hora.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo2};border-radius:14px;|" style="background:#F5F8F6;border-radius:14px;">
+              <tr>
+                <td th:style="|padding:16px 20px;font-size:14px;line-height:1.5;color:${t.tinta2};|" style="padding:16px 20px;font-size:14px;line-height:1.5;color:#4A635C;"
+                    th:text="|Suas respostas são suas: a empresa vê só os números do grupo, nunca o seu resultado individual.|">
+                  Privacidade.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 28px;">
+            <p th:style="|margin:0;padding-top:18px;border-top:1px solid ${t.linha};font-size:12px;line-height:1.5;color:${t.tinta3};|"
+               style="margin:0;padding-top:18px;border-top:1px solid #D2DDD8;font-size:12px;line-height:1.5;color:#7D918B;">
+              Se o botão não abrir, copie este endereço no navegador:<br>
+              <a th:href="${c.link}" th:text="${c.link}" th:style="|color:${t.tinta2};word-break:break-all;|" style="color:#4A635C;word-break:break-all;">link</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

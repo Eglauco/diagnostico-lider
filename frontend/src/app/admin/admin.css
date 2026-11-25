@@ -244,6 +244,24 @@ tbody tr {
   }
 }
 
+/* Diálogo largo (revisão da planilha, detalhe do convite): quase a tela toda no celular;
+   no computador, até 60rem. O conteúdo rola por dentro, com cabeçalho e rodapé fixos. */
+.dialogo-largo {
+  height: 92dvh;
+}
+.dialogo-largo > div {
+  height: 100%;
+}
+@media (min-width: 640px) {
+  .dialogo-largo {
+    max-width: 60rem;
+    height: min(88dvh, 52rem);
+  }
+  .dialogo-medio {
+    max-width: 40rem;
+  }
+}
+
 .avatar {
   display: grid;
   place-items: center;

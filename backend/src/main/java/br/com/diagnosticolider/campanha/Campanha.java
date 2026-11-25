@@ -1,5 +1,7 @@
 package br.com.diagnosticolider.campanha;
 
+import java.time.Instant;
+
 import br.com.diagnosticolider.empresa.Empresa;
 import br.com.diagnosticolider.questionario.Questionario;
 import jakarta.persistence.Column;
@@ -61,6 +63,16 @@ public class Campanha {
 
 	public boolean vinculadaAEmpresa() {
 		return empresa != null;
+	}
+
+	/** A avaliação da empresa já encerrou? O link geral não encerra por data. */
+	public boolean encerrada(Instant agora) {
+		return empresa != null && empresa.encerrada(agora);
+	}
+
+	/** Data marcada para o encerramento (null no link geral ou sem data). */
+	public Instant encerraEm() {
+		return empresa == null ? null : empresa.getEncerraEm();
 	}
 
 	public Long getId() {

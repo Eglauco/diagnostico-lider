@@ -35,7 +35,9 @@ public record AppProperties(String urlPublica, Pdf pdf, Email email, AcessoInici
 
 	}
 
-	public record Email(ProvedorEmail provedor, String remetente, String resendApiKey) {
+	/** desviarPara: só em desenvolvimento, todo e-mail vai para este endereço (vazio: para quem é). */
+	public record Email(ProvedorEmail provedor, String remetente, String responderPara, String resendApiKey,
+			String resendWebhookSecret, String desviarPara) {
 	}
 
 	public enum MotorPdf {

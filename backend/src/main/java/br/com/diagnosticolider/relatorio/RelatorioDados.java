@@ -15,7 +15,8 @@ public record RelatorioDados(UUID id, String nome, String primeiroNome, String e
 		String urlResultado, MarcaEmpresa empresa, PaletaMarca.Tema tema, Logo logo) {
 
 	/**
-	 * Logomarca da empresa: embutida no PDF (dataUri) e por endereço público no e-mail (url).
+	 * Logomarca da empresa: embutida no PDF (dataUri) e por endereço público no e-mail (url; no envio
+	 * o Correio troca pela imagem embutida, ver LogoEmbutida).
 	 * pedeNome: logo só com o símbolo, então o nome da empresa vai ao lado.
 	 * larguraEmail/alturaEmail: tamanho exato no e-mail (o Outlook estica imagem sem largura).
 	 */

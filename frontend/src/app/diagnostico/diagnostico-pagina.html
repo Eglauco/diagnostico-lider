@@ -1,8 +1,17 @@
-@if (campanha.error()) {
-  <app-nao-encontrado
-    titulo="Este link não está disponível"
-    mensagem="O diagnóstico pode ter sido encerrado, ou o endereço chegou incompleto. Confira o link que você recebeu."
-  />
+@if (erroCarregar()) {
+  @if (token()) {
+    <app-nao-encontrado
+      sobretitulo="Convite"
+      titulo="Este convite não está disponível"
+      mensagem="O convite pode ter sido cancelado, ou o endereço chegou incompleto. Confira o e-mail que você recebeu ou fale com o RH da sua empresa."
+      [mostrarAcao]="false"
+    />
+  } @else {
+    <app-nao-encontrado
+      titulo="Este link não está disponível"
+      mensagem="O diagnóstico pode ter sido encerrado, ou o endereço chegou incompleto. Confira o link que você recebeu."
+    />
+  }
 } @else if (!pronto()) {
   <div class="grid min-h-dvh place-items-center" aria-busy="true">
     <span class="size-9 animate-spin rounded-full border-[3px] border-linha border-t-brasa" aria-hidden="true"></span>
@@ -10,6 +19,14 @@
   </div>
 } @else if (calculando()) {
   <app-calculando [nome]="primeiroNome()" />
+} @else if (encerrada() && retomada()?.tipo !== 'concluido') {
+  <!-- Avaliação encerrada: o resultado da empresa fechou. Quem já concluiu ainda vê o próprio resultado (retomada). -->
+  <app-nao-encontrado
+    sobretitulo="Avaliação encerrada"
+    titulo="Este diagnóstico foi encerrado"
+    [mensagem]="'A avaliação' + (marca() ? ' da ' + marca()!.nome : '') + ' foi encerrada ' + (dataEncerramento() ? 'em ' + dataEncerramento() : '') + '. Obrigado pelo interesse.'"
+    [mostrarAcao]="false"
+  />
 } @else {
   <div class="mx-auto flex min-h-dvh w-full max-w-xl flex-col">
     @if (indice() > 0) {
@@ -18,8 +35,38 @@
 
     <main class="palco flex-1" [attr.data-direcao]="direcao()">
       @for (etapa of etapaVisivel(); track etapa.chave) {
-        <section class="flex flex-col" [class.etapa-cheia]="etapa.tipo !== 'inicio'" animate.enter="etapa-entrar" animate.leave="etapa-sair">
-          @if (etapa.tipo === 'inicio') {
+        <section class="flex flex-col" [class.etapa-cheia]="etapa.tipo !== 'inicio' && etapa.tipo !== 'confirmar'" animate.enter="etapa-entrar" animate.leave="etapa-sair">
+          @if (etapa.tipo === 'confirmar') {
+            @if (retomada()) {
+              <!-- Convite já começado (ou concluído): continuar de onde parou ou ver o resultado. -->
+              <app-boas-vindas
+                [empresa]="marca()"
+                [totalPerguntas]="grupos()[1]"
+                [retomada]="retomada()"
+                [permitirRecomecar]="false"
+                (continuar)="continuarDeOndeParou()"
+                (verResultado)="verResultado()"
+              />
+            } @else {
+              <app-confirmar-dados
+                [empresa]="marca()"
+                [primeiroNome]="primeiroNome()"
+                [controles]="formulario"
+                [opcoesCargo]="dadosCampanha()?.perfil ? opcoesCargo() : []"
+                [cargo]="perfil().cargo"
+                [outroNome]="perfil().outroNome"
+                [erros]="errosConfirmacao()"
+                [prazo]="prazo()"
+                [ultimo]="etapa.ultimo"
+                [enviando]="enviando()"
+                [(editando)]="editandoDados"
+                (editou)="editou($event)"
+                (escolherCargo)="escolherCargoConfirmacao($event)"
+                (escreverOutro)="editouOutroNome($event)"
+                (confirmar)="confirmarDados(etapa)"
+              />
+            }
+          } @else if (etapa.tipo === 'inicio') {
             <app-boas-vindas
               [empresa]="marca()"
               [totalPerguntas]="grupos()[1]"

@@ -37,18 +37,18 @@ class EnvioDiagnosticoService {
 
 	private final ITemplateEngine templates;
 
-	private final EmailSender email;
+	private final Correio correio;
 
 	private final DiagnosticoRepository diagnosticos;
 
 	private final Clock clock;
 
 	EnvioDiagnosticoService(RelatorioDadosService dados, RelatorioPdfService pdf, ITemplateEngine templates,
-			EmailSender email, DiagnosticoRepository diagnosticos, Clock clock) {
+			Correio correio, DiagnosticoRepository diagnosticos, Clock clock) {
 		this.dados = dados;
 		this.pdf = pdf;
 		this.templates = templates;
-		this.email = email;
+		this.correio = correio;
 		this.diagnosticos = diagnosticos;
 		this.clock = clock;
 	}
@@ -60,6 +60,7 @@ class EnvioDiagnosticoService {
 	}
 
 	void enviar(UUID id) {
+		var origem = new Correio.Origem(EmailEnviado.Tipo.RESULTADO, null, null, id);
 		try {
 			RelatorioDados relatorio = dados.montar(id);
 			byte[] anexo = pdf.gerar(relatorio);
@@ -68,15 +69,23 @@ class EnvioDiagnosticoService {
 			contexto.setVariable("r", relatorio);
 			String html = templates.process("email/diagnostico-pronto", contexto);
 
-			email.enviar(new EmailSender.Mensagem(relatorio.email(),
+			correio.enviar(new EmailSender.Mensagem(relatorio.email(),
 					relatorio.primeiroNome() + ", seu diagnóstico de carreira está pronto", html,
-					List.of(new EmailSender.Anexo(relatorio.nomeArquivo(), anexo))));
+					List.of(new EmailSender.Anexo(relatorio.nomeArquivo(), anexo))), origem);
 			diagnosticos.atualizarStatusEmail(id, StatusEmail.ENVIADO, Instant.now(clock));
 		}
 		catch (RuntimeException | Error e) {
 			// Error também: uma falha de classpath não pode deixar o status preso em PENDENTE.
 			log.error("Falha ao enviar o diagnóstico {} por e-mail", id, e);
 			diagnosticos.atualizarStatusEmail(id, StatusEmail.FALHOU, null);
+			String motivo = e instanceof EmailSender.FalhaEnvio ? e.getMessage()
+					: "Erro inesperado ao montar o PDF ou o e-mail: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+			try {
+				correio.naoSaiu(origem, motivo);
+			}
+			catch (RuntimeException ignorada) {
+				// A auditoria não pode esconder a falha original (já registrada acima).
+			}
 		}
 	}
 

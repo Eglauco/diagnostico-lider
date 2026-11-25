@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<title th:text="|Participação — ${r.empresa}|">Participação</title>
+<style th:utext="${fontes}"></style>
+<style>
+  /* Páginas A4 de altura fixa: cada peça tem altura fixa e o servidor pagina (ParticipacaoService). */
+  @page { size: A4; margin: 0; }
+  :root {
+    --abeto: #0F2B26; --abeto-2: #4A635C; --abeto-3: #7D918B;
+    --nevoa: #EDF2EF; --nevoa-2: #F5F8F6; --linha: #D2DDD8;
+    --acao: #0F2B26; --sobre-acao: #FFFFFF;
+    --respondeu: #1F8A5B; --respondeu-suave: #E2F2EA;
+    --andamento: #C27C0B; --andamento-suave: #FBF0DC;
+    --nao-abriu: #A9B8B2; --nao-abriu-suave: #EDF2EF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4; color: var(--abeto); background: #fff;
+    font-feature-settings: 'tnum' 1;
+  }
+  .display {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-variation-settings: 'opsz' 96; font-stretch: 84%;
+    letter-spacing: -0.02em; word-spacing: 0.08em;
+  }
+
+  .pagina {
+    width: 210mm; height: 297mm; padding: 14mm 17mm 12mm; overflow: hidden;
+    display: flex; flex-direction: column; break-after: page;
+  }
+  .pagina:last-child { break-after: auto; }
+  .conteudo { flex: 1; min-height: 0; overflow: hidden; }
+
+  .topo { height: 11mm; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--linha); }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 12.5px; }
+  .marca img.logo { display: block; height: 26px; width: auto; max-width: 170px; object-fit: contain; }
+  .monograma {
+    width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    background: var(--acao); color: var(--sobre-acao); font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .topo > span { color: var(--abeto-2); font-size: 11.5px; }
+  .rodape {
+    height: 9mm; flex-shrink: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+    border-top: 1px solid var(--linha); font-size: 10.5px; color: var(--abeto-3);
+  }
+
+  /* Abertura (só na primeira página) ---------------------------------- */
+  .abertura { height: 80mm; padding-top: 9mm; }
+  .rotulo { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); }
+  .abertura h1 { margin-top: 6px; font-size: 40px; line-height: 1; font-weight: 700; max-width: 150mm; }
+  .abertura .sub { margin-top: 8px; font-size: 15px; color: var(--abeto-2); }
+  .meta { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 11.5px; }
+  .meta span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--nevoa-2); border: 1px solid var(--linha); color: var(--abeto-2); }
+  .meta span.prazo { color: var(--abeto); font-weight: 600; }
+  .meta svg { display: block; }
+
+  .placar { margin-top: 9mm; }
+  .barra { display: flex; gap: 3px; height: 14px; border-radius: 7px; overflow: hidden; background: var(--nevoa); }
+  .barra span { display: block; height: 100%; }
+  .p-respondeu { background: var(--respondeu); --cor: var(--respondeu); }
+  .p-andamento { background: var(--andamento); --cor: var(--andamento); }
+  .p-nao-abriu { background: var(--nao-abriu); --cor: var(--nao-abriu); }
+  .partes { margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .parte { padding-top: 9px; border-top: 3px solid var(--cor); }
+  .parte.c-respondeu { --cor: var(--respondeu); }
+  .parte.c-andamento { --cor: var(--andamento); }
+  .parte.c-nao-abriu { --cor: var(--nao-abriu); }
+  .parte strong { display: block; font-size: 34px; line-height: 1; font-weight: 700; }
+  .parte strong small { font-family: 'Instrument Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--abeto-3); letter-spacing: 0; margin-left: 4px; }
+  .parte span { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--abeto-2); }
+
+  /* Grupos e líderes: alturas fixas (ALTURA_GRUPO = 19mm, ALTURA_LINHA = 12.5mm) ---- */
+  .grupo-cab { height: 19mm; padding-top: 6mm; border-bottom: 1px solid var(--abeto); overflow: hidden; }
+  .grupo-cab h2 { display: flex; align-items: center; gap: 9px; font-size: 16px; line-height: 1.2; font-weight: 700; }
+  .grupo-cab h2 i { width: 10px; height: 10px; border-radius: 50%; background: var(--cor); box-shadow: 0 0 0 4px var(--suave); flex-shrink: 0; }
+  .grupo-cab h2 .qtd { font-family: 'Instrument Sans', sans-serif; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--suave); color: var(--tinta); }
+  .grupo-cab h2 em { font-style: normal; font-size: 11.5px; font-weight: 500; color: var(--abeto-3); }
+  .grupo-cab p { margin-top: 3px; font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-comecou, .g-abriu { --cor: var(--andamento); --suave: var(--andamento-suave); --tinta: #8A5700; }
+  .g-nao-abriu { --cor: #7D918B; --suave: var(--nao-abriu-suave); --tinta: var(--abeto-2); }
+  .g-respondeu { --cor: var(--respondeu); --suave: var(--respondeu-suave); --tinta: #17714A; }
+
+  .lider {
+    height: 12.5mm; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-content: center;
+    border-bottom: 1px solid var(--linha); overflow: hidden;
+  }
+  .lider > div { min-width: 0; }
+  .lider .nome { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lider .nome small { font-size: 12px; font-weight: 500; color: var(--abeto-2); margin-left: 6px; }
+  .lider .contato { margin-top: 1px; font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lider .direita { text-align: right; max-width: 82mm; }
+  .lider .detalhe { font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; }
+  .lider .link { display: inline-flex; align-items: center; gap: 4px; margin-top: 1px; font-size: 10.5px; font-weight: 600; color: var(--abeto); text-decoration: none; white-space: nowrap; }
+  .lider .link svg { flex-shrink: 0; }
+</style>
+<!-- Paleta da empresa (PaletaMarca): sem cores próprias, sai a identidade do Diagnóstico. -->
+<style th:inline="css">
+  :root {
+    --abeto: [(${r.tema.tinta})]; --abeto-2: [(${r.tema.tinta2})]; --abeto-3: [(${r.tema.tinta3})];
+    --nevoa: [(${r.tema.fundo})]; --nevoa-2: [(${r.tema.fundo2})]; --linha: [(${r.tema.linha})];
+    --acao: [(${r.tema.acao})]; --sobre-acao: [(${r.tema.sobreAcao})];
+  }
+</style>
+</head>
+<body>
+
+<section class="pagina" th:each="p : ${r.paginas}">
+  <header class="topo">
+    <div class="marca">
+      <img th:if="${r.logo != null}" class="logo" th:src="${r.logo}" th:alt="${r.empresa}" alt="Empresa">
+      <span th:if="${r.logo == null}" class="monograma" th:text="${r.sigla}">CH</span>
+      <span th:if="${r.logo == null or r.logoPedeNome}" th:text="${r.empresa}">Empresa</span>
+    </div>
+    <span>Participação · Diagnóstico do Líder</span>
+  </header>
+
+  <div class="conteudo">
+    <div class="abertura" th:if="${p.numero == 1}">
+      <p class="rotulo" th:text="${r.rotulo}">Acompanhamento da participação</p>
+      <h1 class="display" th:text="${r.titulo}">5 líderes ainda não responderam</h1>
+      <p class="sub" th:text="${r.subtitulo}">7 de 12 já responderam (58%).</p>
+      <div class="meta">
+        <span th:if="${r.prazo != null}" class="prazo">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+          <th:block th:text="${r.prazo}">A avaliação vai até 30 de novembro, às 18h: faltam 7 dias.</th:block>
+        </span>
+        <span th:text="${r.atualizadoEm}">Atualizado em 23 de novembro de 2026, às 22h</span>
+      </div>
+
+      <div class="placar" th:if="${r.placar.total > 0}">
+        <div class="barra">
+          <th:block th:each="parte : ${r.placar.partes}">
+            <span th:if="${parte.quantidade > 0}" th:class="|p-${parte.codigo}|" th:style="|flex: ${parte.quantidade}|"></span>
+          </th:block>
+        </div>
+        <div class="partes">
+          <div th:each="parte : ${r.placar.partes}" th:class="|parte c-${parte.codigo}|">
+            <strong class="display"><th:block th:text="${parte.quantidade}">7</th:block><small th:text="|${parte.percentual}%|">58%</small></strong>
+            <span th:text="${parte.rotulo}">Responderam</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <th:block th:each="b : ${p.blocos}">
+      <div th:class="|grupo-cab g-${b.grupo.codigo}|">
+        <h2>
+          <i></i>
+          <span th:text="${b.grupo.titulo}">Ainda não abriram o link</span>
+          <span class="qtd" th:text="${b.grupo.quantidade}">3</span>
+          <em th:if="${b.continuacao}">continuação</em>
+        </h2>
+        <p th:text="${b.grupo.dica}">Mande a cada um o link pessoal dele.</p>
+      </div>
+      <div class="lider" th:each="l : ${b.lideres}">
+        <div>
+          <p class="nome"><th:block th:text="${l.nome}">Ana Paula Souza</th:block><small th:if="${l.cargo != null}" th:text="${l.cargo}">Gerente</small></p>
+          <p class="contato" th:text="${l.contato}">ana.souza@empresa.com · (11) 98765-4321</p>
+        </div>
+        <div class="direita">
+          <p class="detalhe" th:if="${l.detalhe != null}" th:text="${l.detalhe}">Último acesso em 22 de novembro, às 14h</p>
+          <a class="link" th:if="${l.link != null}" th:href="${l.link}" href="#">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1 1M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1-1" stroke-linecap="round"/></svg>
+            <th:block th:text="${l.linkVisivel}">diagnostico.app/i/Ab3dE5fG7h</th:block>
+          </a>
+        </div>
+      </div>
+    </th:block>
+  </div>
+
+  <footer class="rodape">
+    <span>Só a participação: as respostas e o resultado de cada líder não são compartilhados com a empresa.<th:block th:if="${r.inativos > 0 and p.numero == #lists.size(r.paginas)}" th:text="| ${r.inativos} inativo${r.inativos == 1 ? '' : 's'} fora da lista.|"></th:block></span>
+    <span th:text="|${p.numero} de ${#lists.size(r.paginas)}|">1 de 2</span>
+  </footer>
+</section>
+
+</body>
+</html>

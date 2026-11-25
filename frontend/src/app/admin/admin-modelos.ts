@@ -34,6 +34,13 @@ export interface EmpresaResumo {
   ultimoDiagnostico: string | null;
   cores: CoresEmpresa;
   logo: LogoEmpresa | null;
+  encerramento: Encerramento;
+}
+
+/** Até quando a avaliação vai (em: ISO, null sem data) e se já encerrou. */
+export interface Encerramento {
+  em: string | null;
+  encerrada: boolean;
 }
 
 /** Cores da marca como cadastradas (null: identidade do Diagnóstico do Líder). */
@@ -68,6 +75,9 @@ export interface EmpresaDetalhe {
   logo: LogoEmpresa | null;
   /** Na ordem da hierarquia, com quantos diagnósticos cada um já tem. */
   cargos: { id: number; nome: string; diagnosticos: number }[];
+  encerramento: Encerramento;
+  /** E-mails dos gestores que recebem os relatórios automáticos (pode ser vazio). */
+  gestores: string[];
 }
 
 export interface Disponibilidade {
@@ -129,6 +139,8 @@ export interface Detalhe {
     faixa: { codigo: string; titulo: string; resumo: string };
     dimensoes: { codigo: string; nome: string; pontuacao: number }[];
   } | null;
+  /** Inativado: fica guardado, mas fora de todos os cálculos. */
+  inativadoEm: string | null;
   respostas: {
     perguntaId: number;
     numero: number;
@@ -139,4 +151,162 @@ export interface Detalhe {
   }[];
 }
 
+// Convites nominais -----------------------------------------------------------
+
+export type StatusConvite = 'AGUARDANDO_ENVIO' | 'ENVIADO' | 'ABRIU' | 'COMECOU' | 'CONCLUIDO' | 'INATIVO';
+
+export interface CargoOpcao {
+  id: number;
+  nome: string;
+}
+
+export interface ConviteItem {
+  id: number;
+  nome: string;
+  email: string;
+  whatsapp: string | null;
+  cargoId: number | null;
+  cargoOutro: boolean;
+  cargo: string | null;
+  status: StatusConvite;
+  criadoEm: string;
+  enviadoEm: string | null;
+  envios: number;
+  ultimoAcessoEm: string | null;
+  acessos: number;
+  concluidoEm: string | null;
+  link: string;
+  /** O diagnóstico do convite, quando o líder já começou. */
+  diagnosticoId: string | null;
+  /** Por que o último e-mail não saiu. Some quando um envio der certo ou o líder abrir o link. */
+  falhaEnvio: string | null;
+}
+
+/** O funil: cada número conta quem chegou pelo menos até ali (inativos à parte, fora dos cálculos). */
+export interface ResumoConvites {
+  total: number;
+  aguardandoEnvio: number;
+  enviados: number;
+  abriram: number;
+  comecaram: number;
+  concluiram: number;
+  inativos: number;
+}
+
+export interface Convites {
+  /** Há provedor de e-mail configurado (sem ele, o disparo fica desligado). */
+  emailAtivo: boolean;
+  encerraEm: string | null;
+  encerrada: boolean;
+  resumo: ResumoConvites;
+  convites: ConviteItem[];
+  cargos: CargoOpcao[];
+}
+
+/** Linha lida da planilha, com o que o servidor já sabe (cargo que bateu, sugestão, já convidado). */
+export interface LinhaImportada {
+  linha: number;
+  nome: string;
+  email: string;
+  whatsapp: string;
+  cargoTexto: string;
+  cargoId: number | null;
+  cargoOutro: boolean;
+  sugestaoCargoId: number | null;
+  jaConvidado: boolean;
+  exemplo: boolean;
+}
+
+export interface Importacao {
+  arquivo: string;
+  linhas: LinhaImportada[];
+  cargos: CargoOpcao[];
+}
+
+export interface NovoConvite {
+  nome: string;
+  email: string;
+  whatsapp: string;
+  cargoId: number | null;
+  cargoOutro: boolean;
+}
+
+export type TipoEventoConvite =
+  | 'CRIADO'
+  | 'EDITADO'
+  | 'ENVIADO'
+  | 'FALHA_ENVIO'
+  | 'RESULTADO_ENVIADO'
+  | 'EMAIL_DEVOLVIDO'
+  | 'EMAIL_SPAM'
+  | 'COMECOU_RESPONDER'
+  | 'VIU_RESULTADO'
+  | 'BAIXOU_PDF'
+  | 'COMPARTILHOU_PDF'
+  | 'PDF_BAIXADO_PAINEL'
+  | 'ABERTO'
+  | 'DADOS_CONFIRMADOS'
+  | 'DADOS_CORRIGIDOS'
+  | 'CONCLUIDO'
+  | 'LEMBRETE'
+  | 'INATIVADO'
+  | 'REATIVADO';
+
+export interface EventoConvite {
+  tipo: TipoEventoConvite;
+  quando: string;
+  detalhe: string | null;
+  /** Quem fez no painel (null: o líder, o sistema ou o envio automático). */
+  autor: string | null;
+  /** A entrega do e-mail deste evento (convite, lembrete, resultado), pelos avisos do Resend. */
+  email: EntregaEmail | null;
+}
+
+export type SituacaoEntrega = 'ENVIADO' | 'ENTREGUE' | 'ATRASADO' | 'DEVOLVIDO' | 'SPAM' | 'BLOQUEADO' | 'FALHOU';
+
+export interface EntregaEmail {
+  situacao: SituacaoEntrega;
+  para: string;
+  entregueEm: string | null;
+  atualizadoEm: string | null;
+  detalhe: string | null;
+}
+
 export const API_ADMIN = '/api/admin';
+
+/** O cartão "Relatórios para o gestor": situação, próximo envio, lembretes aos líderes e histórico. */
+export interface PainelAcompanhamento {
+  emailAtivo: boolean;
+  gestores: string[];
+  pausado: boolean;
+  situacao: 'DESLIGADO' | 'SEM_GESTOR' | 'AGUARDANDO' | 'ATIVO' | 'PAUSADO' | 'FINAL_PENDENTE' | 'FINALIZADO';
+  titulo: string;
+  explicacao: string;
+  proximoEnvio: string | null;
+  /** Uma frase para cada lembrete aos líderes; null sem prazo. */
+  lembretes: { tresDias: string; umDia: string } | null;
+  historico: ItemAcompanhamento[];
+}
+
+export interface ItemAcompanhamento {
+  id: number;
+  tipo: 'DIARIO' | 'FINAL' | 'LEMBRETE';
+  manual: boolean;
+  quando: string;
+  para: string;
+  responderam: number | null;
+  total: number | null;
+  enviado: boolean;
+  detalhe: string | null;
+  /** Quem clicou em "Enviar agora" (null: automático). */
+  autor: string | null;
+  /** O que o Resend avisou sobre a entrega (null: sem aviso ainda). */
+  entrega: SituacaoEntrega | null;
+  entregaDetalhe: string | null;
+}
+
+export interface EnvioAcompanhamento {
+  enviado: boolean;
+  tipo: 'DIARIO' | 'FINAL';
+  mensagem: string;
+}

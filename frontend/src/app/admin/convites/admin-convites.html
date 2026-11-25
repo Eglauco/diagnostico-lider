@@ -1,0 +1,304 @@
+<main class="mx-auto max-w-6xl px-4 pt-6 pb-20 sm:px-6">
+  <a
+    [routerLink]="['/administrador/empresas', id()]"
+    class="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-[15px] font-semibold text-abeto-2 transition-colors hover:text-abeto"
+  >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+      <path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+    {{ empresa.hasValue() ? empresa.value().nome : 'Empresa' }}
+  </a>
+
+  <header class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div class="min-w-0">
+      <p class="rotulo text-brasa-escura">Convites</p>
+      <h1 class="display mt-2 text-[36px] leading-[1] font-bold sm:text-[48px]">Convites por e-mail</h1>
+      <p class="mt-3 max-w-2xl text-[16px] text-abeto-2">
+        Cada líder recebe um link só dele, com os dados já preenchidos para confirmar. Você acompanha quem abriu e quem concluiu.
+      </p>
+    </div>
+    @if (convites.hasValue() && convites.value().convites.length) {
+      <div class="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+        <button type="button" class="botao-secundario" (click)="adicionando.set(true)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round" /></svg>
+          Adicionar líder
+        </button>
+        <button type="button" class="botao-secundario" [attr.aria-busy]="lendo()" (click)="escolherArquivo()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M12 15V4m0 0l-4.5 4.5M12 4l4.5 4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          {{ lendo() ? 'Lendo a planilha…' : 'Importar mais líderes' }}
+        </button>
+        <button type="button" class="botao-primario" [attr.aria-busy]="enviando()" [class.opacity-60]="!convites.value().emailAtivo" (click)="enviar()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M4 6.5h16v11H4z" stroke-linejoin="round" /><path d="M4.5 7l7.5 6 7.5-6" stroke-linejoin="round" /></svg>
+          Enviar convites{{ pendentesDeEnvio() ? ' (' + pendentesDeEnvio() + ')' : '' }}
+        </button>
+      </div>
+    }
+  </header>
+
+  <input #arquivo type="file" class="sr-only" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" tabindex="-1" aria-hidden="true" (change)="aoEscolher($event)" />
+
+  @if (aviso(); as a) {
+    <div
+      class="aparecer mt-5 flex items-start gap-3 rounded-2xl px-4 py-3.5 text-[15px]"
+      [class]="a.tipo === 'ok' ? 'bg-ascensao-suave text-[#17714A]' : a.tipo === 'erro' ? 'bg-[#FDEDEF] text-travada' : 'bg-white text-abeto ring-1 ring-linha'"
+      [attr.role]="a.tipo === 'erro' ? 'alert' : 'status'"
+    >
+      <p class="flex-1">{{ a.texto }}</p>
+      <button type="button" class="-my-1 -mr-1 grid size-9 shrink-0 place-items-center rounded-full hover:bg-black/5" aria-label="Fechar aviso" (click)="aviso.set(null)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" /></svg>
+      </button>
+    </div>
+  }
+
+  @if (convites.error()) {
+    <div class="cartao mt-6 p-8 text-center" role="alert">
+      <p class="text-[18px] font-semibold">Não foi possível carregar os convites.</p>
+      <button type="button" class="botao-secundario mt-5" (click)="convites.reload()">Tentar de novo</button>
+    </div>
+  } @else if (convites.hasValue()) {
+    @if (convites.value(); as d) {
+      <!-- Situação: encerramento e envio por e-mail. -->
+      <div class="mt-6 grid gap-3 lg:grid-cols-2">
+        @if (encerramento(); as enc) {
+          <div class="flex items-start gap-3 rounded-2xl px-4 py-3.5 text-[15px]" [class]="enc.encerrada ? 'bg-[#FDEDEF] text-travada' : 'bg-white ring-1 ring-linha'">
+            <svg class="mt-0.5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" stroke-linecap="round" /></svg>
+            <p class="flex-1">
+              @if (enc.encerrada) {
+                <strong class="font-semibold">Avaliação encerrada</strong> {{ enc.texto }}. Os links pessoais estão fechados e nenhum convite sai mais.
+              } @else {
+                Avaliação aberta até <strong class="font-semibold">{{ enc.texto }}</strong>. Depois disso os links fecham e o resultado da empresa fica final.
+              }
+            </p>
+            <a [routerLink]="['/administrador/empresas', id(), 'editar']" fragment="encerramento-secao" class="-my-1 inline-flex min-h-11 shrink-0 items-center font-semibold underline decoration-current/30 underline-offset-4">Mudar</a>
+          </div>
+        } @else {
+          <div class="flex items-start gap-3 rounded-2xl bg-white px-4 py-3.5 text-[15px] ring-1 ring-linha">
+            <svg class="mt-0.5 shrink-0 text-abeto-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" stroke-linecap="round" /></svg>
+            <p class="flex-1 text-abeto-2">Sem data de encerramento: a avaliação fica aberta até você encerrar.</p>
+            <a [routerLink]="['/administrador/empresas', id(), 'editar']" fragment="encerramento-secao" class="-my-1 inline-flex min-h-11 shrink-0 items-center font-semibold text-abeto underline decoration-linha underline-offset-4">Definir data</a>
+          </div>
+        }
+        @if (!d.emailAtivo) {
+          <div class="flex items-start gap-3 rounded-2xl bg-white px-4 py-3.5 text-[15px] ring-1 ring-linha">
+            <svg class="mt-0.5 shrink-0 text-abeto-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6.5h16v11H4z" stroke-linejoin="round" /><path d="M4.5 7l7.5 6 7.5-6" stroke-linejoin="round" /></svg>
+            <p class="flex-1 text-abeto-2">
+              <strong class="font-semibold text-abeto">Envio por e-mail desligado neste servidor.</strong>
+              Por enquanto nenhum convite chega aos líderes. Você já pode importar a lista e revisar o e-mail.
+            </p>
+          </div>
+        }
+      </div>
+
+      @if (naoSairam(); as falhas) {
+        @if (falhas.ids.length) {
+          <div class="aparecer mt-3 flex flex-col gap-3 rounded-2xl bg-[#FDEDEF] px-4 py-3.5 text-[15px] text-travada sm:flex-row sm:items-center" role="alert">
+            <div class="flex flex-1 items-start gap-3">
+              <svg class="mt-0.5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6.5h16v11H4z" stroke-linejoin="round" /><path d="M4.5 7l7.5 6 7.5-6" stroke-linejoin="round" /><path d="M16.5 15.5l4 4m0-4l-4 4" stroke-linecap="round" /></svg>
+              <p class="flex-1">
+                <strong class="font-semibold">{{ falhas.ids.length === 1 ? 'O e-mail de 1 líder não chegou.' : 'O e-mail de ' + falhas.ids.length + ' líderes não chegou.' }}</strong>
+                {{ falhas.motivo }}
+              </p>
+            </div>
+            <button type="button" class="botao-secundario shrink-0 bg-white" [attr.aria-busy]="enviando()" (click)="enviar(falhas.ids)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 0113-5.1M19.5 12a7.5 7.5 0 01-13 5.1" stroke-linecap="round" /><path d="M17.5 3.5v3.6h-3.6M6.5 20.5v-3.6h3.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              {{ enviando() ? 'Enviando…' : 'Enviar de novo' }}
+            </button>
+          </div>
+        }
+      }
+
+      @if (!d.convites.length) {
+        <!-- Começo: três passos, com a planilha no centro. -->
+        <section
+          class="cartao mt-6 p-6 sm:p-8"
+          [class.ring-2]="arrastando()"
+          [class.ring-abeto]="arrastando()"
+          aria-labelledby="titulo-comecar"
+          (dragover)="$event.preventDefault(); arrastando.set(true)"
+          (dragleave)="arrastando.set(false)"
+          (drop)="aoSoltar($event)"
+        >
+          <h2 id="titulo-comecar" class="text-[20px] font-semibold">Convide os líderes pela planilha</h2>
+          <ol class="mt-5 grid gap-4 sm:grid-cols-3">
+            <li class="rounded-2xl bg-nevoa-2 p-4">
+              <span class="grid size-8 place-items-center rounded-full bg-abeto text-[14px] font-bold text-white" aria-hidden="true">1</span>
+              <p class="mt-3 font-semibold">Baixe a planilha modelo</p>
+              <p class="mt-1 text-[14px] text-abeto-2">Já vem com os cargos de {{ empresa.hasValue() ? empresa.value().nome : 'da empresa' }}.</p>
+            </li>
+            <li class="rounded-2xl bg-nevoa-2 p-4">
+              <span class="grid size-8 place-items-center rounded-full bg-abeto text-[14px] font-bold text-white" aria-hidden="true">2</span>
+              <p class="mt-3 font-semibold">O RH preenche</p>
+              <p class="mt-1 text-[14px] text-abeto-2">Nome, e-mail, WhatsApp e cargo de cada líder.</p>
+            </li>
+            <li class="rounded-2xl bg-nevoa-2 p-4">
+              <span class="grid size-8 place-items-center rounded-full bg-abeto text-[14px] font-bold text-white" aria-hidden="true">3</span>
+              <p class="mt-3 font-semibold">Importe e revise</p>
+              <p class="mt-1 text-[14px] text-abeto-2">Você confere tudo e corrige o que precisar antes de convidar.</p>
+            </li>
+          </ol>
+          <div class="mt-6 flex flex-col gap-2 sm:flex-row">
+            <button type="button" class="botao-secundario" [attr.aria-busy]="baixando()" (click)="baixarModelo()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              {{ baixando() ? 'Gerando a planilha…' : 'Baixar planilha modelo' }}
+            </button>
+            <button type="button" class="botao-primario" [attr.aria-busy]="lendo()" (click)="escolherArquivo()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M12 15V4m0 0l-4.5 4.5M12 4l4.5 4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              {{ lendo() ? 'Lendo a planilha…' : 'Importar planilha preenchida' }}
+            </button>
+          </div>
+          <p class="mt-3 text-[14px] text-abeto-2">
+            <span class="hidden sm:inline">Ou arraste o arquivo (.xlsx ou .csv) para cá. </span>
+            Só um líder?
+            <button type="button" class="font-semibold text-abeto underline decoration-linha underline-offset-4 hover:decoration-abeto" (click)="adicionando.set(true)">Adicione aqui mesmo</button>.
+          </p>
+        </section>
+      } @else {
+        <!-- Funil -->
+        <dl class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          @for (f of funil(); track f.rotulo) {
+            <div class="cartao kpi">
+              <dt>{{ f.rotulo }}</dt>
+              <dd>{{ f.valor }}</dd>
+              @if (f.pct !== null) {
+                <p>{{ f.pct }}% dos convidados</p>
+              } @else {
+                <p>{{ d.resumo.inativos ? d.resumo.inativos + ' inativo' + (d.resumo.inativos === 1 ? '' : 's') + ' fora dos cálculos' : 'com link pessoal' }}</p>
+              }
+            </div>
+          }
+        </dl>
+
+        <!-- Relatório para a empresa cobrar quem falta (a empresa não acessa o painel). -->
+        <section class="cartao mt-4 flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between" aria-labelledby="titulo-exportar">
+          <div class="flex items-start gap-3.5">
+            <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-nevoa text-abeto" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M7 3.5h7l4 4V20a.5.5 0 01-.5.5h-10.5a.5.5 0 01-.5-.5V4a.5.5 0 01.5-.5z" stroke-linejoin="round" /><path d="M14 3.5V8h4" stroke-linejoin="round" /><path d="M9.5 12.5h5M9.5 16h3.5" stroke-linecap="round" /></svg>
+            </span>
+            <div class="min-w-0">
+              <h2 id="titulo-exportar" class="text-[17px] leading-snug font-semibold">Relatório de participação</h2>
+              <p class="mt-1 text-[14px] text-abeto-2">
+                @if (faltamResponder() > 0) {
+                  <strong class="font-semibold text-abeto">{{ faltamResponder() }} {{ faltamResponder() === 1 ? 'líder ainda não respondeu' : 'líderes ainda não responderam' }}.</strong>
+                  Mande para a empresa cobrar: vai a situação e o link pessoal de cada um, sem nenhuma resposta individual.
+                } @else {
+                  <strong class="font-semibold text-abeto">Todos já responderam.</strong> O relatório mostra a participação completa, sem nenhuma resposta individual.
+                }
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+            <button type="button" class="botao-primario" [attr.aria-busy]="exportando() === 'pdf'" [disabled]="exportando() !== null" (click)="exportarPdf()">
+              @if (compartilhaPdf) {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M12 15V4m0 0l-4 4m4-4l4 4" stroke-linecap="round" stroke-linejoin="round" /><path d="M8 11H6.5a1 1 0 00-1 1v7.5a1 1 0 001 1h11a1 1 0 001-1V12a1 1 0 00-1-1H16" stroke-linecap="round" /></svg>
+              } @else {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              }
+              {{ exportando() === 'pdf' ? 'Gerando o PDF…' : compartilhaPdf ? 'Compartilhar PDF' : 'Baixar PDF' }}
+            </button>
+            <button type="button" class="botao-secundario" [attr.aria-busy]="exportando() === 'xlsx'" [disabled]="exportando() !== null" (click)="exportarExcel()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 9.5h16M4 14.5h16M10 9.5v10.5" /></svg>
+              {{ exportando() === 'xlsx' ? 'Gerando a planilha…' : 'Baixar Excel' }}
+            </button>
+          </div>
+        </section>
+
+        <!-- O gestor da empresa recebe a participação todo dia útil e o resultado no fim. -->
+        <app-cartao-acompanhamento class="mt-4" [empresaId]="+id()" [atualizacao]="d" />
+
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <button type="button" class="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold text-abeto hover:underline" (click)="verEmail()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></svg>
+            Ver o e-mail de convite
+          </button>
+          <button type="button" class="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold text-abeto hover:underline" [attr.aria-busy]="baixando()" (click)="baixarModelo()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Baixar planilha modelo
+          </button>
+        </div>
+
+        <!-- Filtros e busca -->
+        <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0" role="group" aria-label="Filtrar por situação">
+            @for (c of chips(); track c.valor) {
+              <button type="button" class="chip" [attr.aria-pressed]="filtro() === c.valor" (click)="filtro.set(c.valor)">
+                {{ c.texto }} <span class="contagem">{{ c.total }}</span>
+              </button>
+            }
+          </div>
+          <label class="campo flex items-center gap-2 lg:ml-auto lg:max-w-xs">
+            <svg class="shrink-0 text-abeto-3" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" stroke-linecap="round" /></svg>
+            <span class="sr-only">Buscar por nome ou e-mail</span>
+            <input type="search" class="min-w-0 flex-1 bg-transparent text-[16px]" placeholder="Buscar nome ou e-mail" [value]="busca()" (input)="busca.set($any($event.target).value)" />
+          </label>
+        </div>
+
+        <!-- Lista: cartões no celular, tabela no computador -->
+        <ul class="mt-4 space-y-2">
+          @for (c of lista(); track c.id) {
+            <li>
+              <button type="button" class="cartao flex w-full items-center gap-4 p-4 text-left transition-shadow hover:shadow-[inset_0_0_0_1.5px_var(--color-abeto-3)]" (click)="selecionado.set(c.id)">
+                <div class="min-w-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-4">
+                  <div class="min-w-0">
+                    <p class="truncate text-[16px] font-semibold" [class.text-abeto-3]="c.status === 'INATIVO'">{{ c.nome }}</p>
+                    <p class="truncate text-[14px] text-abeto-2">{{ c.email }}</p>
+                  </div>
+                  <p class="mt-1 truncate text-[14px] text-abeto-2 lg:mt-0">{{ c.cargo || 'Sem cargo' }}</p>
+                  <p class="mt-1 truncate text-[13px] lg:mt-0 lg:text-[14px]" [class]="c.falhaEnvio ? 'font-semibold text-travada' : 'text-abeto-3'">{{ ultimaAtividade(c) }}</p>
+                </div>
+                <span class="inline-flex min-h-7 shrink-0 items-center rounded-full px-2.5 text-[13px] font-semibold" [class]="CLASSE_STATUS[c.status]">{{ ROTULO_STATUS[c.status] }}</span>
+                <svg class="hidden shrink-0 text-abeto-3 sm:block" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </button>
+            </li>
+          } @empty {
+            <li class="cartao p-6 text-center text-[15px] text-abeto-2">Nenhum convite com esse filtro.</li>
+          }
+        </ul>
+      }
+    }
+  } @else {
+    <div class="mt-6 space-y-3" aria-hidden="true">
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="cartao h-28 animate-pulse"></div>
+        }
+      </div>
+      <div class="cartao h-64 animate-pulse"></div>
+    </div>
+  }
+</main>
+
+@if (importacao(); as imp) {
+  <app-revisao-importacao [empresaId]="+id()" [importacao]="imp" (criados)="criados($event)" (fechou)="importacao.set(null)" />
+}
+
+@if (adicionando()) {
+  <app-novo-convite [empresaId]="+id()" [cargos]="convites.hasValue() ? convites.value().cargos : []" (adicionado)="adicionado($event)" (fechou)="adicionando.set(false)" />
+}
+
+@if (conviteSelecionado(); as c) {
+  <app-detalhe-convite
+    [convite]="c"
+    [cargos]="convites.hasValue() ? convites.value().cargos : []"
+    [emailAtivo]="convites.hasValue() && convites.value().emailAtivo"
+    [encerrada]="convites.hasValue() && convites.value().encerrada"
+    (mudou)="convites.reload()"
+    (fechou)="selecionado.set(null)"
+  />
+}
+
+<dialog #dialogoEmail class="dialogo dialogo-largo dialogo-medio" aria-labelledby="email-titulo" (close)="htmlEmail.set(null)">
+  <div class="flex flex-col">
+    <header class="flex items-start justify-between gap-4 border-b border-linha px-5 pt-5 pb-4 sm:px-7">
+      <div>
+        <h2 id="email-titulo" class="display text-[24px] leading-tight font-bold">E-mail de convite</h2>
+        <p class="mt-1 text-[14px] text-abeto-2">Como o líder recebe, com o link pessoal dele.</p>
+      </div>
+      <button type="button" class="-mt-1 -mr-2 grid size-11 shrink-0 place-items-center rounded-full text-abeto-2 hover:bg-nevoa hover:text-abeto" aria-label="Fechar" (click)="fecharEmail()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" /></svg>
+      </button>
+    </header>
+    @if (htmlEmail(); as html) {
+      <iframe class="min-h-0 w-full flex-1 bg-nevoa" title="Prévia do e-mail de convite" sandbox="" [srcdoc]="html"></iframe>
+    }
+  </div>
+</dialog>

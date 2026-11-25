@@ -7,8 +7,9 @@ import { RouterLink } from '@angular/router';
 import { baixarArquivo } from '../compartilhado/download';
 import { FAIXAS, ORDEM_FAIXAS } from '../compartilhado/faixas';
 import { dataCompleta } from '../compartilhado/formatos';
-import { API_ADMIN, EmpresaDetalhe } from './admin-modelos';
+import { API_ADMIN, Convites, EmpresaDetalhe } from './admin-modelos';
 import { linkWhatsappComTexto, mensagemConvite } from './convite';
+import { encerramentoPorExtenso } from './encerramento/secao-encerramento';
 import { KitQr } from './qr/kit-qr';
 
 /** Tudo o que a empresa precisa para divulgar: link, convite pronto e QR Code. */
@@ -23,6 +24,9 @@ export class AdminEmpresa {
   readonly id = input.required<string>();
 
   protected readonly empresa = httpResource<EmpresaDetalhe>(() => `${API_ADMIN}/empresas/${this.id()}`);
+  /** Resumo dos convites por e-mail (o funil) para o cartão da página. */
+  protected readonly convites = httpResource<Convites>(() => `${API_ADMIN}/empresas/${this.id()}/convites`);
+  protected readonly encerramentoPorExtenso = encerramentoPorExtenso;
   private readonly dados = computed(() => (this.empresa.hasValue() ? this.empresa.value() : undefined));
 
   /** Acabou de ser cadastrada (veio do formulário): mostra a confirmação uma vez só. */

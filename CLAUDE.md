@@ -21,6 +21,8 @@ Visão geral, estrutura, API e deploy: ver `README.md`. Regras do Angular: `fron
 - A curva da carreira é a assinatura visual. A mesma função existe em
   `frontend/src/app/compartilhado/curva-carreira.ts` e
   `backend/.../relatorio/CurvaCarreira.java`: mude as duas juntas.
+- A regra do WhatsApp (DDD, 9 do celular, tamanho e mensagens) também é dupla:
+  `frontend/src/app/compartilhado/entrada-telefone.ts` e `backend/.../compartilhado/Telefones.java`.
 
 ## Rodando nesta máquina
 
@@ -30,4 +32,7 @@ Visão geral, estrutura, API e deploy: ver `README.md`. Regras do Angular: `fron
   longo demais para o socket Unix do JDK: rode com
   `-Dspring-boot.run.jvmArguments=-Djdk.net.unixdomain.tmpdir=<caminho curto sem espaços>`.
 - Sem Docker local: o PDF em dev usa o Chrome instalado (`PDF_MOTOR=chrome`, padrão).
+- E-mail em dev: o `backend/.env` liga o Resend (`EMAIL_PROVEDOR=resend`) e desvia tudo para
+  `EMAIL_DESVIAR_PARA` (o Gmail do dono), com o destinatário original no assunto. Deixe sempre
+  ligado: os testes precisam ser reais como em produção. Nunca leve `EMAIL_DESVIAR_PARA` ao Railway.
 - PostgreSQL local: `localhost:5432/diagnostico_lider` (postgres/root).

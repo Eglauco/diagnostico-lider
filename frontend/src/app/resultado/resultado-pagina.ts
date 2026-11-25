@@ -155,6 +155,7 @@ export class ResultadoPagina {
   }
 
   private confirmarCompartilhado() {
+    this.api.registrarUsoDoPdf(this.id(), 'compartilhou');
     vibrar(12);
     this.compartilhado.set(true);
     clearTimeout(this.timerCompartilhado);
@@ -162,6 +163,7 @@ export class ResultadoPagina {
   }
 
   private salvar(arquivo: File) {
+    this.api.registrarUsoDoPdf(this.id(), 'baixou');
     this.tocarDeNovo.set(false);
     salvarBlob(arquivo, arquivo.name);
   }

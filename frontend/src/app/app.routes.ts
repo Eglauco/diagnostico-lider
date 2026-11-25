@@ -14,6 +14,12 @@ export const routes: Routes = [
     title: 'Diagnóstico de carreira do líder',
     loadComponent: () => import('./diagnostico/diagnostico-pagina').then((m) => m.DiagnosticoPagina),
   },
+  // Convite nominal: link pessoal do líder, com os dados da planilha do RH para confirmar.
+  {
+    path: 'i/:token',
+    title: 'Seu convite · Diagnóstico de carreira do líder',
+    loadComponent: () => import('./diagnostico/diagnostico-pagina').then((m) => m.DiagnosticoPagina),
+  },
   {
     path: 'resultado/:id',
     title: 'Seu diagnóstico de carreira',

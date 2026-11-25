@@ -17,6 +17,7 @@
 	<properties>
 		<java.version>27</java.version>
 		<awssdk.version>2.59.7</awssdk.version>
+		<poi.version>6.0.0</poi.version>
 	</properties>
 
 	<dependencyManagement>
@@ -63,6 +64,13 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<!-- Planilha de convites: gera o modelo (com a lista de cargos da empresa) e lê o que o RH
+		     preencheu (.xlsx). -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>${poi.version}</version>
 		</dependency>
 		<!-- Logomarcas no bucket S3 do Railway. Cliente HTTP do próprio JDK: a imagem fica menor
 		     sem o Netty e o Apache HttpClient que o SDK traz por padrão. -->

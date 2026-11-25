@@ -10,6 +10,23 @@ export interface CampanhaPublica {
   /** Empresa com cargos cadastrados: o líder informa cargo e tempo no cargo. Senão, null. */
   perfil: PerfilCampanha | null;
   questionario: Questionario;
+  /** Até quando a avaliação da empresa vai (ISO; null sem data). */
+  encerraEm: string | null;
+  /** Já passou da data: ninguém começa nem responde mais. */
+  encerrada: boolean;
+}
+
+/**
+ * Link pessoal (/i/:token): os dados que vieram da planilha do RH para o líder confirmar, o link
+ * da empresa e o diagnóstico, se ele já começou. cargo: id, CARGO_OUTRO ou null.
+ */
+export interface ConvitePublico {
+  nome: string;
+  email: string;
+  whatsapp: string | null;
+  cargo: string | null;
+  campanha: CampanhaPublica;
+  diagnosticoId: string | null;
 }
 
 export interface PerfilCampanha {

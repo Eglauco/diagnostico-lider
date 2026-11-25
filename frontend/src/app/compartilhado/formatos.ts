@@ -45,3 +45,17 @@ export function whatsappLegivel(digitos: string): string {
 export function linkWhatsapp(digitos: string): string {
   return `https://wa.me/${digitos}`;
 }
+
+/** "segunda-feira, 30 de novembro, às 18h" (com o ano quando não é o corrente): o prazo de uma avaliação. */
+export function prazoPorExtenso(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dia = d.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+  });
+  const minutos = d.getMinutes() ? String(d.getMinutes()).padStart(2, '0') : '';
+  return `${dia}, às ${d.getHours()}h${minutos}`;
+}

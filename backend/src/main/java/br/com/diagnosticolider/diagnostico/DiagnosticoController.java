@@ -64,4 +64,16 @@ class DiagnosticoController {
 		return service.resultado(id);
 	}
 
+	record UsoDoPdf(String acao) {
+	}
+
+	/** Auditoria: o líder compartilhou ({"acao":"compartilhou"}) ou baixou ({"acao":"baixou"}) o PDF. */
+	@PostMapping("/diagnosticos/{id}/pdf-usado")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void pdfUsado(@PathVariable UUID id, @RequestBody UsoDoPdf uso) {
+		if (uso != null && ("compartilhou".equals(uso.acao()) || "baixou".equals(uso.acao()))) {
+			service.registrarUsoDoPdf(id, "compartilhou".equals(uso.acao()));
+		}
+	}
+
 }

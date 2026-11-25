@@ -41,7 +41,7 @@ public final class DiagnosticoDtos {
 	public record DiagnosticoDto(UUID id, String campanha, StatusDiagnostico status, String primeiroNome,
 			Map<Long, List<Long>> respostas) {
 
-		static DiagnosticoDto de(Diagnostico d) {
+		public static DiagnosticoDto de(Diagnostico d) {
 			Map<Long, List<Long>> respostas = new LinkedHashMap<>();
 			d.respostasPorPergunta()
 				.forEach((pergunta, opcoes) -> respostas.put(pergunta, opcoes.stream().map(Opcao::getId).toList()));

@@ -17,6 +17,18 @@ export class DiagnosticoApi {
     );
   }
 
+  /** Link pessoal: confirma (ou corrige) os dados e começa o diagnóstico do convite. */
+  iniciarConvite(token: string, dados: DadosRespondente, perfil: PerfilLider | null): Promise<Diagnostico> {
+    return firstValueFrom(
+      this.http.post<Diagnostico>(`${API}/convites/${token}/diagnosticos`, paraEnvio(dados, perfil)),
+    );
+  }
+
+  /** O link pessoal abriu neste aparelho (vai para a auditoria do convite). */
+  registrarAcesso(token: string, dispositivo: 'celular' | 'computador'): Promise<unknown> {
+    return firstValueFrom(this.http.post(`${API}/convites/${token}/acesso`, { dispositivo }));
+  }
+
   atualizarRespondente(id: string, dados: DadosRespondente, perfil: PerfilLider | null): Promise<Diagnostico> {
     return firstValueFrom(this.http.put<Diagnostico>(`${API}/diagnosticos/${id}/respondente`, paraEnvio(dados, perfil)));
   }
@@ -35,6 +47,11 @@ export class DiagnosticoApi {
 
   urlPdf(id: string): string {
     return `${API}/diagnosticos/${id}/relatorio.pdf`;
+  }
+
+  /** Auditoria: o líder compartilhou ou baixou o PDF. Sem esperar e sem atrapalhar se falhar. */
+  registrarUsoDoPdf(id: string, acao: 'compartilhou' | 'baixou'): void {
+    this.http.post(`${API}/diagnosticos/${id}/pdf-usado`, { acao }).subscribe({ error: () => undefined });
   }
 }
 

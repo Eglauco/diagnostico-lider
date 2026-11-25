@@ -1,12 +1,16 @@
 package br.com.diagnosticolider.campanha;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.com.diagnosticolider.compartilhado.Datas;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
+import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.diagnostico.TempoCargo;
 import br.com.diagnosticolider.empresa.Cargo;
 import br.com.diagnosticolider.empresa.CargoService;
@@ -27,12 +31,15 @@ public class CampanhaService {
 
 	private final CargoService cargos;
 
+	private final Clock clock;
+
 	CampanhaService(CampanhaRepository campanhas, QuestionarioVersaoRepository versoes, LogomarcaService logomarcas,
-			CargoService cargos) {
+			CargoService cargos, Clock clock) {
 		this.campanhas = campanhas;
 		this.versoes = versoes;
 		this.logomarcas = logomarcas;
 		this.cargos = cargos;
+		this.clock = clock;
 	}
 
 	public Campanha campanhaAtiva(String codigo) {
@@ -47,10 +54,31 @@ public class CampanhaService {
 	}
 
 	public CampanhaPublicaDto buscarPublica(String codigo) {
-		Campanha campanha = campanhaAtiva(codigo);
+		return publica(campanhaAtiva(codigo));
+	}
+
+	/** O link como o líder vê (também usado pelo convite nominal, que leva ao link da empresa). */
+	public CampanhaPublicaDto publica(Campanha campanha) {
 		QuestionarioVersao versao = versaoPublicada(campanha);
 		return new CampanhaPublicaDto(campanha.getCodigo(), campanha.getNome(), logomarcas.marca(campanha.getEmpresa()),
-				perfil(campanha), QuestionarioDto.de(versao));
+				perfil(campanha), QuestionarioDto.de(versao), campanha.encerraEm(), campanha.encerrada(agora()));
+	}
+
+	/**
+	 * Depois do encerramento da avaliação da empresa ninguém começa nem responde mais: o
+	 * resultado da empresa está fechado.
+	 */
+	public void exigirAberta(Campanha campanha) {
+		if (campanha.encerrada(agora())) {
+			var erro = RegraNegocioException.conflito("A avaliação da %s foi encerrada em %s."
+				.formatted(campanha.getEmpresa().getNome(), Datas.porExtenso(campanha.encerraEm(), agora())));
+			erro.getBody().setProperty("encerrada", true);
+			throw erro;
+		}
+	}
+
+	private Instant agora() {
+		return Instant.now(clock);
 	}
 
 	/** Cargos ativos da empresa do link (vazio no link geral e em empresas sem cargos). */

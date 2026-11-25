@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +21,28 @@ class LogEmailSender implements EmailSender {
 			"ultimo-email.html");
 
 	@Override
-	public void enviar(Mensagem m) {
+	public boolean ativo() {
+		return false;
+	}
+
+	@Override
+	public String enviar(Mensagem m) {
 		log.info("[e-mail simulado] para={} assunto=\"{}\" anexos={} html={}", m.para(), m.assunto(),
 				m.anexos().stream().map(a -> a.nome() + " (" + a.conteudo().length / 1024 + " KB)").toList(),
-				guardar(m.html()));
+				guardar(comImagens(m)));
+		return null;
+	}
+
+	/** No arquivo, a imagem embutida (cid:) vira data URI, para a logo aparecer no navegador. */
+	private static String comImagens(Mensagem m) {
+		String html = m.html();
+		for (Anexo a : m.anexos()) {
+			if (a.cid() != null) {
+				html = html.replace("cid:" + a.cid(),
+						"data:image/png;base64," + Base64.getEncoder().encodeToString(a.conteudo()));
+			}
+		}
+		return html;
 	}
 
 	private static String guardar(String html) {

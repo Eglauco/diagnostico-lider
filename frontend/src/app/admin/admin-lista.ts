@@ -62,7 +62,9 @@ export class AdminLista {
     url: `${API_ADMIN}/diagnosticos`,
     params: semVazios({
       busca: this.busca(),
-      status: this.status(),
+      // "Inativos" não é uma situação do diagnóstico: são os tirados dos cálculos.
+      status: this.status() === 'INATIVO' ? null : this.status(),
+      inativos: this.status() === 'INATIVO' ? 'true' : null,
       faixa: this.faixa(),
       campanha: this.campanha(),
       cargo: this.campanha() ? this.cargo() : null,

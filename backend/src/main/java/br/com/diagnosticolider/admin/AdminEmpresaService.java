@@ -1,9 +1,14 @@
 package br.com.diagnosticolider.admin;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,6 +20,7 @@ import br.com.diagnosticolider.admin.EmpresaDtos.Disponibilidade;
 import br.com.diagnosticolider.admin.EmpresaDtos.EditarEmpresa;
 import br.com.diagnosticolider.admin.EmpresaDtos.EmpresaDetalhe;
 import br.com.diagnosticolider.admin.EmpresaDtos.EmpresaResumo;
+import br.com.diagnosticolider.admin.EmpresaDtos.Encerramento;
 import br.com.diagnosticolider.admin.EmpresaDtos.Indicadores;
 import br.com.diagnosticolider.admin.EmpresaDtos.Link;
 import br.com.diagnosticolider.admin.EmpresaDtos.NovaEmpresa;
@@ -44,6 +50,11 @@ public class AdminEmpresaService {
 	/** Sufixos tentados (-2, -3…) antes de desistir de sugerir um endereço livre. */
 	private static final int MAXIMO_SUFIXOS = 50;
 
+	static final int MAXIMO_GESTORES = 20;
+
+	/** A mesma regra dos convites: algo@dominio.algo, sem espaços. */
+	private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
 	private final EmpresaRepository empresas;
 
 	private final CampanhaRepository campanhas;
@@ -58,9 +69,12 @@ public class AdminEmpresaService {
 
 	private final CargoService cargos;
 
+	private final Clock clock;
+
 	AdminEmpresaService(EmpresaRepository empresas, CampanhaRepository campanhas, QuestionarioRepository questionarios,
 			DiagnosticoRepository diagnosticos, AppProperties propriedades, LogomarcaService logomarcas,
-			CargoService cargos) {
+			CargoService cargos, Clock clock) {
+		this.clock = clock;
 		this.empresas = empresas;
 		this.campanhas = campanhas;
 		this.questionarios = questionarios;
@@ -80,7 +94,7 @@ public class AdminEmpresaService {
 			var contagem = contagens.get(e.getId());
 			return new EmpresaResumo(e.getId(), e.getNome(), e.getCriadoEm(), link(links.get(e.getId())),
 					contagem == null ? 0 : contagem.total(), contagem == null ? 0 : contagem.concluidos(),
-					contagem == null ? null : contagem.ultimo(), cores(e), logomarcas.logo(e));
+					contagem == null ? null : contagem.ultimo(), cores(e), logomarcas.logo(e), encerramento(e));
 		}).toList();
 	}
 
@@ -91,7 +105,12 @@ public class AdminEmpresaService {
 				resumo.indiceMedio(), resumo.porFaixa());
 		return new EmpresaDetalhe(empresa.getId(), empresa.getNome(), empresa.getCriadoEm(),
 				link(linksPrincipais(List.of(id)).get(id)), indicadores, RelatorioEmpresaService.MINIMO_LIDERES,
-				cores(empresa), empresa.tema(), logomarcas.logo(empresa), cargos.itens(id));
+				cores(empresa), empresa.tema(), logomarcas.logo(empresa), cargos.itens(id), encerramento(empresa),
+				empresa.getGestores());
+	}
+
+	private Encerramento encerramento(Empresa empresa) {
+		return new Encerramento(empresa.getEncerraEm(), empresa.encerrada(Instant.now(clock)));
 	}
 
 	/** Edita nome, cores e cargos. O link (código) não muda: pode já estar impresso nos materiais. */
@@ -106,6 +125,8 @@ public class AdminEmpresaService {
 		String nomeAnterior = empresa.getNome();
 		empresa.renomear(nome);
 		empresa.definirCores(cores[0], cores[1]);
+		empresa.definirEncerramento(pedido.encerraEm());
+		empresa.definirGestores(gestores(pedido.gestores()));
 		this.cargos.definir(empresa, pedido.cargos());
 		// O link da empresa leva o nome dela (aparece nos filtros do painel): acompanha a troca.
 		campanhas.findByEmpresaIdInOrderByIdAsc(List.of(id))
@@ -142,6 +163,31 @@ public class AdminEmpresaService {
 		return new String[] { p, s };
 	}
 
+	/**
+	 * Os e-mails dos gestores como serão usados: sem espaços, em minúsculas, sem repetir e sem as
+	 * linhas vazias. Um inválido vira erro na linha dele (campo "gestores.N").
+	 */
+	static List<String> gestores(List<String> emails) {
+		if (emails == null) {
+			return List.of();
+		}
+		if (emails.size() > MAXIMO_GESTORES) {
+			throw new RegraNegocioException("Cadastre até %d gestores.".formatted(MAXIMO_GESTORES)).noCampo("gestores");
+		}
+		var validos = new LinkedHashSet<String>();
+		for (int i = 0; i < emails.size(); i++) {
+			String email = emails.get(i) == null ? "" : emails.get(i).strip().toLowerCase(Locale.ROOT);
+			if (email.isEmpty()) {
+				continue;
+			}
+			if (email.length() > 254 || !EMAIL.matcher(email).matches()) {
+				throw new RegraNegocioException("Confira este e-mail: falta o @ ou o domínio.").noCampo("gestores." + i);
+			}
+			validos.add(email);
+		}
+		return List.copyOf(validos);
+	}
+
 	private static boolean vazio(String valor) {
 		return valor == null || valor.isBlank();
 	}
@@ -171,6 +217,8 @@ public class AdminEmpresaService {
 		try {
 			Empresa nova = new Empresa(nome);
 			nova.definirCores(cores[0], cores[1]);
+			nova.definirEncerramento(pedido.encerraEm());
+			nova.definirGestores(gestores(pedido.gestores()));
 			Empresa empresa = empresas.saveAndFlush(nova);
 			campanhas.saveAndFlush(Campanha.daEmpresa(codigo, empresa, questionario));
 			cargos.definir(empresa, pedido.cargos());

@@ -59,9 +59,11 @@ export type Retomada =
             <button type="button" class="botao-primario mt-4 w-full" (click)="continuar.emit()">
               Continuar de onde parei <span class="seta" aria-hidden="true">→</span>
             </button>
-            <button type="button" class="mt-2 min-h-12 w-full text-[15px] font-semibold text-abeto-2 underline-offset-4 hover:underline" (click)="recomecar.emit()">
-              Começar do zero
-            </button>
+            @if (permitirRecomecar()) {
+              <button type="button" class="mt-2 min-h-12 w-full text-[15px] font-semibold text-abeto-2 underline-offset-4 hover:underline" (click)="recomecar.emit()">
+                Começar do zero
+              </button>
+            }
           </div>
         }
         @case ('concluido') {
@@ -70,9 +72,11 @@ export type Retomada =
             <button type="button" class="botao-primario mt-4 w-full" (click)="verResultado.emit()">
               Ver meu resultado <span class="seta" aria-hidden="true">→</span>
             </button>
-            <button type="button" class="mt-2 min-h-12 w-full text-[15px] font-semibold text-abeto-2 underline-offset-4 hover:underline" (click)="recomecar.emit()">
-              Fazer de novo
-            </button>
+            @if (permitirRecomecar()) {
+              <button type="button" class="mt-2 min-h-12 w-full text-[15px] font-semibold text-abeto-2 underline-offset-4 hover:underline" (click)="recomecar.emit()">
+                Fazer de novo
+              </button>
+            }
           </div>
         }
         @default {
@@ -93,6 +97,8 @@ export class BoasVindas {
   readonly empresa = input<MarcaEmpresa | null>(null);
   readonly totalPerguntas = input.required<number>();
   readonly retomada = input<Retomada | null>(null);
+  /** No convite nominal o link é de um diagnóstico só: sem "Começar do zero". */
+  readonly permitirRecomecar = input(true);
 
   readonly comecar = output();
   readonly continuar = output();

@@ -4,21 +4,34 @@ import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { email, form, maxLength, required, validate } from '@angular/forms/signals';
 
-import { CampanhaPublica, CARGO_OUTRO, DadosRespondente, Opcao, OpcaoPerfil, PerfilLider, Pergunta } from '../api/modelos';
+import {
+  CampanhaPublica,
+  CARGO_OUTRO,
+  ConvitePublico,
+  DadosRespondente,
+  Opcao,
+  OpcaoPerfil,
+  PerfilLider,
+  Pergunta,
+} from '../api/modelos';
 import { DiagnosticoApi, problemaDe } from '../api/diagnostico-api';
 import { armazenamento, esperar, vibrar } from '../compartilhado/util';
-import { formatarTelefone } from '../compartilhado/entrada-telefone';
+import { formatarTelefone, problemaTelefone } from '../compartilhado/entrada-telefone';
+import { prazoPorExtenso } from '../compartilhado/formatos';
 import { aplicarTema } from '../compartilhado/tema-marca';
 import { NaoEncontrado } from '../nao-encontrado';
 import { BarraProgresso } from './barra-progresso';
 import { BoasVindas, Retomada } from './boas-vindas';
 import { Calculando } from './calculando';
+import { ConfirmarDados, ErrosConfirmacao } from './confirmar-dados';
 import { CampoId, EtapaCampo } from './etapa-campo';
 import { EtapaEscolha } from './etapa-escolha';
 import { EtapaPergunta } from './etapa-pergunta';
 
 type Etapa =
   | { tipo: 'inicio'; chave: string }
+  /** Convite nominal: os dados da planilha do RH, para confirmar (ou corrigir) numa tela só. */
+  | { tipo: 'confirmar'; chave: string; ultimo: boolean }
   | { tipo: 'campo'; chave: string; campo: CampoId; ultimo: boolean }
   /** Cargo e tempo no cargo: só no link de empresa com cargos cadastrados. */
   | { tipo: 'perfil'; chave: string; perfil: 'cargo' | 'tempo'; ultimo: boolean }
@@ -36,6 +49,8 @@ interface ProgressoSalvo {
   id: string | null;
   dados: DadosRespondente;
   perfil?: PerfilLider;
+  /** Convite: o líder já confirmou os dados. */
+  confirmado?: boolean;
 }
 
 const VAZIO: DadosRespondente = { nome: '', email: '', whatsapp: '' };
@@ -51,7 +66,7 @@ const ETAPA_DO_CAMPO: Record<string, string> = { cargo: 'cargo', cargoOutroNome:
  */
 @Component({
   selector: 'app-diagnostico-pagina',
-  imports: [BarraProgresso, BoasVindas, Calculando, EtapaCampo, EtapaEscolha, EtapaPergunta, NaoEncontrado],
+  imports: [BarraProgresso, BoasVindas, Calculando, ConfirmarDados, EtapaCampo, EtapaEscolha, EtapaPergunta, NaoEncontrado],
   templateUrl: './diagnostico-pagina.html',
 })
 export class DiagnosticoPagina {
@@ -60,15 +75,27 @@ export class DiagnosticoPagina {
   private readonly rota = inject(ActivatedRoute);
   private readonly location = inject(Location);
 
-  /** :codigo da rota (ausente no link geral) e ?passo= da URL. */
+  /** :codigo da rota (ausente no link geral), :token do convite nominal (/i/:token) e ?passo= da URL. */
   readonly codigo = input<string>();
+  readonly token = input<string>();
   readonly passo = input<string>();
 
   protected readonly codigoCampanha = computed(() => this.codigo() ?? 'geral');
-  protected readonly campanha = httpResource<CampanhaPublica>(
-    () => `/api/public/campanhas/${encodeURIComponent(this.codigoCampanha())}`,
+  protected readonly campanha = httpResource<CampanhaPublica>(() =>
+    this.token() ? undefined : `/api/public/campanhas/${encodeURIComponent(this.codigoCampanha())}`,
   );
-  private readonly chave = computed(() => `diagnostico-lider:${this.codigoCampanha()}`);
+  /** Link pessoal: os dados que o RH mandou e o link da empresa, num pedido só. */
+  protected readonly convite = httpResource<ConvitePublico>(() =>
+    this.token() ? `/api/public/convites/${encodeURIComponent(this.token()!)}` : undefined,
+  );
+  protected readonly dadosCampanha = computed(() =>
+    this.token() ? (this.convite.hasValue() ? this.convite.value().campanha : undefined) : this.campanha.value(),
+  );
+  protected readonly carregada = computed(() => (this.token() ? this.convite.hasValue() : this.campanha.hasValue()));
+  protected readonly erroCarregar = computed(() => (this.token() ? this.convite.error() : this.campanha.error()));
+  private readonly chave = computed(() =>
+    this.token() ? `diagnostico-lider:convite:${this.token()}` : `diagnostico-lider:${this.codigoCampanha()}`,
+  );
 
   // Estado do diagnóstico ---------------------------------------------------
   protected readonly dados = signal<DadosRespondente>({ ...VAZIO });
@@ -82,8 +109,23 @@ export class DiagnosticoPagina {
   protected readonly restaurado = signal(false);
 
   /** Link de empresa: nome, monograma e paleta (as cores valem só se a empresa tiver cores próprias). */
-  protected readonly marca = computed(() => (this.campanha.hasValue() ? this.campanha.value().empresa : null), {
+  protected readonly marca = computed(() => this.dadosCampanha()?.empresa ?? null, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+
+  // Convite nominal ----------------------------------------------------------
+  /** O líder tocou em "Está tudo certo" na tela de confirmação dos dados. */
+  private readonly confirmado = signal(false);
+  protected readonly editandoDados = signal(false);
+  /** Avaliação da empresa encerrada: ninguém começa nem responde mais. */
+  protected readonly encerrada = computed(() => !!this.dadosCampanha()?.encerrada);
+  protected readonly prazo = computed(() => {
+    const encerraEm = this.dadosCampanha()?.encerraEm;
+    return encerraEm && !this.encerrada() ? prazoPorExtenso(encerraEm) : null;
+  });
+  protected readonly dataEncerramento = computed(() => {
+    const encerraEm = this.dadosCampanha()?.encerraEm;
+    return encerraEm ? prazoPorExtenso(encerraEm) : '';
   });
   protected readonly primeiroNome = computed(() => this.dados().nome.trim().split(/\s+/)[0] ?? '');
 
@@ -98,10 +140,8 @@ export class DiagnosticoPagina {
     email(c.email, { message: 'Confira o e-mail: parece faltar o @ ou o domínio.' });
     required(c.whatsapp, { message: 'Escreva o seu WhatsApp para continuar.' });
     validate(c.whatsapp, ({ value }) => {
-      const digitos = value().replace(/\D/g, '').length;
-      return digitos > 0 && digitos < 10
-        ? { kind: 'whatsapp', message: 'Confira o número: DDD + número, como (11) 98765-4321.' }
-        : null;
+      const problema = problemaTelefone(value());
+      return problema ? { kind: 'whatsapp', message: problema } : null;
     });
   });
 
@@ -116,23 +156,32 @@ export class DiagnosticoPagina {
 
   // Etapas -------------------------------------------------------------------
   protected readonly etapas = computed<Etapa[]>(() => {
-    const campanha = this.campanha.value();
+    const campanha = this.dadosCampanha();
     if (!campanha) return [];
     const campos: CampoId[] = ['nome', 'email', 'whatsapp'];
     const comPerfil = !!campanha.perfil;
     const dimensoes = new Map(campanha.questionario.dimensoes.map((d) => [d.codigo, d.nome]));
     const perguntas = campanha.questionario.perguntas;
+    // Convite nominal: os dados (e o cargo) vêm da planilha do RH e são confirmados numa tela só.
+    const identificacao: Etapa[] = this.token()
+      ? [
+          { tipo: 'confirmar', chave: 'confirmar', ultimo: !comPerfil },
+          ...(comPerfil ? [{ tipo: 'perfil', chave: 'tempo', perfil: 'tempo', ultimo: true } satisfies Etapa] : []),
+        ]
+      : [
+          { tipo: 'inicio', chave: 'inicio' },
+          ...campos.map(
+            (campo, i): Etapa => ({ tipo: 'campo', chave: campo, campo, ultimo: !comPerfil && i === campos.length - 1 }),
+          ),
+          ...(comPerfil
+            ? [
+                { tipo: 'perfil', chave: 'cargo', perfil: 'cargo', ultimo: false } satisfies Etapa,
+                { tipo: 'perfil', chave: 'tempo', perfil: 'tempo', ultimo: true } satisfies Etapa,
+              ]
+            : []),
+        ];
     return [
-      { tipo: 'inicio', chave: 'inicio' },
-      ...campos.map(
-        (campo, i): Etapa => ({ tipo: 'campo', chave: campo, campo, ultimo: !comPerfil && i === campos.length - 1 }),
-      ),
-      ...(comPerfil
-        ? [
-            { tipo: 'perfil', chave: 'cargo', perfil: 'cargo', ultimo: false } satisfies Etapa,
-            { tipo: 'perfil', chave: 'tempo', perfil: 'tempo', ultimo: true } satisfies Etapa,
-          ]
-        : []),
+      ...identificacao,
       ...perguntas.map(
         (pergunta, i): Etapa => ({
           tipo: 'pergunta',
@@ -158,7 +207,7 @@ export class DiagnosticoPagina {
   /** O que vai para o servidor: dados do líder e, se o link pede, cargo e tempo no cargo. */
   private readonly envio = computed(() => ({
     dados: this.dados(),
-    perfil: this.campanha.value()?.perfil ? this.perfil() : null,
+    perfil: this.dadosCampanha()?.perfil ? this.perfil() : null,
   }));
   private readonly sincronizado = computed(
     () => this.diagnosticoId() !== null && this.dadosSincronizados() === JSON.stringify(this.envio()),
@@ -166,10 +215,10 @@ export class DiagnosticoPagina {
 
   /** Opções das telas de cargo (com "não está na lista" no fim) e de tempo no cargo. */
   protected readonly opcoesCargo = computed<OpcaoPerfil[]>(() => [
-    ...(this.campanha.value()?.perfil?.cargos ?? []),
+    ...(this.dadosCampanha()?.perfil?.cargos ?? []),
     { valor: CARGO_OUTRO, texto: 'Meu cargo não está na lista' },
   ]);
-  protected readonly opcoesTempo = computed(() => this.campanha.value()?.perfil?.tempos ?? []);
+  protected readonly opcoesTempo = computed(() => this.dadosCampanha()?.perfil?.tempos ?? []);
 
   /** Etapa mais avançada que o líder pode abrir: todas as anteriores precisam estar completas. */
   private readonly limite = computed(() => {
@@ -193,7 +242,7 @@ export class DiagnosticoPagina {
     source: this.indice,
     computation: (atual, anterior) => (anterior && atual < anterior.source ? 'tras' : 'frente'),
   });
-  protected readonly pronto = computed(() => this.campanha.hasValue() && this.restaurado());
+  protected readonly pronto = computed(() => this.carregada() && this.restaurado());
 
   constructor() {
     // Cores da empresa na página inteira enquanto o líder estiver aqui.
@@ -204,7 +253,7 @@ export class DiagnosticoPagina {
 
     // Restaura o progresso salvo no aparelho assim que a campanha carrega.
     effect(() => {
-      if (!this.campanha.hasValue() || untracked(this.restaurado)) return;
+      if (!this.carregada() || untracked(this.restaurado)) return;
       untracked(() => void this.restaurar());
     });
 
@@ -215,7 +264,18 @@ export class DiagnosticoPagina {
         id: this.diagnosticoId(),
         dados: this.dados(),
         perfil: this.perfil(),
+        confirmado: this.confirmado(),
       } satisfies ProgressoSalvo);
+    });
+
+    // Convite: o link abriu neste aparelho (auditoria). Só aqui, na página que carregou: a
+    // prévia do WhatsApp também abre o link, mas não roda isto.
+    effect(() => {
+      const token = this.token();
+      if (!token || !this.carregada() || untracked(() => this.acessoRegistrado)) return;
+      this.acessoRegistrado = true;
+      const celular = matchMedia('(pointer: coarse)').matches;
+      void this.api.registrarAcesso(token, celular ? 'celular' : 'computador').catch(() => undefined);
     });
 
     // URL pedindo uma etapa ainda bloqueada (ex.: recarregou sem dados): corrige a URL.
@@ -228,22 +288,30 @@ export class DiagnosticoPagina {
 
   private async restaurar() {
     const salvo = armazenamento.ler<ProgressoSalvo>(this.chave());
+    const convite = this.token() && this.convite.hasValue() ? this.convite.value() : null;
     if (salvo?.dados) {
       // Só os campos atuais: progresso salvo por versões antigas podia trazer "empresa".
       const { nome = '', email = '', whatsapp = '' } = salvo.dados;
       this.dados.set({ nome, email, whatsapp: formatarTelefone(whatsapp) });
+    } else if (convite) {
+      // Convite: os dados que o RH mandou, para o líder só confirmar.
+      this.dados.set({ nome: convite.nome, email: convite.email, whatsapp: formatarTelefone(convite.whatsapp ?? '') });
     }
     if (salvo?.perfil) this.perfil.set(this.perfilValido(salvo.perfil));
-    if (salvo?.id) {
+    else if (convite?.cargo) this.perfil.set(this.perfilValido({ cargo: convite.cargo }));
+    // O diagnóstico do convite vale mais que o do aparelho (ele pode ter começado em outro).
+    const id = convite?.diagnosticoId ?? salvo?.id ?? null;
+    this.confirmado.set(!!convite?.diagnosticoId || !!salvo?.confirmado);
+    if (id) {
       try {
-        const d = await this.api.buscar(salvo.id);
+        const d = await this.api.buscar(id);
         this.diagnosticoId.set(d.id);
         this.dadosSincronizados.set(JSON.stringify(this.envio()));
         const respostas: Record<number, number[]> = {};
         Object.entries(d.respostas).forEach(([pergunta, opcoes]) => (respostas[Number(pergunta)] = opcoes));
         this.respostas.set(respostas);
         this.concluido.set(d.status === 'CONCLUIDO');
-        const total = this.campanha.value()?.questionario.perguntas.length ?? 0;
+        const total = this.dadosCampanha()?.questionario.perguntas.length ?? 0;
         this.retomada.set(
           d.status === 'CONCLUIDO'
             ? { tipo: 'concluido', primeiroNome: d.primeiroNome }
@@ -259,7 +327,7 @@ export class DiagnosticoPagina {
 
   /** Progresso salvo pode citar um cargo que saiu da lista: aí ele volta a ser perguntado. */
   private perfilValido(salvo: Partial<PerfilLider>): PerfilLider {
-    const perfil = this.campanha.value()?.perfil;
+    const perfil = this.dadosCampanha()?.perfil;
     const cargo = salvo.cargo ?? null;
     const tempo = salvo.tempo ?? null;
     return {
@@ -273,6 +341,8 @@ export class DiagnosticoPagina {
     switch (etapa.tipo) {
       case 'inicio':
         return true;
+      case 'confirmar':
+        return this.confirmado() && this.dadosValidos() && (!etapa.ultimo || this.sincronizado());
       case 'campo':
         return this.formulario[etapa.campo]().valid() && (!etapa.ultimo || this.sincronizado());
       case 'perfil':
@@ -330,6 +400,46 @@ export class DiagnosticoPagina {
     return this.formulario[campo]().errors()[0]?.message ?? null;
   }
 
+  /** Convite: nome, e-mail, WhatsApp e (se a empresa tem cargos) o cargo, prontos para seguir. */
+  private readonly dadosValidos = computed(
+    () =>
+      this.formulario.nome().valid() &&
+      this.formulario.email().valid() &&
+      this.formulario.whatsapp().valid() &&
+      (!this.dadosCampanha()?.perfil || this.perfil().cargo !== null),
+  );
+  private readonly tentouConfirmar = signal(false);
+  private acessoRegistrado = false;
+
+  protected readonly errosConfirmacao = computed<ErrosConfirmacao>(() => ({
+    nome: this.mensagemErro('nome'),
+    email: this.mensagemErro('email'),
+    whatsapp: this.mensagemErro('whatsapp'),
+    cargo:
+      this.errosServidor()['cargo'] ??
+      (this.tentouConfirmar() && this.dadosCampanha()?.perfil && this.perfil().cargo === null ? 'Escolha o seu cargo.' : null),
+  }));
+
+  /** "Está tudo certo": com algo faltando ou errado, abre os campos e mostra o que corrigir. */
+  protected async confirmarDados(etapa: Extract<Etapa, { tipo: 'confirmar' }>) {
+    this.tentou.set({ nome: true, email: true, whatsapp: true });
+    this.tentouConfirmar.set(true);
+    if (!this.dadosValidos() || this.errosServidor()['nome'] || this.errosServidor()['email'] || this.errosServidor()['whatsapp']) {
+      this.editandoDados.set(true);
+      vibrar(30);
+      return;
+    }
+    this.confirmado.set(true);
+    if (etapa.ultimo && !this.sincronizado() && !(await this.sincronizar())) return;
+    this.editandoDados.set(false);
+    this.irPara(this.indice() + 1);
+  }
+
+  protected escolherCargoConfirmacao(valor: string | null) {
+    this.perfil.update((p) => ({ ...p, cargo: valor }));
+    this.limparErroPerfil();
+  }
+
   protected editou(campo: CampoId) {
     if (this.errosServidor()[campo]) this.errosServidor.update(({ [campo]: _, ...resto }) => resto);
     this.erro.set(null);
@@ -352,9 +462,13 @@ export class DiagnosticoPagina {
     const envio = this.envio();
     try {
       const id = this.diagnosticoId();
-      const diagnostico = id
-        ? await this.api.atualizarRespondente(id, envio.dados, envio.perfil)
-        : await this.api.iniciar(this.codigoCampanha(), envio.dados, envio.perfil);
+      // Convite: sempre pelo link pessoal, que cria ou atualiza e registra o que mudou na auditoria.
+      const token = this.token();
+      const diagnostico = token
+        ? await this.api.iniciarConvite(token, envio.dados, envio.perfil)
+        : id
+          ? await this.api.atualizarRespondente(id, envio.dados, envio.perfil)
+          : await this.api.iniciar(this.codigoCampanha(), envio.dados, envio.perfil);
       this.diagnosticoId.set(diagnostico.id);
       this.dadosSincronizados.set(JSON.stringify(envio));
       return true;
@@ -364,9 +478,11 @@ export class DiagnosticoPagina {
       const primeiro = Object.keys(campos)[0];
       if (primeiro) {
         this.errosServidor.set(campos);
-        const chave = ETAPA_DO_CAMPO[primeiro] ?? primeiro;
+        // No convite, os dados e o cargo ficam na tela de confirmação (que abre para corrigir).
+        const chave = this.token() && primeiro !== 'tempoCargo' ? 'confirmar' : (ETAPA_DO_CAMPO[primeiro] ?? primeiro);
+        if (chave === 'confirmar') this.editandoDados.set(true);
         const indice = this.etapas().findIndex((et) => et.chave === chave);
-        if (indice > 0 && indice !== this.indice()) this.irPara(indice);
+        if (indice >= 0 && indice !== this.indice()) this.irPara(indice);
       } else {
         this.erro.set(problema.detail ?? 'Não foi possível continuar. Tente de novo.');
       }

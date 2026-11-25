@@ -31,27 +31,28 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.LinhaResumo(d.status, f.codigo, d.pontuacao)
 			from Diagnostico d left join d.faixa f
+			where d.inativadoEm is null
 			""")
 	List<LinhaResumo> resumoGeral();
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.LinhaResumo(d.status, f.codigo, d.pontuacao)
 			from Diagnostico d left join d.faixa f
-			where d.campanha.codigo = :campanha
+			where d.campanha.codigo = :campanha and d.inativadoEm is null
 			""")
 	List<LinhaResumo> resumoDaCampanha(String campanha);
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.LinhaResumo(d.status, f.codigo, d.pontuacao)
 			from Diagnostico d left join d.faixa f
-			where d.campanha.codigo = :campanha and d.cargo.id = :cargo
+			where d.campanha.codigo = :campanha and d.cargo.id = :cargo and d.inativadoEm is null
 			""")
 	List<LinhaResumo> resumoDaCampanhaNoCargo(String campanha, Long cargo);
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.LinhaResumo(d.status, f.codigo, d.pontuacao)
 			from Diagnostico d left join d.faixa f
-			where d.campanha.codigo = :campanha and d.cargoOutro = true
+			where d.campanha.codigo = :campanha and d.cargoOutro = true and d.inativadoEm is null
 			""")
 	List<LinhaResumo> resumoDaCampanhaOutroCargo(String campanha);
 
@@ -59,16 +60,17 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 	@Query("""
 			select new br.com.diagnosticolider.empresa.ContagemCargo(c.id, count(d))
 			from Diagnostico d join d.cargo c
-			where d.campanha.codigo = :campanha
+			where d.campanha.codigo = :campanha and d.inativadoEm is null
 			group by c.id
 			""")
 	List<ContagemCargo> contagemPorCargoDaCampanha(String campanha);
 
-	long countByCampanhaCodigoAndCargoOutroTrue(String campanha);
+	long countByCampanhaCodigoAndCargoOutroTrueAndInativadoEmIsNull(String campanha);
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.ContagemPorCampanha(c.codigo, count(d))
 			from Diagnostico d join d.campanha c
+			where d.inativadoEm is null
 			group by c.codigo
 			""")
 	List<ContagemPorCampanha> contagemPorCampanha();
@@ -76,7 +78,7 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.LinhaResumo(d.status, f.codigo, d.pontuacao)
 			from Diagnostico d left join d.faixa f
-			where d.empresa.id = :empresa
+			where d.empresa.id = :empresa and d.inativadoEm is null
 			""")
 	List<LinhaResumo> resumoDaEmpresa(Long empresa);
 
@@ -85,26 +87,30 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 				sum(case when d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO then 1 else 0 end),
 				max(d.iniciadoEm))
 			from Diagnostico d join d.empresa e
+			where d.inativadoEm is null
 			group by e.id
 			""")
 	List<ContagemPorEmpresa> contagemPorEmpresa();
 
-	/** Diagnósticos de uma empresa (as respostas e dimensões vêm em lote, pelo batch fetch). */
+	/** Diagnósticos (ativos) de uma empresa; as respostas e dimensões vêm em lote, pelo batch fetch. */
 	@EntityGraph(attributePaths = { "faixa", "versao", "cargo" })
-	List<Diagnostico> findByEmpresaIdAndStatus(Long empresa, StatusDiagnostico status);
+	List<Diagnostico> findByEmpresaIdAndStatusAndInativadoEmIsNull(Long empresa, StatusDiagnostico status);
 
-	long countByEmpresaId(Long empresa);
+	long countByEmpresaIdAndStatusAndInativadoEmIsNull(Long empresa, StatusDiagnostico status);
+
+	long countByEmpresaIdAndInativadoEmIsNull(Long empresa);
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.MediaGeral(avg(d.pontuacao), count(d))
 			from Diagnostico d
-			where d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO
+			where d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO and d.inativadoEm is null
 			""")
 	MediaGeral mediaGeral();
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.MediaDimensao(dd.dimensao.codigo, avg(dd.pontuacao))
 			from DiagnosticoDimensao dd
+			where dd.diagnostico.inativadoEm is null
 			group by dd.dimensao.codigo
 			""")
 	List<MediaDimensao> mediaGeralPorDimensao();

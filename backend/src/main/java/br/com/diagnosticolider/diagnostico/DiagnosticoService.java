@@ -17,6 +17,7 @@ import br.com.diagnosticolider.campanha.Campanha;
 import br.com.diagnosticolider.campanha.CampanhaService;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
+import br.com.diagnosticolider.compartilhado.Telefones;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.DiagnosticoDto;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.IniciarRequest;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.ResultadoDto;
@@ -55,16 +56,23 @@ public class DiagnosticoService {
 	}
 
 	public DiagnosticoDto iniciar(String codigoCampanha, IniciarRequest req) {
-		Campanha campanha = campanhas.campanhaAtiva(codigoCampanha);
+		return DiagnosticoDto.de(criar(campanhas.campanhaAtiva(codigoCampanha), req));
+	}
+
+	/** Diagnóstico novo no link (também a partir de um convite nominal, que aponta para o link). */
+	public Diagnostico criar(Campanha campanha, IniciarRequest req) {
+		campanhas.exigirAberta(campanha);
 		QuestionarioVersao versao = campanhas.versaoPublicada(campanha);
+		Respondente respondente = respondente(campanha, req);
 		PerfilCargo perfil = perfil(campanha, req);
-		Diagnostico diagnostico = Diagnostico.iniciar(campanha, versao, respondente(campanha, req), agora());
+		Diagnostico diagnostico = Diagnostico.iniciar(campanha, versao, respondente, agora());
 		diagnostico.definirPerfil(perfil);
-		return DiagnosticoDto.de(diagnosticos.save(diagnostico));
+		return diagnosticos.save(diagnostico);
 	}
 
 	public DiagnosticoDto atualizarRespondente(UUID id, IniciarRequest req) {
 		Diagnostico diagnostico = carregar(id);
+		campanhas.exigirAberta(diagnostico.getCampanha());
 		diagnostico.atualizarRespondente(respondente(diagnostico.getCampanha(), req));
 		diagnostico.definirPerfil(perfil(diagnostico.getCampanha(), req));
 		return DiagnosticoDto.de(diagnostico);
@@ -99,6 +107,10 @@ public class DiagnosticoService {
 
 	/** Link de empresa: a empresa vem da campanha. Link geral: não pedimos empresa ao líder. */
 	private static Respondente respondente(Campanha campanha, IniciarRequest req) {
+		var problemaWhatsapp = Telefones.problema(req.whatsapp());
+		if (problemaWhatsapp.isPresent()) {
+			throw new RegraNegocioException(problemaWhatsapp.get()).noCampo("whatsapp");
+		}
 		String empresa = campanha.vinculadaAEmpresa() ? campanha.getEmpresa().getNome() : null;
 		return Respondente.de(req.nome(), req.email(), req.whatsapp(), empresa);
 	}
@@ -110,6 +122,7 @@ public class DiagnosticoService {
 
 	public void responder(UUID id, Long perguntaId, List<Long> opcaoIds) {
 		Diagnostico diagnostico = carregar(id);
+		campanhas.exigirAberta(diagnostico.getCampanha());
 		Pergunta pergunta = diagnostico.getVersao()
 			.pergunta(perguntaId)
 			.orElseThrow(() -> new NaoEncontradoException("Esta pergunta não faz parte do seu diagnóstico."));
@@ -125,6 +138,16 @@ public class DiagnosticoService {
 			throw new RegraNegocioException("Escolha apenas uma opção.");
 		}
 		diagnostico.responder(pergunta, escolhidas, agora());
+		eventos.publishEvent(new PassoDoLider.Respondeu(id, diagnostico.respostasPorPergunta().size(),
+				diagnostico.getVersao().getPerguntas().size()));
+	}
+
+	/** O líder compartilhou ou baixou o PDF (o aparelho avisa: o arquivo é o mesmo nos dois casos). */
+	public void registrarUsoDoPdf(UUID id, boolean compartilhou) {
+		Diagnostico diagnostico = carregar(id);
+		if (diagnostico.concluido()) {
+			eventos.publishEvent(new PassoDoLider.UsouPdf(id, compartilhou));
+		}
 	}
 
 	/** Calcula e grava o resultado. Idempotente: concluir de novo devolve o mesmo resultado. */
@@ -133,6 +156,7 @@ public class DiagnosticoService {
 		if (diagnostico.concluido()) {
 			return ResultadoDto.de(diagnostico, logomarcas.marca(diagnostico.getEmpresa()));
 		}
+		campanhas.exigirAberta(diagnostico.getCampanha());
 
 		QuestionarioVersao versao = diagnostico.getVersao();
 		Map<Long, List<Opcao>> respostas = diagnostico.respostasPorPergunta();
@@ -176,6 +200,7 @@ public class DiagnosticoService {
 		if (!diagnostico.concluido()) {
 			throw RegraNegocioException.conflito("Este diagnóstico ainda não foi concluído.");
 		}
+		eventos.publishEvent(new PassoDoLider.ViuResultado(id));
 		return ResultadoDto.de(diagnostico, logomarcas.marca(diagnostico.getEmpresa()));
 	}
 

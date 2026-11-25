@@ -53,6 +53,12 @@
             } @else {
               <span>Cores do Diagnóstico do Líder</span>
             }
+            @if (e.encerramento.em; as em) {
+              <a [routerLink]="['editar']" fragment="encerramento-secao" class="inline-flex items-center gap-1.5 underline-offset-4 hover:underline" [class.text-travada]="e.encerramento.encerrada" [class.font-semibold]="e.encerramento.encerrada">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" stroke-linecap="round" /></svg>
+                {{ e.encerramento.encerrada ? 'Avaliação encerrada em ' : 'Avaliação aberta até ' }}{{ encerramentoPorExtenso(em) }}
+              </a>
+            }
           </div>
         </div>
         <a [routerLink]="['editar']" class="botao-secundario shrink-0">
@@ -88,6 +94,27 @@
               <a [href]="l.url" target="_blank" rel="noopener" class="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-abeto-2 hover:text-abeto">
                 Abrir como o líder vê <span aria-hidden="true">↗</span><span class="sr-only">(abre em nova aba)</span>
               </a>
+            </section>
+
+            <section class="cartao order-1 p-5 sm:p-6" aria-labelledby="titulo-convites">
+              <div class="flex items-center justify-between gap-3">
+                <h2 id="titulo-convites" class="text-[17px] font-semibold">Convites por e-mail</h2>
+                <a [routerLink]="['convites']" class="inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-abeto hover:underline">
+                  Abrir <span aria-hidden="true">→</span>
+                </a>
+              </div>
+              @if (convites.hasValue() && convites.value().convites.length; as total) {
+                @let r = convites.value().resumo;
+                <p class="mt-1 text-[14px] text-abeto-2">Um link pessoal por líder, com o registro de quem abriu e de quem concluiu.</p>
+                <dl class="mt-4 grid grid-cols-3 gap-2 text-center">
+                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Convidados</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.total }}</dd></div>
+                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Abriram</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.abriram }}</dd></div>
+                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Concluíram</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.concluiram }}</dd></div>
+                </dl>
+              } @else {
+                <p class="mt-1 text-[14px] text-abeto-2">Importe a planilha do RH: cada líder recebe um link só dele, já com os dados preenchidos, e você acompanha quem abriu e quem concluiu.</p>
+                <a [routerLink]="['convites']" class="botao-secundario mt-4 w-full sm:w-auto">Convidar líderes por e-mail</a>
+              }
             </section>
 
             <section class="cartao order-3 p-5 sm:p-6" aria-labelledby="titulo-convite">

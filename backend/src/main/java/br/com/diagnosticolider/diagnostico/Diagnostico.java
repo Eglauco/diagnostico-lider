@@ -101,6 +101,10 @@ public class Diagnostico {
 	@Column(name = "concluido_em")
 	private Instant concluidoEm;
 
+	/** Inativado pelo administrador: fica guardado, mas fora de todos os cálculos. */
+	@Column(name = "inativado_em")
+	private Instant inativadoEm;
+
 	/** Cargo informado no link da empresa (nulo no link geral e em "Outro cargo"). */
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "cargo_id")
@@ -133,6 +137,33 @@ public class Diagnostico {
 	}
 
 	/** O líder voltou e corrigiu nome, e-mail, WhatsApp ou empresa antes de concluir. */
+	/**
+	 * Correção feita no painel (vale também depois de concluído): os dados do líder e o cargo.
+	 * As respostas, o resultado e o tempo no cargo não mudam.
+	 */
+	public void corrigirPeloPainel(Respondente respondente, Cargo cargo, boolean outro) {
+		this.respondente = respondente;
+		this.cargo = outro ? null : cargo;
+		this.cargoOutro = outro;
+		if (!outro) {
+			this.cargoOutroNome = null;
+		}
+	}
+
+	public void inativar(Instant agora) {
+		if (inativadoEm == null) {
+			inativadoEm = agora;
+		}
+	}
+
+	public void reativar() {
+		inativadoEm = null;
+	}
+
+	public Instant getInativadoEm() {
+		return inativadoEm;
+	}
+
 	public void atualizarRespondente(Respondente respondente) {
 		exigirEmAndamento();
 		this.respondente = respondente;

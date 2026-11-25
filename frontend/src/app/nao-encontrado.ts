@@ -10,14 +10,19 @@ import { Marca } from './compartilhado/marca';
   template: `
     <app-marca />
     <div class="flex flex-1 flex-col justify-center">
-      <p class="rotulo text-brasa-escura">Fora da curva</p>
+      <p class="rotulo text-brasa-escura">{{ sobretitulo() }}</p>
       <h1 class="display mt-3 text-[40px] leading-[1.02] font-bold">{{ titulo() }}</h1>
       <p class="mt-4 text-[18px] text-abeto-2">{{ mensagem() }}</p>
-      <a routerLink="/" class="botao-primario mt-8 self-start">Ir para o diagnóstico <span class="seta" aria-hidden="true">→</span></a>
+      @if (mostrarAcao()) {
+        <a routerLink="/" class="botao-primario mt-8 self-start">Ir para o diagnóstico <span class="seta" aria-hidden="true">→</span></a>
+      }
     </div>
   `,
 })
 export class NaoEncontrado {
   readonly titulo = input('Não encontramos esta página');
   readonly mensagem = input('O endereço pode estar incompleto. Confira o link que você recebeu.');
+  /** Link pessoal fechado ou cancelado: mandar para o link geral não ajuda. */
+  readonly mostrarAcao = input(true);
+  readonly sobretitulo = input('Fora da curva');
 }

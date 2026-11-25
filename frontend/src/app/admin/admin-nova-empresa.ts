@@ -10,6 +10,8 @@ import { API_ADMIN, Disponibilidade, EmpresaDetalhe } from './admin-modelos';
 import { CODIGO_MINIMO, codigoDigitando, normalizarCodigo } from './codigo-campanha';
 import { CargoEditavel, cargosParaEnvio, cargosSugeridos } from './cargos/cargos';
 import { SecaoCargos } from './cargos/secao-cargos';
+import { SecaoEncerramento } from './encerramento/secao-encerramento';
+import { errosDeGestores, gestoresParaEnvio, problemaGestores, SecaoGestores } from './gestores/secao-gestores';
 import { normalizarHex, siglaDe, usarPreviaDeCores } from './cores/cores';
 import { PreviaMarca } from './cores/previa-marca';
 import { SecaoCores } from './cores/secao-cores';
@@ -25,7 +27,7 @@ type Campo = 'nome' | 'codigo' | 'corPrimaria' | 'corSecundaria' | 'cargos';
  */
 @Component({
   selector: 'app-admin-nova-empresa',
-  imports: [CampoLogo, FormField, PreviaMarca, QrSvg, RouterLink, SecaoCargos, SecaoCores],
+  imports: [CampoLogo, FormField, PreviaMarca, QrSvg, RouterLink, SecaoCargos, SecaoEncerramento, SecaoGestores, SecaoCores],
   templateUrl: './admin-nova-empresa.html',
   styleUrl: './admin.css',
   host: { class: 'block' },
@@ -97,11 +99,16 @@ export class AdminNovaEmpresa {
 
   // Cargos: começa com a lista sugerida, para editar em vez de partir do zero ---
   protected readonly cargos = signal<CargoEditavel[]>(cargosSugeridos());
+  /** Encerramento da avaliação (ISO; null: sem data). */
+  protected readonly encerraEm = signal<string | null>(null);
+  /** E-mails dos gestores que recebem os relatórios (pode ficar vazio). */
+  protected readonly gestores = signal<string[]>([]);
+  protected readonly errosGestores = signal<Record<number, string>>({});
 
   // Envio --------------------------------------------------------------------
   protected readonly enviando = signal(false);
   protected readonly erro = signal<string | null>(null);
-  private readonly tentou = signal(false);
+  protected readonly tentou = signal(false);
   private readonly errosServidor = signal<Partial<Record<Campo, string>>>({});
 
   protected readonly erroNome = computed(
@@ -166,6 +173,8 @@ export class AdminNovaEmpresa {
     if (this.erroCodigo()) return this.recusar('codigo');
     if (this.corPrimaria() && !normalizarHex(this.corPrimaria())) return this.recusar('corPrimaria');
     if (this.corSecundaria() && !normalizarHex(this.corSecundaria())) return this.recusar('corSecundaria');
+    const gestorErrado = problemaGestores(this.gestores());
+    if (gestorErrado) return this.recusarGestor(gestorErrado.indice);
 
     this.enviando.set(true);
     this.erro.set(null);
@@ -177,6 +186,8 @@ export class AdminNovaEmpresa {
           corPrimaria: normalizarHex(this.corPrimaria()),
           corSecundaria: normalizarHex(this.corSecundaria()),
           cargos: cargosParaEnvio(this.cargos()),
+          encerraEm: this.encerraEm(),
+          gestores: gestoresParaEnvio(this.gestores()),
         }),
       );
       try {
@@ -195,9 +206,14 @@ export class AdminNovaEmpresa {
       const problema = problemaDe(e);
       const campos = (problema.campos ?? {}) as Partial<Record<Campo, string>>;
       const campo = (['nome', 'codigo', 'corPrimaria', 'corSecundaria', 'cargos'] as Campo[]).find((c) => campos[c]);
+      const errosGestores = errosDeGestores(problema.campos as Record<string, string> | undefined);
+      const linhaGestor = Object.keys(errosGestores).map(Number)[0];
       if (campo) {
         this.errosServidor.set(campos);
         this.recusar(campo);
+      } else if (linhaGestor !== undefined) {
+        this.errosGestores.set(errosGestores);
+        this.recusarGestor(linhaGestor);
       } else {
         this.erro.set(problema.detail ?? 'Não foi possível cadastrar agora. Tente de novo.');
       }
@@ -208,6 +224,11 @@ export class AdminNovaEmpresa {
 
   protected erroDoServidor(campo: Campo): string | null {
     return this.errosServidor()[campo] ?? null;
+  }
+
+  private recusarGestor(indice: number) {
+    vibrar(30);
+    document.getElementById('gestor-' + indice)?.focus();
   }
 
   private recusar(campo: Campo) {

@@ -44,7 +44,7 @@ public final class AdminDtos {
 
 	public record Detalhe(UUID id, StatusDiagnostico status, StatusEmail statusEmail, Instant iniciadoEm,
 			Instant concluidoEm, Instant consentimentoEm, Instant emailEnviadoEm, Lider lider, Origem origem,
-			Resultado resultado, List<RespostaDetalhe> respostas) {
+			Resultado resultado, List<RespostaDetalhe> respostas, Instant inativadoEm) {
 
 		/** cargo e tempoCargo: só no link de empresa com cargos (nulos nos demais). */
 		public record Lider(String nome, String email, String whatsapp, String empresa, String cargo,

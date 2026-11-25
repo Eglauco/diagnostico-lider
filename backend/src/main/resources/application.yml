@@ -69,8 +69,15 @@ app:
   email:
     # log: só registra no console (dev). resend: envia pela API HTTP da Resend (produção).
     provedor: ${EMAIL_PROVEDOR:log}
-    remetente: ${EMAIL_REMETENTE:Diagnóstico do Líder <onboarding@resend.dev>}
+    remetente: ${EMAIL_REMETENTE:Diagnóstico do Líder <diagnostico@terasoftware.com.br>}
+    # Para onde vão as respostas dos líderes (o remetente não tem caixa de entrada). Vazio: sem reply-to.
+    responder-para: ${EMAIL_RESPONDER_PARA:}
     resend-api-key: ${RESEND_API_KEY:}
+    # Segredo do webhook (whsec_…): o Resend avisa entrega, devolução e spam de cada e-mail.
+    resend-webhook-secret: ${RESEND_WEBHOOK_SECRET:}
+    # Só em desenvolvimento (backend/.env): todo e-mail sai de verdade, mas para este endereço, com o
+    # destinatário original no assunto. Nunca no Railway.
+    desviar-para: ${EMAIL_DESVIAR_PARA:}
   # Logomarcas das empresas. No Railway: bucket "logomarcas" (S3_* por referência de variável) e
   # ARMAZENAMENTO_PREFIXO=producao. Localmente: pasta "desenvolvimento"; sem S3_*, fica em disco.
   armazenamento:

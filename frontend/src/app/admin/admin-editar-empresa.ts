@@ -10,6 +10,8 @@ import { vibrar } from '../compartilhado/util';
 import { API_ADMIN, EmpresaDetalhe } from './admin-modelos';
 import { CargoEditavel, cargosDaEmpresa, cargosParaEnvio } from './cargos/cargos';
 import { SecaoCargos } from './cargos/secao-cargos';
+import { SecaoEncerramento } from './encerramento/secao-encerramento';
+import { errosDeGestores, gestoresParaEnvio, problemaGestores, SecaoGestores } from './gestores/secao-gestores';
 import { normalizarHex, siglaDe, usarPreviaDeCores } from './cores/cores';
 import { PreviaMarca } from './cores/previa-marca';
 import { SecaoCores } from './cores/secao-cores';
@@ -18,10 +20,10 @@ import { logoEmPrevia, salvarLogo } from './logo/salvar-logo';
 
 type Campo = 'nome' | 'corPrimaria' | 'corSecundaria' | 'cargos';
 
-/** Editar nome, logo, cores e cargos. O link fica como está: pode já estar impresso nos materiais. */
+/** Editar nome, logo, cores, cargos e o encerramento da avaliação. O link fica como está: pode já estar impresso nos materiais. */
 @Component({
   selector: 'app-admin-editar-empresa',
-  imports: [CampoLogo, FormField, PreviaMarca, RouterLink, SecaoCargos, SecaoCores],
+  imports: [CampoLogo, FormField, PreviaMarca, RouterLink, SecaoCargos, SecaoCores, SecaoEncerramento, SecaoGestores],
   templateUrl: './admin-editar-empresa.html',
   styleUrl: './admin.css',
   host: { class: 'block' },
@@ -46,6 +48,11 @@ export class AdminEditarEmpresa {
   protected readonly sigla = computed(() => siglaDe(this.modelo().nome || 'Empresa'));
 
   protected readonly cargos = signal<CargoEditavel[]>([]);
+  /** Encerramento da avaliação (ISO; null: sem data). */
+  protected readonly encerraEm = signal<string | null>(null);
+  /** E-mails dos gestores que recebem os relatórios (pode ficar vazio). */
+  protected readonly gestores = signal<string[]>([]);
+  protected readonly errosGestores = signal<Record<number, string>>({});
 
   protected readonly logo = signal<MudancaLogo>(null);
   protected readonly logoAtual = computed(() => (this.empresa.hasValue() ? this.empresa.value().logo : null));
@@ -79,10 +86,13 @@ export class AdminEditarEmpresa {
       this.corPrimaria.set(e.cores.primaria ?? '');
       this.corSecundaria.set(e.cores.secundaria ?? '');
       this.cargos.set(cargosDaEmpresa(e.cargos));
+      this.encerraEm.set(e.encerramento.em);
+      this.gestores.set(e.gestores);
       this.carregado.set(true);
-      // Veio do "Editar cargos" da página da empresa: vai direto para a seção.
-      if (this.rota.snapshot.fragment === 'cargos-secao') {
-        setTimeout(() => document.getElementById('cargos-secao')?.scrollIntoView({ block: 'start' }), 150);
+      // Veio de um atalho (cargos, encerramento ou gestores): vai direto para a seção.
+      const secao = this.rota.snapshot.fragment;
+      if (secao === 'cargos-secao' || secao === 'encerramento-secao' || secao === 'gestores-secao') {
+        setTimeout(() => document.getElementById(secao)?.scrollIntoView({ block: 'start' }), 150);
       }
     });
   }
@@ -103,6 +113,8 @@ export class AdminEditarEmpresa {
     if (this.erroNome()) return this.recusar('nome');
     if (this.corPrimaria() && !normalizarHex(this.corPrimaria())) return this.recusar('corPrimaria');
     if (this.corSecundaria() && !normalizarHex(this.corSecundaria())) return this.recusar('corSecundaria');
+    const gestorErrado = problemaGestores(this.gestores());
+    if (gestorErrado) return this.recusarGestor(gestorErrado.indice);
 
     this.enviando.set(true);
     try {
@@ -112,6 +124,8 @@ export class AdminEditarEmpresa {
           corPrimaria: normalizarHex(this.corPrimaria()),
           corSecundaria: normalizarHex(this.corSecundaria()),
           cargos: cargosParaEnvio(this.cargos()),
+          encerraEm: this.encerraEm(),
+          gestores: gestoresParaEnvio(this.gestores()),
         }),
       );
       await salvarLogo(this.http, this.id(), this.logo());
@@ -120,15 +134,25 @@ export class AdminEditarEmpresa {
       const problema = problemaDe(e);
       const campos = (problema.campos ?? {}) as Partial<Record<Campo, string>>;
       const campo = (['nome', 'corPrimaria', 'corSecundaria', 'cargos'] as Campo[]).find((c) => campos[c]);
+      const errosGestores = errosDeGestores(problema.campos as Record<string, string> | undefined);
+      const linhaGestor = Object.keys(errosGestores).map(Number)[0];
       if (campo) {
         this.errosServidor.set(campos);
         this.recusar(campo);
+      } else if (linhaGestor !== undefined) {
+        this.errosGestores.set(errosGestores);
+        this.recusarGestor(linhaGestor);
       } else {
         this.erro.set(problema.detail ?? 'Não foi possível salvar agora. Tente de novo.');
       }
     } finally {
       this.enviando.set(false);
     }
+  }
+
+  private recusarGestor(indice: number) {
+    vibrar(30);
+    document.getElementById('gestor-' + indice)?.focus();
   }
 
   private recusar(campo: Campo) {

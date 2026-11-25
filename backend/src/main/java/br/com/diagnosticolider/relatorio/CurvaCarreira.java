@@ -70,6 +70,12 @@ public final class CurvaCarreira {
 		return new Ponto(escalaX(largura).applyAsDouble(t), escalaY(altura).applyAsDouble(altura(t)));
 	}
 
+	/** Onde a curva passa (y do desenho) num x qualquer: para pôr rótulos sem esbarrar nela. */
+	public static double yNoX(double largura, double altura, double x) {
+		double t = Math.clamp((x - MARGEM_X) / (largura - 2 * MARGEM_X), 0.0, 1.0);
+		return escalaY(altura).applyAsDouble(altura(t));
+	}
+
 	public static Desenho desenhar(double largura, double altura, int indice) {
 		double margemBase = MARGEM_BASE;
 		DoubleUnaryOperator x = escalaX(largura);

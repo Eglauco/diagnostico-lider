@@ -1,5 +1,6 @@
 package br.com.diagnosticolider.relatorio;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.com.diagnosticolider.campanha.CodigoCampanha;
+import br.com.diagnosticolider.compartilhado.Datas;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.diagnostico.Diagnostico;
@@ -38,6 +40,7 @@ import br.com.diagnosticolider.questionario.Pergunta;
 import br.com.diagnosticolider.questionario.QuestionarioVersao;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.Coluna;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.CurvaGrupo;
+import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.EtiquetaMedia;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.Destaque;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.DimensaoResumo;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.FaixaResumo;
@@ -76,6 +79,11 @@ public class RelatorioEmpresaService {
 
 	private static final double ALTURA_CURVA = 212;
 
+	/** A etiqueta "Média do grupo" na curva da capa (o template desenha com essas medidas). */
+	static final double ETIQUETA_LARGURA = 140;
+
+	static final double ETIQUETA_ALTURA = 22;
+
 	/** Quantas dimensões e perguntas cabem numa página. */
 	private static final int DIMENSOES_POR_PAGINA = 4;
 
@@ -87,16 +95,50 @@ public class RelatorioEmpresaService {
 
 	private final LogomarcaService logomarcas;
 
-	RelatorioEmpresaService(EmpresaRepository empresas, DiagnosticoRepository diagnosticos, LogomarcaService logomarcas) {
+	private final Clock clock;
+
+	RelatorioEmpresaService(EmpresaRepository empresas, DiagnosticoRepository diagnosticos, LogomarcaService logomarcas,
+			Clock clock) {
 		this.empresas = empresas;
 		this.diagnosticos = diagnosticos;
 		this.logomarcas = logomarcas;
+		this.clock = clock;
+	}
+
+	/**
+	 * Com data de encerramento, o relatório diz se é o resultado final (a avaliação encerrou) ou
+	 * parcial (ainda aberta, os números podem mudar). Sem data, não diz nada.
+	 */
+	private RelatorioEmpresaDados.Situacao situacao(Empresa empresa) {
+		if (empresa.getEncerraEm() == null) {
+			return null;
+		}
+		Instant agora = Instant.now(clock);
+		String data = Datas.porExtenso(empresa.getEncerraEm(), agora);
+		return empresa.encerrada(agora)
+				? new RelatorioEmpresaDados.Situacao("resultado final", "A avaliação foi encerrada em " + data + ": este é o resultado final.")
+				: new RelatorioEmpresaDados.Situacao("resultado parcial",
+						"A avaliação vai até " + data + ": este é um resultado parcial, e os números ainda podem mudar.");
 	}
 
 	public RelatorioEmpresaDados montar(Long empresaId) {
+		return montar(empresaId, null);
+	}
+
+	/**
+	 * Todos os líderes convidados responderam antes do prazo: o resultado não vai mudar por falta
+	 * de resposta, então o relatório diz isso em vez de "resultado parcial".
+	 */
+	public RelatorioEmpresaDados montarComTodosRespondidos(Long empresaId, int convidados) {
+		return montar(empresaId, new RelatorioEmpresaDados.Situacao("todos responderam",
+				(convidados == 1 ? "O líder convidado respondeu" : "Todos os %d líderes convidados responderam".formatted(convidados))
+						+ " antes do prazo: a participação está completa."));
+	}
+
+	private RelatorioEmpresaDados montar(Long empresaId, RelatorioEmpresaDados.Situacao situacao) {
 		Empresa empresa = empresas.findById(empresaId)
 			.orElseThrow(() -> new NaoEncontradoException("Empresa não encontrada."));
-		List<Diagnostico> concluidos = diagnosticos.findByEmpresaIdAndStatus(empresaId, StatusDiagnostico.CONCLUIDO);
+		List<Diagnostico> concluidos = diagnosticos.findByEmpresaIdAndStatusAndInativadoEmIsNull(empresaId, StatusDiagnostico.CONCLUIDO);
 		int n = concluidos.size();
 		if (n < MINIMO_LIDERES) {
 			throw RegraNegocioException.conflito(("O relatório consolidado precisa de pelo menos %d diagnósticos "
@@ -142,7 +184,7 @@ public class RelatorioEmpresaService {
 		DimensaoResumo maisFragil = dimensoes.stream().filter(d -> "fragil".equals(d.destaque())).findFirst().orElse(null);
 		DimensaoResumo maisForte = dimensoes.stream().filter(d -> "forte".equals(d.destaque())).findFirst().orElse(null);
 
-		int iniciaram = (int) diagnosticos.countByEmpresaId(empresaId);
+		int iniciaram = (int) diagnosticos.countByEmpresaIdAndInativadoEmIsNull(empresaId);
 		var participacao = new Participacao(iniciaram, n, iniciaram - n, Math.round(100f * n / iniciaram),
 				tempoMediano(concluidos));
 
@@ -170,11 +212,13 @@ public class RelatorioEmpresaService {
 				indice, referencia, faixaDaMedia, faixas,
 				destaques(n, indice, referencia, faixas, faixaDaMedia, maisForte, maisFragil, limites, participacao,
 						porCargo, pCargos),
-				curva(concluidos, indice.media()), histograma(indices, faixasDaVersao), limites, paginasDimensoes,
+				curva(concluidos.stream().map(d -> new Lider(d.getPontuacao(), d.getFaixa().getCodigo())).toList(), indice.media()), histograma(indices, faixasDaVersao), limites, paginasDimensoes,
 				maisFragil, paginasPerguntas, notaVersoes, MINIMO_LIDERES, paginas,
 				"relatorio-consolidado-" + CodigoCampanha.normalizar(empresa.getNome()) + ".pdf", empresa.tema(),
 				MarcaEmpresa.siglaDe(empresa.getNome()), logomarcas.dataUri(empresa),
-				logomarcas.logo(empresa) != null && logomarcas.logo(empresa).pedeNome(), porCargo);
+				logomarcas.logo(empresa) != null && logomarcas.logo(empresa).pedeNome(), porCargo,
+				situacao != null && !empresa.encerrada(Instant.now(clock)) ? situacao
+						: situacao(empresa));
 	}
 
 	/** O que a análise por cargo usa de cada diagnóstico concluído. */
@@ -298,23 +342,53 @@ public class RelatorioEmpresaService {
 	// Curva e histograma ---------------------------------------------------
 
 	/** Todos os líderes na curva; índices iguais ficam empilhados, como no painel. */
-	private static CurvaGrupo curva(List<Diagnostico> concluidos, int mediaDoGrupo) {
+	/** Um líder na curva da capa: só o índice e a faixa, sem identificação. */
+	record Lider(int indice, String faixa) {
+	}
+
+	static CurvaGrupo curva(List<Lider> concluidos, int mediaDoGrupo) {
 		var desenho = CurvaCarreira.desenhar(LARGURA_CURVA, ALTURA_CURVA, mediaDoGrupo);
 		int n = concluidos.size();
 		double raio = n <= 25 ? 6.5 : n <= 80 ? 5 : 3.5;
-		Map<Integer, List<Diagnostico>> porIndice = concluidos.stream()
-			.collect(Collectors.groupingBy(Diagnostico::getPontuacao, TreeMap::new, Collectors.toList()));
-		int maiorPilha = porIndice.values().stream().mapToInt(List::size).max().orElse(1);
-		double passo = Math.min(raio * 2 - 1, maiorPilha > 1 ? 110.0 / (maiorPilha - 1) : raio * 2);
+		Map<Integer, List<Lider>> porIndice = concluidos.stream()
+			.collect(Collectors.groupingBy(Lider::indice, TreeMap::new, Collectors.toList()));
+
+		// A média cai onde as bolinhas se concentram: a etiqueta vai para a área livre embaixo da
+		// curva (as pilhas sempre sobem a partir dela). Só se a curva passar baixa demais ali
+		// (média muito alta), a etiqueta volta para o alto e as pilhas desviam dela.
+		double meia = ETIQUETA_LARGURA / 2;
+		double centro = Math.clamp(desenho.voce().x(), 10 + meia, LARGURA_CURVA - 10 - meia);
+		double curvaMaisBaixa = 0;
+		for (double x = centro - meia; x <= centro + meia; x += 4) {
+			curvaMaisBaixa = Math.max(curvaMaisBaixa, CurvaCarreira.yNoX(LARGURA_CURVA, ALTURA_CURVA, x));
+		}
+		double yEmbaixo = Math.max(curvaMaisBaixa + raio + 6, desenho.base() - ETIQUETA_ALTURA - 16);
+		boolean embaixo = yEmbaixo + ETIQUETA_ALTURA <= desenho.base() - 4;
+		EtiquetaMedia media = embaixo
+				? new EtiquetaMedia(arredondar(centro), arredondar(yEmbaixo), arredondar(desenho.voce().y()), desenho.base())
+				: new EtiquetaMedia(arredondar(centro), 0, ETIQUETA_ALTURA, desenho.base());
+
+		// Pilhas de quem tem o mesmo índice: o passo encolhe para nenhuma sair do desenho (nem
+		// cobrir a etiqueta, quando ela está no alto).
+		double passo = raio * 2 - 1;
+		for (var pilha : porIndice.entrySet()) {
+			if (pilha.getValue().size() > 1) {
+				var base = CurvaCarreira.ponto(LARGURA_CURVA, ALTURA_CURVA, pilha.getKey());
+				boolean sobEtiqueta = !embaixo && Math.abs(base.x() - centro) < meia + raio;
+				double topo = sobEtiqueta ? ETIQUETA_ALTURA + 4 + raio : raio + 2;
+				passo = Math.min(passo, Math.max(0, (base.y() - topo) / (pilha.getValue().size() - 1)));
+			}
+		}
+		double passoFinal = passo;
 		List<PontoLider> pontos = new ArrayList<>();
 		porIndice.forEach((indice, grupo) -> {
 			var ponto = CurvaCarreira.ponto(LARGURA_CURVA, ALTURA_CURVA, indice);
 			for (int k = 0; k < grupo.size(); k++) {
-				pontos.add(new PontoLider(arredondar(ponto.x()), arredondar(ponto.y() - k * passo),
-						grupo.get(k).getFaixa().getCodigo()));
+				pontos.add(new PontoLider(arredondar(ponto.x()), arredondar(ponto.y() - k * passoFinal),
+						grupo.get(k).faixa()));
 			}
 		});
-		return new CurvaGrupo(desenho, pontos, raio);
+		return new CurvaGrupo(desenho, pontos, raio, media);
 	}
 
 	private static List<Coluna> histograma(List<Integer> indices, List<FaixaResultado> faixas) {

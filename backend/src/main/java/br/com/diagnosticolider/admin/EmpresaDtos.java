@@ -25,18 +25,19 @@ public final class EmpresaDtos {
 			@Size(max = 60, message = "Use até 60 caracteres.") String codigo,
 			@Size(max = 7, message = "Use um código de cor como #0057B8.") String corPrimaria,
 			@Size(max = 7, message = "Use um código de cor como #0057B8.") String corSecundaria,
-			List<CargoService.Pedido> cargos) {
+			List<CargoService.Pedido> cargos, Instant encerraEm, List<String> gestores) {
 	}
 
 	/**
 	 * O link não muda na edição: ele pode já estar impresso nos materiais da empresa. Os cargos vêm
-	 * na ordem da hierarquia (o primeiro é o primeiro nível de liderança).
+	 * na ordem da hierarquia (o primeiro é o primeiro nível de liderança). encerraEm: quando a
+	 * avaliação encerra (null: sem data). gestores: e-mails que recebem os relatórios (pode ser vazio).
 	 */
 	public record EditarEmpresa(
 			@NotBlank(message = "Escreva o nome da empresa.") @Size(max = 160, message = "Use até 160 caracteres.") String nome,
 			@Size(max = 7, message = "Use um código de cor como #0057B8.") String corPrimaria,
 			@Size(max = 7, message = "Use um código de cor como #0057B8.") String corSecundaria,
-			List<CargoService.Pedido> cargos) {
+			List<CargoService.Pedido> cargos, Instant encerraEm, List<String> gestores) {
 	}
 
 	/** O link que vai para os líderes da empresa. */
@@ -48,7 +49,7 @@ public final class EmpresaDtos {
 	}
 
 	public record EmpresaResumo(Long id, String nome, Instant criadaEm, Link link, long diagnosticos, long concluidos,
-			Instant ultimoDiagnostico, Cores cores, MarcaEmpresa.Logo logo) {
+			Instant ultimoDiagnostico, Cores cores, MarcaEmpresa.Logo logo, Encerramento encerramento) {
 	}
 
 	/**
@@ -58,7 +59,11 @@ public final class EmpresaDtos {
 	 */
 	public record EmpresaDetalhe(Long id, String nome, Instant criadaEm, Link link, Indicadores indicadores,
 			int minimoRelatorio, Cores cores, PaletaMarca.Tema tema, MarcaEmpresa.Logo logo,
-			List<CargoService.Item> cargos) {
+			List<CargoService.Item> cargos, Encerramento encerramento, List<String> gestores) {
+	}
+
+	/** Até quando a avaliação vai (em: null sem data) e se já encerrou. */
+	public record Encerramento(Instant em, boolean encerrada) {
 	}
 
 	public record Indicadores(long total, long concluidos, long emAndamento, Integer indiceMedio,
