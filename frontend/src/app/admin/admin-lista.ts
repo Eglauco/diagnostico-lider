@@ -3,7 +3,7 @@ import { httpResource, HttpResourceRef } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { Curva } from '../compartilhado/curva';
-import { baixarArquivo } from '../compartilhado/download';
+import { baixarArquivo, buscarArquivo, compartilharArquivo, podeCompartilharArquivos } from '../compartilhado/download';
 import { estiloFaixa, FAIXAS, ORDEM_FAIXAS } from '../compartilhado/faixas';
 import { quando } from '../compartilhado/formatos';
 import { MANTER_ROLAGEM } from '../compartilhado/rolagem';
@@ -59,9 +59,9 @@ export class AdminLista {
     url: `${API_ADMIN}/painel`,
     params: semVazios({ campanha: this.campanha(), cargo: this.campanha() ? this.cargo() : null }),
   }));
-  protected readonly lista = httpResource<Pagina<ItemLista>>(() => ({
-    url: `${API_ADMIN}/diagnosticos`,
-    params: semVazios({
+  /** Os filtros da tela como a API entende; a exportação usa os mesmos, sem paginar. */
+  private readonly filtrosApi = computed(() =>
+    semVazios({
       busca: this.busca(),
       // "Inativos" não é uma situação do diagnóstico: são os tirados dos cálculos.
       status: this.status() === 'INATIVO' ? null : this.status(),
@@ -69,9 +69,11 @@ export class AdminLista {
       faixa: this.faixa(),
       campanha: this.campanha(),
       cargo: this.campanha() ? this.cargo() : null,
-      pagina: this.paginaAtual() - 1,
-      tamanho: TAMANHO_PAGINA,
     }),
+  );
+  protected readonly lista = httpResource<Pagina<ItemLista>>(() => ({
+    url: `${API_ADMIN}/diagnosticos`,
+    params: { ...this.filtrosApi(), pagina: this.paginaAtual() - 1, tamanho: TAMANHO_PAGINA },
   }));
   protected readonly dadosPainel = ultimoValor(this.painel);
   protected readonly dadosLista = ultimoValor(this.lista);
@@ -79,6 +81,11 @@ export class AdminLista {
   protected readonly termo = linkedSignal(() => this.busca() ?? '');
   private readonly campoBusca = viewChild<ElementRef<HTMLInputElement>>('campoBusca');
   protected readonly baixando = signal<string | null>(null);
+  protected readonly exportando = signal<'pdf' | 'xlsx' | null>(null);
+  /** No celular o PDF abre a folha de compartilhar (WhatsApp, e-mail); no computador, baixa. */
+  protected readonly compartilhaPdf = podeCompartilharArquivos();
+  /** PDF já gerado, guardado quando o navegador pediu um novo toque para abrir a folha. */
+  private pdfPronto: { url: string; arquivo: File } | null = null;
   protected readonly erro = signal<string | null>(null);
   protected readonly copiado = signal<string | null>(null);
 
@@ -117,6 +124,13 @@ export class AdminLista {
       const quantidade = p?.porFaixa[f.codigo] ?? 0;
       return { ...f, quantidade, percentual: total ? Math.round((quantidade / total) * 100) : 0 };
     });
+  });
+  protected readonly totalLista = computed(() => this.dadosLista()?.total ?? 0);
+  /** "Exportar os 37 diagnósticos": deixa claro que vai a lista toda, não só a página aberta. */
+  protected readonly rotuloExportacao = computed(() => {
+    const total = this.totalLista();
+    if (!total) return 'Exportar a lista';
+    return total === 1 ? 'Exportar o diagnóstico da lista' : `Exportar os ${total.toLocaleString('pt-BR')} diagnósticos`;
   });
   protected readonly intervalo = computed(() => {
     const l = this.dadosLista();
@@ -173,6 +187,32 @@ export class AdminLista {
       this.erro.set(`Não foi possível gerar o PDF de ${item.nome}. Tente de novo.`);
     } finally {
       this.baixando.set(null);
+    }
+  }
+
+  /** Exporta a lista inteira com os filtros da tela (não só a página aberta). */
+  protected async exportar(tipo: 'pdf' | 'xlsx') {
+    if (this.exportando() || !this.dadosLista()?.total) return;
+    const url = `${API_ADMIN}/diagnosticos/exportacao.${tipo}?${new URLSearchParams(
+      Object.entries(this.filtrosApi()).map(([chave, valor]) => [chave, String(valor)]),
+    )}`;
+    const nome = `diagnosticos.${tipo}`;
+    this.exportando.set(tipo);
+    this.erro.set(null);
+    try {
+      if (tipo === 'xlsx' || !this.compartilhaPdf) {
+        await baixarArquivo(url, nome);
+        return;
+      }
+      const arquivo = this.pdfPronto?.url === url ? this.pdfPronto.arquivo : await buscarArquivo(url, nome);
+      const resultado = await compartilharArquivo(arquivo, 'Diagnósticos');
+      this.pdfPronto = resultado === 'precisa-de-toque' ? { url, arquivo } : null;
+      if (resultado === 'precisa-de-toque') this.erro.set('O PDF está pronto. Toque em "PDF" de novo para enviar.');
+    } catch (e) {
+      const motivo = e instanceof Error && !e.message.startsWith('Falha ao baixar') ? e.message : null;
+      this.erro.set(motivo ?? `Não foi possível gerar ${tipo === 'pdf' ? 'o PDF' : 'a planilha'} agora. Tente de novo.`);
+    } finally {
+      this.exportando.set(null);
     }
   }
 

@@ -158,6 +158,9 @@ todo usuário acessa tudo, inclusive a gestão de usuários em `/administrador/u
 |--------|-------------------------------------------------|-------------------------------------------------------------|
 | GET    | `/api/admin/painel?campanha=&cargo=`            | Indicadores, pontos da curva, totais por link e os cargos do link |
 | GET    | `/api/admin/diagnosticos?busca=&status=&faixa=&campanha=&cargo=&inativos=&pagina=&tamanho=` | Lista paginada (mais recentes primeiro); `inativos=true` mostra só os inativados |
+| GET    | `/api/admin/diagnosticos/exportacao.xlsx?busca=&status=&faixa=&campanha=&cargo=&inativos=` | A lista inteira com os filtros da tela, em Excel (resumo com fórmulas, uma coluna por dimensão) |
+| GET    | `/api/admin/diagnosticos/exportacao.pdf?…`      | A mesma lista em PDF (indicadores, curva e uma linha por líder; até 1.000) |
+| GET    | `/api/admin/diagnosticos/exportacao.html?…`     | O PDF em HTML, para ajustar o layout                        |
 | GET    | `/api/admin/diagnosticos/{id}`                  | Detalhe completo: líder, origem, resultado, todas as respostas |
 | GET    | `/api/admin/diagnosticos/{id}/relatorio.pdf`    | PDF do diagnóstico                                          |
 | GET    | `/api/admin/empresas`                           | Empresas com o link e quantos diagnósticos cada uma recebeu |
@@ -326,6 +329,12 @@ O RH manda a lista de líderes numa planilha e cada um recebe por e-mail um link
   servidor (`ParticipacaoService.paginar`, peças de altura fixa em `participacao.html`); o Excel
   (`PlanilhaParticipacao`) traz filtro, datas de verdade e um resumo com fórmulas já calculadas.
   No celular, o painel abre a folha de compartilhar com o PDF.
+- **Exportar a lista de respostas** (PDF e Excel, ao lado dos filtros do painel): leva todos os
+  diagnósticos com os filtros da tela (link, cargo, situação, faixa e busca), não só a página
+  aberta (`ExportacaoDiagnosticos`). Documento interno: tem o nome e o resultado de cada líder,
+  por isso sai com a marca do Diagnóstico do Líder, não a da empresa. O PDF (`diagnosticos.html`)
+  é paginado no servidor como o de participação e vai até 1.000 diagnósticos; acima disso, o Excel
+  (`PlanilhaDiagnosticos`), com datas de verdade, a pontuação de cada dimensão e o resumo com fórmulas.
 - **E-mail:** o disparo usa o mesmo `EmailSender` do diagnóstico. Enquanto `EMAIL_PROVEDOR=log`,
   ele fica desligado no painel ("Envio por e-mail desligado neste servidor"), e nada é marcado
   como enviado.

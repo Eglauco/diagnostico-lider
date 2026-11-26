@@ -343,10 +343,10 @@ public class RelatorioEmpresaService {
 
 	/** Todos os líderes na curva; índices iguais ficam empilhados, como no painel. */
 	/** Um líder na curva da capa: só o índice e a faixa, sem identificação. */
-	record Lider(int indice, String faixa) {
+	public record Lider(int indice, String faixa) {
 	}
 
-	static CurvaGrupo curva(List<Lider> concluidos, int mediaDoGrupo) {
+	public static CurvaGrupo curva(List<Lider> concluidos, int mediaDoGrupo) {
 		var desenho = CurvaCarreira.desenhar(LARGURA_CURVA, ALTURA_CURVA, mediaDoGrupo);
 		int n = concluidos.size();
 		double raio = n <= 25 ? 6.5 : n <= 80 ? 5 : 3.5;

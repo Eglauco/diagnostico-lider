@@ -144,6 +144,26 @@ public class AdminService {
 				resultado.getTotalPages());
 	}
 
+	/**
+	 * A lista filtrada inteira, sem paginar e na mesma ordem da tela (mais recentes primeiro):
+	 * é o que a exportação em PDF e Excel leva.
+	 */
+	List<Diagnostico> filtrados(String busca, StatusDiagnostico status, String faixa, String campanha, String cargo,
+			boolean inativos) {
+		FiltroCargo filtroCargo = vazio(campanha) ? null : FiltroCargo.de(cargo);
+		return diagnosticos.findAll(filtro(busca, status, faixa, campanha, filtroCargo, inativos),
+				Sort.by(Sort.Direction.DESC, "iniciadoEm"));
+	}
+
+	/** O nome do cargo filtrado (ex.: "Gerente" ou "Outro cargo"), para descrever a exportação. */
+	String nomeDoCargo(String campanha, String cargo) {
+		if (vazio(campanha) || vazio(cargo)) {
+			return null;
+		}
+		return cargosDoLink(campanha).stream().filter(c -> c.valor().equals(cargo)).map(CargoFiltro::nome).findFirst()
+			.orElse(null);
+	}
+
 	public Detalhe detalhe(UUID id) {
 		Diagnostico d = diagnosticos.findById(id)
 			.orElseThrow(() -> new NaoEncontradoException("Diagnóstico não encontrado."));

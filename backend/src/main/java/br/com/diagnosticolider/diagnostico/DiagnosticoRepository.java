@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -27,6 +28,11 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 	@Override
 	@EntityGraph(attributePaths = { "campanha", "empresa", "faixa", "cargo" })
 	Page<Diagnostico> findAll(Specification<Diagnostico> filtro, Pageable pagina);
+
+	/** A lista do painel inteira (exportação), com o mesmo carregamento antecipado. */
+	@Override
+	@EntityGraph(attributePaths = { "campanha", "empresa", "faixa", "cargo" })
+	List<Diagnostico> findAll(Specification<Diagnostico> filtro, Sort ordem);
 
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.LinhaResumo(d.status, f.codigo, d.pontuacao)

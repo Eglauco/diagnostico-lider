@@ -276,3 +276,41 @@ tbody tr {
   background: var(--color-linha);
   color: var(--color-abeto-2);
 }
+
+/* Exportar a lista (PDF e Excel), ao lado dos filtros: alvo de 48px no celular, da altura dos chips no computador. */
+.exportar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--color-linha);
+  color: var(--color-abeto);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    box-shadow 180ms,
+    color 180ms;
+}
+.exportar:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1.5px var(--color-abeto-3);
+}
+.exportar:disabled {
+  cursor: not-allowed;
+  color: var(--color-abeto-3);
+}
+.exportar[aria-busy='true'] {
+  cursor: progress;
+  color: var(--color-abeto);
+}
+@media (min-width: 64rem) {
+  .exportar {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 14px;
+  }
+}

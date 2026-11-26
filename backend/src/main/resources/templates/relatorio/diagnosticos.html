@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<title th:text="|${r.titulo} — ${r.escopo}|">Diagnósticos</title>
+<style th:utext="${fontes}"></style>
+<style>
+  /* Páginas A4 de altura fixa: cada peça tem altura fixa e o servidor pagina (ExportacaoDiagnosticos). */
+  @page { size: A4; margin: 0; }
+  :root {
+    --abeto: #0F2B26; --abeto-2: #4A635C; --abeto-3: #7D918B;
+    --nevoa: #EDF2EF; --nevoa-2: #F5F8F6; --linha: #D2DDD8; --brasa: #FF5B37;
+    --travada: #C2364B; --travada-tinta: #A52B40; --travada-suave: #F8E6E9;
+    --plato: #A86A00; --plato-tinta: #855300; --plato-suave: #FBF0DC;
+    --ascensao: #1F8A5B; --ascensao-tinta: #17714A; --ascensao-suave: #E2F2EA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4; color: var(--abeto); background: #fff;
+    font-feature-settings: 'tnum' 1;
+  }
+  .display {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-variation-settings: 'opsz' 96; font-stretch: 84%;
+    letter-spacing: -0.02em; word-spacing: 0.08em;
+  }
+
+  .pagina {
+    width: 210mm; height: 297mm; padding: 14mm 17mm 12mm; overflow: hidden;
+    display: flex; flex-direction: column; break-after: page;
+  }
+  .pagina:last-child { break-after: auto; }
+  .conteudo { flex: 1; min-height: 0; overflow: hidden; }
+
+  .topo { height: 11mm; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--linha); }
+  .marca { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 12.5px; }
+  .marca svg { display: block; }
+  .topo > span { color: var(--abeto-2); font-size: 11.5px; }
+  .rodape {
+    height: 9mm; flex-shrink: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+    border-top: 1px solid var(--linha); font-size: 10.5px; color: var(--abeto-3);
+  }
+
+  /* Abertura, indicadores e curva: só na primeira página (alturas em ExportacaoDiagnosticos) --- */
+  .abertura { height: 48mm; padding-top: 8mm; overflow: hidden; }
+  .rotulo { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2); }
+  .abertura h1 { margin-top: 6px; font-size: 38px; line-height: 1; font-weight: 700; }
+  .abertura .sub { margin-top: 8px; font-size: 14px; color: var(--abeto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 11.5px; }
+  .meta span { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: var(--nevoa-2); border: 1px solid var(--linha); color: var(--abeto-2); }
+
+  .indicadores { height: 24mm; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-content: start; }
+  .indicador { padding-top: 9px; border-top: 3px solid var(--abeto); }
+  .indicador.c-concluidos { border-color: var(--ascensao); }
+  .indicador.c-andamento { border-color: var(--plato); }
+  .indicador strong { display: block; font-size: 32px; line-height: 1; font-weight: 700; }
+  .indicador strong small { font-family: 'Instrument Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--abeto-3); letter-spacing: 0; margin-left: 4px; }
+  .indicador span { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--abeto-2); }
+
+  .curva { height: 74mm; padding-top: 2mm; overflow: hidden; }
+  .curva figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .curva figcaption strong { font-size: 14px; font-weight: 700; }
+  .legenda { display: flex; gap: 14px; font-size: 11.5px; color: var(--abeto-2); }
+  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .legenda i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+  .legenda b { color: var(--abeto); font-weight: 700; }
+  .curva svg { display: block; width: 100%; height: auto; margin-top: 3mm; overflow: visible; }
+  .curva .rot { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--abeto-3); }
+  .curva .pilula { font-size: 11.5px; font-weight: 600; fill: #fff; }
+  .ponto { stroke: #fff; stroke-width: 1.4; }
+  .p-TRAVADA, .f-TRAVADA i { fill: var(--travada); background: var(--travada); }
+  .p-PLATO, .f-PLATO i { fill: var(--plato); background: var(--plato); }
+  .p-ASCENSAO, .f-ASCENSAO i { fill: var(--ascensao); background: var(--ascensao); }
+
+  /* Tabela: cabeçalho (9mm) e linhas (12.5mm) de altura fixa --------------------------- */
+  .cabecalho, .linha { display: grid; grid-template-columns: minmax(0, 1fr) 40mm 33mm; column-gap: 12px; }
+  .cabecalho {
+    height: 9mm; align-items: end; padding-bottom: 6px; border-bottom: 1px solid var(--abeto);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--abeto-2);
+  }
+  .cabecalho span:last-child { text-align: right; }
+  .linha { height: 12.5mm; align-content: center; align-items: center; border-bottom: 1px solid var(--linha); overflow: hidden; }
+  .linha > div { min-width: 0; }
+  .linha .nome { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .linha .nome small { font-size: 12px; font-weight: 500; color: var(--abeto-2); margin-left: 6px; }
+  .linha .contato { margin-top: 1px; font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .resultado { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .selo { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .selo i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .s-TRAVADA { background: var(--travada-suave); color: var(--travada-tinta); }
+  .s-PLATO { background: var(--plato-suave); color: var(--plato-tinta); }
+  .s-ASCENSAO { background: var(--ascensao-suave); color: var(--ascensao-tinta); }
+  .s-andamento { background: var(--nevoa); color: var(--abeto-2); }
+  .indice { font-size: 15px; font-weight: 700; }
+  .indice small { font-size: 10.5px; font-weight: 600; color: var(--abeto-3); }
+  .resultado .respondidas { font-size: 11.5px; color: var(--abeto-2); }
+  .data { text-align: right; font-size: 11.5px; color: var(--abeto-2); white-space: nowrap; }
+  .vazio { padding: 14mm 0; text-align: center; font-size: 14px; color: var(--abeto-2); }
+</style>
+</head>
+<body>
+
+<section class="pagina" th:each="p : ${r.paginas}">
+  <header class="topo">
+    <div class="marca">
+      <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true">
+        <rect width="26" height="26" rx="7" fill="#0F2B26"/>
+        <path d="M5 19 C 9 19, 9 8, 13 8 S 17 8, 21 12" fill="none" stroke="#FF5B37" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      Diagnóstico do Líder
+    </div>
+    <span th:text="|Painel · ${r.escopo}|">Painel · Todos os links</span>
+  </header>
+
+  <div class="conteudo">
+    <th:block th:if="${p.primeira}">
+      <div class="abertura">
+        <p class="rotulo" th:text="|Diagnósticos · ${r.escopo}|">Diagnósticos · Todos os links</p>
+        <h1 class="display" th:text="${r.titulo}">37 diagnósticos</h1>
+        <p class="sub" th:if="${r.filtros != null}" th:text="${r.filtros}">Filtros: faixa Platô · cargo Gerente</p>
+        <div class="meta"><span th:text="${r.exportadoEm}">Exportado em 26 de novembro de 2026, às 9h12</span></div>
+      </div>
+
+      <div class="indicadores">
+        <div class="indicador c-concluidos">
+          <strong class="display"><th:block th:text="${r.resumo.concluidos}">30</th:block><small th:text="|${r.resumo.taxaConclusao}%|">81%</small></strong>
+          <span>Concluídos</span>
+        </div>
+        <div class="indicador c-andamento">
+          <strong class="display" th:text="${r.resumo.emAndamento}">7</strong>
+          <span>Em andamento</span>
+        </div>
+        <div class="indicador">
+          <strong class="display"><th:block th:text="${r.resumo.indiceMedio != null} ? ${r.resumo.indiceMedio} : '—'">62</th:block><small th:if="${r.resumo.indiceMedio != null}">/100</small></strong>
+          <span>Índice médio dos concluídos</span>
+        </div>
+      </div>
+
+      <figure class="curva" th:if="${r.curva != null}" th:with="c=${r.curva.desenho}">
+        <figcaption>
+          <strong>Onde estão os líderes</strong>
+          <span class="legenda">
+            <span th:each="f : ${r.faixas}" th:class="|f-${f.codigo}|"><i></i><th:block th:text="${f.rotulo}">Platô</th:block> <b th:text="${f.quantidade}">12</b> <th:block th:text="|· ${f.percentual}%|">· 40%</th:block></span>
+          </span>
+        </figcaption>
+        <svg th:attr="viewBox=|0 0 ${c.largura} ${c.altura}|" role="img" aria-label="Curva da carreira com a posição de cada líder">
+          <defs>
+            <linearGradient id="brilho" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FF5B37" stop-opacity="0.16"/>
+              <stop offset="1" stop-color="#FF5B37" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1="10" th:attr="x2=${c.largura - 10},y1=${c.base},y2=${c.base}" stroke="#D2DDD8" stroke-width="1"/>
+          <path th:attr="d=${c.area}" fill="url(#brilho)"/>
+          <path th:attr="d=${c.curva}" fill="none" stroke="#FF5B37" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <g th:with="m=${r.curva.media}">
+            <line th:attr="x1=${c.voce.x},x2=${c.voce.x},y1=${m.linhaDe},y2=${m.linhaAte}" stroke="#0F2B26" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.45"/>
+            <rect th:attr="x=${m.x - 70},y=${m.y}" width="140" height="22" rx="11" fill="#0F2B26"/>
+            <text class="pilula" text-anchor="middle" th:attr="x=${m.x},y=${m.y + 15}" th:text="|Média da lista: ${r.resumo.indiceMedio}|">Média da lista: 62</text>
+          </g>
+          <circle th:each="pt : ${r.curva.pontos}" th:class="|ponto p-${pt.faixa}|" th:attr="cx=${pt.x},cy=${pt.y},r=${r.curva.raio}"/>
+          <text class="rot" text-anchor="middle" th:attr="x=${c.subida.x},y=${c.subida.y}" th:text="${c.subida.texto}">Subida</text>
+          <text class="rot" text-anchor="middle" th:attr="x=${c.plato.x},y=${c.plato.y}" th:text="${c.plato.texto}">Platô</text>
+          <text class="rot" text-anchor="middle" th:attr="x=${c.queda.x},y=${c.queda.y}" th:text="${c.queda.texto}">Queda</text>
+        </svg>
+      </figure>
+    </th:block>
+
+    <div class="cabecalho"><span>Líder</span><span>Resultado</span><span th:text="${r.colunaData}">Data</span></div>
+    <div class="linha" th:each="l : ${p.linhas}">
+      <div>
+        <p class="nome"><th:block th:text="${l.nome}">Ana Paula Souza</th:block><small th:if="${l.cargo != null}" th:text="${l.cargo}">Gerente</small></p>
+        <p class="contato" th:text="${l.contato}">ana.souza@empresa.com · (11) 98765-4321</p>
+      </div>
+      <div class="resultado" th:if="${l.concluido}">
+        <span th:class="|selo s-${l.faixa}|"><i></i><th:block th:text="${l.faixaRotulo}">Platô</th:block></span>
+        <span class="indice" th:if="${l.indice != null}"><th:block th:text="${l.indice}">58</th:block><small>/100</small></span>
+      </div>
+      <div class="resultado" th:unless="${l.concluido}">
+        <span class="selo s-andamento">Em andamento</span>
+        <span class="respondidas" th:text="${l.andamento}">12 de 30</span>
+      </div>
+      <p class="data" th:text="${l.data}">Concluiu 03/11/2026</p>
+    </div>
+    <p class="vazio" th:if="${p.primeira and #lists.isEmpty(p.linhas)}">Nenhum diagnóstico com esses filtros.</p>
+  </div>
+
+  <footer class="rodape">
+    <span>Documento interno do painel: traz o nome e o resultado de cada líder.</span>
+    <span th:text="|${p.numero} de ${#lists.size(r.paginas)}|">1 de 2</span>
+  </footer>
+</section>
+
+</body>
+</html>

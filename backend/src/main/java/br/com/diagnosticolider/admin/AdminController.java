@@ -21,6 +21,7 @@ import br.com.diagnosticolider.admin.AdminDtos.Detalhe;
 import br.com.diagnosticolider.admin.AdminDtos.ItemLista;
 import br.com.diagnosticolider.admin.AdminDtos.Pagina;
 import br.com.diagnosticolider.admin.AdminDtos.Painel;
+import br.com.diagnosticolider.admin.ExportacaoDiagnosticos.Filtros;
 import br.com.diagnosticolider.convite.ConviteService;
 import br.com.diagnosticolider.diagnostico.StatusDiagnostico;
 import br.com.diagnosticolider.relatorio.RelatorioDados;
@@ -44,9 +45,15 @@ class AdminController {
 
 	private final ConviteService convites;
 
+	private final ExportacaoDiagnosticos exportacao;
+
+	private static final MediaType XLSX = MediaType
+		.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
 	AdminController(AdminService service, RelatorioDadosService relatorioDados, RelatorioPdfService relatorioPdf,
-			ConviteService convites) {
+			ConviteService convites, ExportacaoDiagnosticos exportacao) {
 		this.convites = convites;
+		this.exportacao = exportacao;
 		this.service = service;
 		this.relatorioDados = relatorioDados;
 		this.relatorioPdf = relatorioPdf;
@@ -64,6 +71,43 @@ class AdminController {
 			@RequestParam(defaultValue = "false") boolean inativos, @RequestParam(defaultValue = "0") int pagina,
 			@RequestParam(defaultValue = "20") int tamanho) {
 		return service.listar(busca, status, faixa, campanha, cargo, inativos, pagina, tamanho);
+	}
+
+	/** A lista filtrada inteira em Excel (os mesmos filtros da tela, sem paginar). */
+	@GetMapping("/diagnosticos/exportacao.xlsx")
+	ResponseEntity<byte[]> exportarExcel(@RequestParam(required = false) String busca,
+			@RequestParam(required = false) StatusDiagnostico status, @RequestParam(required = false) String faixa,
+			@RequestParam(required = false) String campanha, @RequestParam(required = false) String cargo,
+			@RequestParam(defaultValue = "false") boolean inativos) {
+		return arquivo(exportacao.planilha(new Filtros(busca, status, faixa, campanha, cargo, inativos)), XLSX);
+	}
+
+	/** A lista filtrada inteira em PDF. */
+	@GetMapping("/diagnosticos/exportacao.pdf")
+	ResponseEntity<byte[]> exportarPdf(@RequestParam(required = false) String busca,
+			@RequestParam(required = false) StatusDiagnostico status, @RequestParam(required = false) String faixa,
+			@RequestParam(required = false) String campanha, @RequestParam(required = false) String cargo,
+			@RequestParam(defaultValue = "false") boolean inativos) {
+		return arquivo(exportacao.pdf(new Filtros(busca, status, faixa, campanha, cargo, inativos)),
+				MediaType.APPLICATION_PDF);
+	}
+
+	/** O HTML do PDF, para conferir o layout no navegador. */
+	@GetMapping(value = "/diagnosticos/exportacao.html", produces = MediaType.TEXT_HTML_VALUE)
+	String exportarHtml(@RequestParam(required = false) String busca,
+			@RequestParam(required = false) StatusDiagnostico status, @RequestParam(required = false) String faixa,
+			@RequestParam(required = false) String campanha, @RequestParam(required = false) String cargo,
+			@RequestParam(defaultValue = "false") boolean inativos) {
+		return exportacao.html(new Filtros(busca, status, faixa, campanha, cargo, inativos));
+	}
+
+	private static ResponseEntity<byte[]> arquivo(ExportacaoDiagnosticos.Arquivo arquivo, MediaType tipo) {
+		var disposicao = ContentDisposition.attachment().filename(arquivo.nome(), StandardCharsets.UTF_8).build();
+		return ResponseEntity.ok()
+			.contentType(tipo)
+			.header(HttpHeaders.CONTENT_DISPOSITION, disposicao.toString())
+			.cacheControl(CacheControl.noStore())
+			.body(arquivo.conteudo());
 	}
 
 	/** Tira o diagnóstico de todos os cálculos (e inativa o convite dele, se houver). */
