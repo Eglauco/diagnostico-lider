@@ -140,9 +140,10 @@
   }
 
   <!-- Lista -->
-  <section class="mt-12" aria-labelledby="titulo-lista">
+  <!-- Altura mínima de uma tela: com poucos resultados a página não encolhe, e os filtros não saem do lugar. -->
+  <section class="mt-12 min-h-[100dvh]" aria-labelledby="titulo-lista">
     <div class="flex flex-wrap items-end justify-between gap-2">
-      <h2 id="titulo-lista" class="display text-[30px] leading-none font-bold">Respostas</h2>
+      <h2 id="titulo-lista" class="display scroll-mt-28 text-[30px] leading-none font-bold">Respostas</h2>
       @if (intervalo(); as i) {
         <p class="text-[14px] text-abeto-2" aria-live="polite">
           Mostrando {{ i.inicio }}–{{ i.fim }} de {{ i.total }}

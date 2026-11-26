@@ -6,6 +6,7 @@ import { Curva } from '../compartilhado/curva';
 import { baixarArquivo } from '../compartilhado/download';
 import { estiloFaixa, FAIXAS, ORDEM_FAIXAS } from '../compartilhado/faixas';
 import { quando } from '../compartilhado/formatos';
+import { MANTER_ROLAGEM } from '../compartilhado/rolagem';
 import { API_ADMIN, ItemLista, Pagina, Painel } from './admin-modelos';
 import { SeloFaixa, SeloStatus } from './selos';
 
@@ -134,13 +135,23 @@ export class AdminLista {
     });
   }
 
+  /**
+   * Os filtros mudam a URL sem mexer na rolagem: a pessoa continua na lista. Só trocar de página
+   * leva ao começo da lista (o título "Respostas"), e não ao topo da tela.
+   */
   protected filtrar(mudancas: Filtros) {
-    void this.router.navigate([], {
-      relativeTo: this.rota,
-      queryParams: mudancas,
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
+    const trocouDePagina = mudancas.pagina != null;
+    void this.router
+      .navigate([], {
+        relativeTo: this.rota,
+        queryParams: mudancas,
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+        state: MANTER_ROLAGEM,
+      })
+      .then(() => {
+        if (trocouDePagina) document.getElementById('titulo-lista')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
   }
 
   protected limparFiltros() {

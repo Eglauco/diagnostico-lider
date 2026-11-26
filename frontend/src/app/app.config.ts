@@ -17,7 +17,9 @@ export const appConfig: ApplicationConfig = {
     provideRouter(
       routes,
       withComponentInputBinding(),
-      withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
+      // A rolagem fica com cuidarDaRolagem (compartilhado/rolagem.ts): topo em tela nova, posição
+      // de antes no voltar, e nada quando só os filtros da mesma tela mudam.
+      withInMemoryScrolling({ scrollPositionRestoration: 'disabled' }),
     ),
     { provide: LOCALE_ID, useValue: 'pt-BR' },
   ],
