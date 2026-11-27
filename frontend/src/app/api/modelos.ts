@@ -27,6 +27,8 @@ export interface ConvitePublico {
   cargo: string | null;
   campanha: CampanhaPublica;
   diagnosticoId: string | null;
+  /** PLANILHA, MANUAL ou LINK (começou pelo link aberto da empresa). */
+  origem: 'PLANILHA' | 'MANUAL' | 'LINK';
 }
 
 export interface PerfilCampanha {

@@ -207,7 +207,7 @@ public class AdminService {
 				new Detalhe.Lider(r.getNome(), r.getEmail(), r.getWhatsapp(), r.getEmpresaInformada(), d.cargoDescrito(),
 						d.getTempoCargo() == null ? null : d.getTempoCargo().texto()),
 				origem,
-				resultado, respostas, d.getInativadoEm());
+				resultado, respostas, d.getInativadoEm(), d.getSubstituidoPor());
 	}
 
 	private static ItemLista item(Diagnostico d) {

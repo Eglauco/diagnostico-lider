@@ -83,7 +83,14 @@ export type Retomada =
           <button type="button" class="botao-primario w-full" (click)="comecar.emit()">
             Começar diagnóstico <span class="seta" aria-hidden="true">→</span>
           </button>
-          <p class="mt-3 text-center text-[13px] text-abeto-2">Usamos seus dados apenas para gerar e enviar o seu diagnóstico.</p>
+          @if (empresa(); as e) {
+            <!-- Link da empresa: o RH acompanha quem participou (para cobrar quem falta), nunca o resultado. -->
+            <p class="mx-auto mt-3 max-w-sm text-center text-[13px] leading-snug text-abeto-2">
+              Usamos seus dados para gerar e enviar o seu diagnóstico. {{ e.nome }} vê que você participou, nunca o seu resultado nem as suas respostas.
+            </p>
+          } @else {
+            <p class="mt-3 text-center text-[13px] text-abeto-2">Usamos seus dados apenas para gerar e enviar o seu diagnóstico.</p>
+          }
           @if (empresa()) {
             <p class="mt-2 flex justify-center sm:hidden"><app-credito-diagnostico class="inline-flex" /></p>
           }

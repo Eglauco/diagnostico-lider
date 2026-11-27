@@ -66,8 +66,12 @@ public final class EmpresaDtos {
 	public record Encerramento(Instant em, boolean encerrada) {
 	}
 
+	/**
+	 * total: diagnósticos começados. lideres: o cadastro de líderes da avaliação (convidados, que vieram
+	 * da planilha ou do cadastro manual, e quem começou pelo link aberto), com quem ainda não começou.
+	 */
 	public record Indicadores(long total, long concluidos, long emAndamento, Integer indiceMedio,
-			Map<String, Long> porFaixa) {
+			Map<String, Long> porFaixa, int lideres, int convidados, int peloLink) {
 	}
 
 	/** Resposta da verificação do endereço enquanto o administrador digita. */

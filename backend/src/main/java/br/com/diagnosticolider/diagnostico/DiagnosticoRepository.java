@@ -104,6 +104,22 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 
 	long countByEmpresaIdAndStatusAndInativadoEmIsNull(Long empresa, StatusDiagnostico status);
 
+	/** As respostas de uma pessoa (pelo e-mail) nos links de uma empresa, a mais antiga primeiro. */
+	@Query("select d from Diagnostico d where d.empresa.id = :empresaId and lower(d.respondente.email) = lower(:email) order by d.iniciadoEm, d.id")
+	List<Diagnostico> daEmpresaPorEmail(Long empresaId, String email);
+
+	/** Os concluídos ativos de uma empresa, só o id: a base da foto do resultado. */
+	@Query("""
+			select d.id from Diagnostico d
+			where d.empresa.id = :empresa and d.inativadoEm is null
+			  and d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO
+			""")
+	List<UUID> concluidosAtivos(Long empresa);
+
+	/** Os diagnósticos de uma foto do resultado; respostas e dimensões vêm em lote, pelo batch fetch. */
+	@EntityGraph(attributePaths = { "faixa", "versao", "cargo" })
+	List<Diagnostico> findByIdIn(java.util.Collection<UUID> ids);
+
 	long countByEmpresaIdAndInativadoEmIsNull(Long empresa);
 
 	@Query("""

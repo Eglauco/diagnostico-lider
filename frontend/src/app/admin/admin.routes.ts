@@ -42,7 +42,7 @@ export const ROTAS_ADMIN: Routes = [
       },
       {
         path: 'empresas/:id/convites',
-        title: 'Convites · Administrador',
+        title: 'Líderes · Administrador',
         loadComponent: () => import('./convites/admin-convites').then((m) => m.AdminConvites),
       },
       {

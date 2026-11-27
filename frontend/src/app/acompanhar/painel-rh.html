@@ -1,0 +1,117 @@
+@if (erro(); as e) {
+  @if (e.status !== 401) {
+    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 text-center">
+      <p class="display text-[30px] leading-tight font-bold">{{ e.status === 404 ? 'Você não acompanha esta empresa' : 'Não deu para abrir agora' }}</p>
+      <p class="mt-3 text-[17px] text-abeto-2" role="alert">
+        {{ e.status === 404 ? 'O seu e-mail não está na lista de gestores dela. Fale com quem administra o Diagnóstico do Líder.' : e.detail }}
+      </p>
+      <div class="mt-8 flex flex-col gap-2">
+        @if (e.status !== 404) {
+          <button type="button" class="botao-primario" (click)="atualizarAgora()">Tentar de novo</button>
+        }
+        <a routerLink="/acompanhar" class="botao-secundario">Voltar ao início</a>
+      </div>
+    </div>
+  }
+} @else if (painel.value(); as p) {
+  <div class="mx-auto flex min-h-dvh w-full max-w-3xl flex-col">
+    <!-- Cabeçalho: a marca da empresa e a conta. No computador, as abas ficam aqui. -->
+    <header class="sticky top-0 z-30 bg-nevoa/90 px-5 pt-[max(12px,env(safe-area-inset-top))] pb-3 backdrop-blur-md sm:px-8">
+      <div class="flex min-h-12 items-center justify-between gap-3">
+        <app-marca-empresa class="min-w-0" [empresa]="p.empresa" />
+        <div class="relative" data-menu-conta>
+          <button
+            type="button"
+            class="grid size-12 place-items-center rounded-full"
+            [attr.aria-expanded]="menuAberto()"
+            aria-haspopup="true"
+            aria-controls="menu-conta"
+            [attr.aria-label]="'Sua conta: ' + (sessao.gestor()?.email ?? '')"
+            (click)="menuAberto.set(!menuAberto())"
+          >
+            <span class="grid size-9 place-items-center rounded-full bg-white text-[15px] font-bold text-abeto ring-1 ring-linha">{{ inicial() }}</span>
+          </button>
+          @if (menuAberto()) {
+            <div id="menu-conta" class="aparecer absolute right-0 z-40 mt-1 w-[min(300px,calc(100vw-32px))] overflow-hidden rounded-[20px] bg-white shadow-[0_24px_48px_-24px_rgb(15_43_38/0.45)] ring-1 ring-linha">
+              <p class="border-b border-linha px-5 py-4 text-[14px] text-abeto-2">
+                Entrou como<br /><strong class="font-semibold break-all text-abeto">{{ sessao.gestor()?.email }}</strong>
+              </p>
+              @if (outrasEmpresas()) {
+                <a routerLink="/acompanhar" class="flex min-h-13 items-center px-5 text-[16px] font-semibold hover:bg-nevoa-2" (click)="menuAberto.set(false)">Trocar de empresa</a>
+              }
+              <button type="button" class="flex min-h-13 w-full items-center px-5 text-left text-[16px] font-semibold text-travada hover:bg-nevoa-2" (click)="sair()">Sair deste aparelho</button>
+            </div>
+          }
+        </div>
+      </div>
+
+      <nav class="mt-3 hidden lg:block" aria-label="Seções">
+        <div class="inline-flex rounded-full bg-white p-1 ring-1 ring-linha" role="tablist">
+          <button type="button" role="tab" class="aba-topo" [attr.aria-selected]="abaAtual() === 'participacao'" (click)="trocarAba('participacao')">Participação</button>
+          <button type="button" role="tab" class="aba-topo" [attr.aria-selected]="abaAtual() === 'resultado'" (click)="trocarAba('resultado')">Resultado do grupo</button>
+        </div>
+      </nav>
+    </header>
+
+    <main class="flex-1 px-5 pb-10 sm:px-8" [attr.aria-busy]="atualizando()">
+      @if (abaAtual() === 'participacao') {
+        <app-participacao-rh
+          [painel]="p"
+          [empresaId]="empresaId()"
+          [agora]="agora()"
+          [atualizado]="atualizadoTexto()"
+          [atualizando]="atualizando()"
+          (atualizar)="atualizarAgora()"
+          (verResultado)="trocarAba('resultado')"
+        />
+      } @else {
+        <app-resultado-rh
+          [resultado]="resultado.value()"
+          [carregando]="resultado.isLoading() && !resultado.hasValue()"
+          [erro]="resultado.error() ? 'Não deu para carregar o resultado agora. Tente de novo em instantes.' : null"
+          [empresaId]="empresaId()"
+          [empresa]="p.empresa.nome"
+          [encerraEm]="p.encerraEm"
+          [agora]="agora()"
+        />
+      }
+
+      <footer class="mt-14 flex flex-col items-center gap-3 text-center">
+        @if (p.empresa.personalizada) {
+          <app-credito-diagnostico class="inline-flex" />
+        }
+        <p class="max-w-sm text-[13px] leading-snug text-abeto-2">
+          Só números do grupo: o resultado e as respostas de cada líder ficam com ele.
+        </p>
+      </footer>
+    </main>
+
+    <!-- Abas no polegar (celular). -->
+    <nav class="abas-rodape sticky bottom-0 z-30 lg:hidden" aria-label="Seções">
+      <div class="grid grid-cols-2" role="tablist">
+        <button type="button" role="tab" class="aba-rodape" [attr.aria-selected]="abaAtual() === 'participacao'" (click)="trocarAba('participacao')">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" stroke-linecap="round" />
+            <path d="M15.5 11.5l1.8 1.8 3.4-3.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Participação
+        </button>
+        <button type="button" role="tab" class="aba-rodape" [attr.aria-selected]="abaAtual() === 'resultado'" (click)="trocarAba('resultado')">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 18c3 0 4-9 8-9s5 4 10 1" stroke-linecap="round" />
+            <circle cx="8" cy="12.5" r="1.4" fill="currentColor" /><circle cx="12.5" cy="9.2" r="1.4" fill="currentColor" /><circle cx="16.5" cy="10.8" r="1.4" fill="currentColor" />
+          </svg>
+          Resultado do grupo
+          @if (resultado.value()?.estado === 'AGUARDANDO') {
+            <span class="sr-only">(ainda fechado)</span>
+          }
+        </button>
+      </div>
+    </nav>
+  </div>
+} @else {
+  <div class="grid min-h-dvh place-items-center" aria-busy="true">
+    <span class="size-8 animate-spin rounded-full border-[3px] border-linha border-t-abeto" aria-hidden="true"></span>
+    <span class="sr-only">Carregando o acompanhamento…</span>
+  </div>
+}

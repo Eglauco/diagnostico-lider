@@ -44,7 +44,6 @@ import br.com.diagnosticolider.notificacao.EmailEnviado;
 import br.com.diagnosticolider.notificacao.EmailEnviadoRepository;
 import br.com.diagnosticolider.notificacao.EmailSender;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados;
-import br.com.diagnosticolider.relatorio.RelatorioEmpresaService;
 import br.com.diagnosticolider.relatorio.RelatorioPdfService;
 
 /**
@@ -71,7 +70,7 @@ public class AcompanhamentoService {
 
 	private final ParticipacaoService participacao;
 
-	private final RelatorioEmpresaService relatorios;
+	private final ResultadoDaEmpresa resultados;
 
 	private final RelatorioPdfService pdf;
 
@@ -98,7 +97,7 @@ public class AcompanhamentoService {
 	private final String urlPublica;
 
 	AcompanhamentoService(EmpresaRepository empresas, ParticipacaoService participacao,
-			RelatorioEmpresaService relatorios, RelatorioPdfService pdf, LembreteService lembretes,
+			ResultadoDaEmpresa resultados, RelatorioPdfService pdf, LembreteService lembretes,
 			DiagnosticoRepository diagnosticos, EnvioAcompanhamentoRepository envios, EmailSender email, Correio correio,
 			EmailEnviadoRepository emailsEnviados, QuemEsta quemEsta, ITemplateEngine templates,
 			TransactionTemplate transacao, Clock clock, AppProperties propriedades) {
@@ -107,7 +106,7 @@ public class AcompanhamentoService {
 		this.quemEsta = quemEsta;
 		this.empresas = empresas;
 		this.participacao = participacao;
-		this.relatorios = relatorios;
+		this.resultados = resultados;
 		this.pdf = pdf;
 		this.lembretes = lembretes;
 		this.diagnosticos = diagnosticos;
@@ -292,7 +291,7 @@ public class AcompanhamentoService {
 		String aviso = null;
 		if (fim) {
 			try {
-				RelatorioEmpresaDados dados = consolidado(empresaId, r, marca.encerrada());
+				RelatorioEmpresaDados dados = resultados.relatorio(empresaId);
 				consolidado = new GestorEmail.Consolidado(dados.indice().media(),
 						dados.faixaDaMedia() == null ? null : dados.faixaDaMedia().titulo(), corDaFaixa(dados.faixaDaMedia()),
 						dados.lideres());
@@ -339,14 +338,9 @@ public class AcompanhamentoService {
 
 		var modelo = new GestorEmail(marca.nome(), MarcaEmpresa.siglaDe(marca.nome()), marca.logo(), marca.tema(), fim,
 				t.rotulo(), t.titulo(), t.subtitulo(), t.novidade(), t.prazo(), r.total() > 0 ? placar : List.of(),
-				pendentes, outros, fim ? List.of() : r.devolvidos(), consolidado, aviso, nomesAnexos, rodape);
+				pendentes, outros, fim ? List.of() : r.devolvidos(), consolidado, aviso, nomesAnexos, rodape,
+				urlPublica + "/acompanhar");
 		return new Montado(t.assunto(), modelo, anexos, r.responderam(), r.total());
-	}
-
-	/** O consolidado, com "todos responderam" no lugar de "resultado parcial" quando for o caso. */
-	private RelatorioEmpresaDados consolidado(Long empresaId, ResumoParticipacao r, boolean encerrada) {
-		return r.todosResponderam() && !encerrada ? relatorios.montarComTodosRespondidos(empresaId, r.total())
-				: relatorios.montar(empresaId);
 	}
 
 	private static String corDaFaixa(RelatorioEmpresaDados.FaixaResumo faixa) {

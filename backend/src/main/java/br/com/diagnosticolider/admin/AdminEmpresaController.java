@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import br.com.diagnosticolider.acompanhamento.ResultadoDaEmpresa;
 import br.com.diagnosticolider.admin.EmpresaDtos.Disponibilidade;
 import br.com.diagnosticolider.admin.EmpresaDtos.EditarEmpresa;
 import br.com.diagnosticolider.admin.EmpresaDtos.EmpresaDetalhe;
@@ -32,7 +33,6 @@ import br.com.diagnosticolider.admin.EmpresaDtos.NovaEmpresa;
 import br.com.diagnosticolider.admin.EmpresaDtos.PreviaTema;
 import br.com.diagnosticolider.empresa.LogomarcaService;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados;
-import br.com.diagnosticolider.relatorio.RelatorioEmpresaService;
 import br.com.diagnosticolider.relatorio.RelatorioPdfService;
 
 /** Empresas e os seus links. Exige usuário logado, como todo /api/admin. */
@@ -42,16 +42,16 @@ class AdminEmpresaController {
 
 	private final AdminEmpresaService service;
 
-	private final RelatorioEmpresaService relatorios;
+	private final ResultadoDaEmpresa resultados;
 
 	private final RelatorioPdfService pdf;
 
 	private final LogomarcaService logomarcas;
 
-	AdminEmpresaController(AdminEmpresaService service, RelatorioEmpresaService relatorios, RelatorioPdfService pdf,
+	AdminEmpresaController(AdminEmpresaService service, ResultadoDaEmpresa resultados, RelatorioPdfService pdf,
 			LogomarcaService logomarcas) {
 		this.service = service;
-		this.relatorios = relatorios;
+		this.resultados = resultados;
 		this.pdf = pdf;
 		this.logomarcas = logomarcas;
 	}
@@ -103,10 +103,13 @@ class AdminEmpresaController {
 		return service.previa(primaria, secundaria);
 	}
 
-	/** Relatório consolidado em PDF, sem nomes; com ?visualizar=true abre no navegador. */
+	/**
+	 * Relatório consolidado em PDF, sem nomes; com ?visualizar=true abre no navegador. É o mesmo
+	 * resultado que o RH vê (a última foto: muda a cada 3 respostas novas).
+	 */
 	@GetMapping("/{id}/relatorio.pdf")
 	ResponseEntity<byte[]> relatorio(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean visualizar) {
-		RelatorioEmpresaDados dados = relatorios.montar(id);
+		RelatorioEmpresaDados dados = resultados.relatorio(id);
 		var disposicao = (visualizar ? ContentDisposition.inline() : ContentDisposition.attachment())
 			.filename(dados.nomeArquivo(), StandardCharsets.UTF_8)
 			.build();
@@ -120,7 +123,7 @@ class AdminEmpresaController {
 	/** O mesmo relatório em HTML, para ajustar o layout no navegador. */
 	@GetMapping(value = "/{id}/relatorio.html", produces = MediaType.TEXT_HTML_VALUE)
 	String relatorioHtml(@PathVariable Long id) {
-		return pdf.html(relatorios.montar(id));
+		return pdf.html(resultados.relatorio(id));
 	}
 
 }

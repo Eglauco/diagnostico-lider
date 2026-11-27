@@ -26,12 +26,15 @@ backend/   Spring Boot (pacote por funcionalidade)
   relatorio/     PDF (template Thymeleaf + Chromium) e a geometria da curva
   notificacao/   envio do PDF por e-mail após a conclusão (assíncrono)
   acompanhamento/ relatórios automáticos ao gestor e lembretes aos líderes (agendador de 5 em 5 min)
+                 e o resultado da empresa em "fotos" anônimas (ResultadoDaEmpresa, RegraDaFoto)
+  rh/            página do RH: entrada por código no e-mail, sem senha, e a API de /acompanhar
   empresa/       empresa, paleta de cores, logomarca e cargos
   arquivos/      onde ficam os arquivos: bucket S3 ou disco local
   db/migration/  Flyway (V2 traz o questionário de exemplo)
 frontend/  Angular
   diagnostico/   questionário: uma etapa por tela, progresso salvo no aparelho
   resultado/     resultado com a curva, dimensões, próximos passos e download do PDF
+  acompanhar/    página do RH: participação ao vivo e resultado do grupo (marca da empresa)
 Dockerfile Build único para o Railway
 ```
 
@@ -190,6 +193,9 @@ todo usuário acessa tudo, inclusive a gestão de usuários em `/administrador/u
 | POST   | `/api/admin/empresas/{id}/acompanhamento/enviar`      | "Enviar agora" (o do dia, ou o final). 409 sem gestor/e-mail |
 | PUT    | `/api/admin/empresas/{id}/acompanhamento/pausa`       | Pausa ou retoma o diário (`{ pausado }`)                 |
 | GET    | `/api/admin/empresas/{id}/acompanhamento/email-previa`| O e-mail que sairia agora, em HTML                       |
+| GET    | `/api/admin/empresas/{id}/acesso-rh`                  | Cada gestor: último acesso à página do RH e acesso mandado |
+| POST   | `/api/admin/empresas/{id}/acesso-rh/convite`          | "Mandar acesso" (`{ email }`): botão que entra direto, 7 dias, uma vez |
+| GET    | `/api/admin/empresas/{id}/acesso-rh/convite-previa`   | Esse e-mail em HTML                                      |
 
 ### Cores da marca por empresa
 
@@ -279,6 +285,9 @@ um ponto, sem identificação), distribuição por faixa, índice médio, median
 com a média geral, participação, cada dimensão (média, amplitude, % em alerta e % forte), cada
 pergunta (quantos escolheram cada alternativa) e o que a empresa pode fazer por faixa.
 
+- **Resultado em fotos:** o que a empresa recebe (este PDF, o e-mail final e a página do RH) sai da última
+  foto do resultado, que só muda com 3 respostas novas (ver "Acesso do RH"). Enquanto a avaliação está
+  aberta, o relatório sai sem a análise por cargo e por pergunta.
 - **Anonimato:** só é gerado com pelo menos 3 diagnósticos concluídos
   (`RelatorioEmpresaService.MINIMO_LIDERES`). Abaixo disso, o painel mostra quantos faltam.
 - **Textos para a empresa** ficam no banco, junto da versão do questionário (V4): `leitura_empresa`
@@ -294,10 +303,29 @@ respostas (`CampanhaService.exigirAberta`, erro 409 com `encerrada: true`), os c
 param de sair e o relatório consolidado passa a dizer "resultado final" (antes: "resultado parcial").
 Quem já concluiu continua vendo o próprio resultado. Sem data, a avaliação fica aberta.
 
-### Convites nominais
+### Convites nominais e o cadastro de líderes
 
 O RH manda a lista de líderes numa planilha e cada um recebe por e-mail um link pessoal
 (`/i/{token}`, 10 caracteres aleatórios), já com os dados preenchidos.
+
+**Todo líder da avaliação é um cadastro** (tabela `convite`, tela "Líderes da avaliação"), com a
+origem (`OrigemLider`): Planilha, Cadastro manual ou Link da empresa. Assim o painel, a página do RH
+e o relatório de participação contam as mesmas pessoas.
+
+- **Link aberto da empresa:** quem começa por `/c/{codigo}` entra no cadastro na hora (evento
+  `DiagnosticoIniciadoPeloLink`), com um link pessoal para continuar de onde parou. Se o e-mail já é de
+  um líder da empresa (o convidado que respondeu pelo link aberto), a resposta entra no cadastro dele,
+  em vez de ele seguir como "não abriu". Os diagnósticos de antes desta regra entram na subida do app
+  (`LideresDoLink`). O link da empresa avisa o líder: "a empresa vê que você participou, nunca o seu
+  resultado nem as suas respostas".
+- **Respondeu de novo:** vale uma resposta por líder. A concluída vence a que ficou pela metade, e
+  entre duas concluídas vale a mais recente; a outra sai dos cálculos (`diagnostico.substituido_por`,
+  com aviso no detalhe do diagnóstico). Quem já tinha concluído e começa de novo só troca de resposta
+  ao terminar. Regra em `ConviteService.entrarNoCadastro` (com testes).
+- **No painel:** o funil (enviados, abriram, começaram, concluíram) é dos convidados; quem veio pelo
+  link aparece à parte, com filtro por origem e a etiqueta "pelo link". A página da empresa mostra
+  líderes, convidados e pelo link. Os lembretes automáticos também vão para quem começou pelo link e
+  não terminou. O Excel de participação ganhou a coluna "Origem".
 
 - **Planilha:** o painel gera o modelo com os cargos da empresa numa lista suspensa
   (`PlanilhaConvites`, Apache POI). Na importação, as colunas são achadas pelo cabeçalho (aceita
@@ -363,6 +391,46 @@ A empresa tem uma lista de gestores (nenhum, um ou vários; cadastro e edição)
   prazo mudar.
 - Nada sai depois das 20h, e um envio ao gestor que falha é tentado até 3 vezes no dia.
   O histórico (`envio_acompanhamento`) mostra o que saiu, quando e para quem.
+
+### Acesso do RH (página de acompanhamento)
+
+Os gestores da empresa (a mesma lista que recebe os relatórios) acompanham a avaliação em
+`/acompanhar`, no celular ou no computador, com a marca da empresa. Só leitura.
+
+- **Entrada sem senha:** a pessoa digita o e-mail e recebe um código de 6 números (vale 10 minutos,
+  5 tentativas, uma vez) com um botão "Entrar" no mesmo e-mail. A tela responde igual para quem não é
+  gestor, sem mandar nada: não revela quem acompanha uma empresa. O aparelho fica lembrado por 30 dias
+  desde o último uso (cookie `ACESSO_RH` HttpOnly, só para `/api/acompanhar`; o hash do token fica no
+  banco, então publicar uma versão nova não desloga ninguém). Tirar o e-mail da lista de gestores tira o
+  acesso na hora. Pedir código tem limite (3 por e-mail e 10 por IP a cada 15 min), porque gasta e-mail.
+- **No painel**, o cartão "Relatórios para o gestor" mostra cada gestor com o último acesso e o
+  "Mandar acesso" (botão que entra direto, vale 7 dias, uma vez). O token do botão vai depois do `#`
+  (`/acompanhar/entrar#…`): não passa pelo servidor nem por quem pré-visualiza links. O e-mail diário
+  e o final ao gestor trazem o botão "Acompanhar ao vivo".
+- **Participação ao vivo** (atualiza a cada minuto com a tela aberta): o placar, quem falta em grupos
+  (começou, abriu, não abriu) com o WhatsApp do líder já com a mensagem e o link pessoal, copiar o link,
+  quem já respondeu (só o nome) e o relatório de participação em PDF e Excel.
+- **Resultado do grupo, anônimo:** o RH vê quem acabou de responder, então se a média mudasse a cada
+  resposta uma conta mostraria o índice dessa pessoa (antes 10 com média 50, depois 11 com 52: quem
+  entrou tem 72). Por isso o resultado é uma foto (`resultado_foto`, regra em `RegraDaFoto`, com testes):
+  abre com 3 concluídos e só muda quando chegam pelo menos 3 respostas novas. No fim da avaliação, se só
+  1 ou 2 responderam depois da última foto, eles ficam de fora do resultado final, com aviso. A média
+  geral de referência fica congelada na foto. Cargos e perguntas só aparecem no resultado final (um cargo
+  pode ganhar uma pessoa só entre duas fotos). Os pontos da curva vão em ordem de índice, nunca na
+  ordem de chegada. Limite que continua valendo: se as 3 respostas novas caem todas na mesma faixa, quem
+  sabe quem foram as 3 sabe a faixa delas.
+
+| Método | Caminho                                          | O que faz                                               |
+|--------|--------------------------------------------------|---------------------------------------------------------|
+| GET    | `/api/acompanhar/sessao`                         | Quem está neste aparelho (`{ gestor }`) e o cookie CSRF  |
+| POST   | `/api/acompanhar/codigo`                         | Manda o código (`{ email }`); 204 sempre                 |
+| POST   | `/api/acompanhar/entrar`                         | `{ email, codigo }` ou `{ link }` (o botão do e-mail)    |
+| POST   | `/api/acompanhar/sair`                           | Esquece este aparelho                                   |
+| GET    | `/api/acompanhar/empresas/{id}`                  | Marca, prazo e participação ao vivo                     |
+| POST   | `/api/acompanhar/empresas/{id}/visita`           | A página abriu (último acesso no painel)                |
+| GET    | `/api/acompanhar/empresas/{id}/resultado`        | A foto do resultado (AGUARDANDO, PARCIAL ou FINAL)      |
+| GET    | `/api/acompanhar/empresas/{id}/resultado.pdf`    | O consolidado da foto em PDF                            |
+| GET    | `/api/acompanhar/empresas/{id}/participacao.pdf` | Participação em PDF (também `.xlsx`)                    |
 
 ### Auditoria (linha do tempo do líder)
 

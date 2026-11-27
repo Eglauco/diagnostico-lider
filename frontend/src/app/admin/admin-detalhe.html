@@ -87,7 +87,15 @@
     </header>
 
     <!-- Inativar: tira o diagnóstico de todos os cálculos (painel, relatório da empresa, média geral). -->
-    @if (d.inativadoEm) {
+    @if (d.substituidoPor) {
+      <div class="aparecer mt-6 flex flex-col gap-3 rounded-2xl bg-nevoa-2 px-4 py-3.5 ring-1 ring-linha sm:flex-row sm:items-center sm:justify-between" role="status">
+        <p class="text-[15px] text-abeto-2">
+          <strong class="font-semibold text-abeto">{{ primeiroNome() }} respondeu de novo{{ d.inativadoEm ? ' (' + quando(d.inativadoEm).toLowerCase() + ')' : '' }}.</strong>
+          Vale a resposta mais recente: esta fica guardada, mas fora de todos os cálculos.
+        </p>
+        <a class="botao-secundario shrink-0" [routerLink]="['/administrador/diagnosticos', d.substituidoPor]">Ver a resposta que vale</a>
+      </div>
+    } @else if (d.inativadoEm) {
       <div class="aparecer mt-6 flex flex-col gap-3 rounded-2xl bg-nevoa-2 px-4 py-3.5 ring-1 ring-linha sm:flex-row sm:items-center sm:justify-between" role="status">
         <p class="text-[15px] text-abeto-2">
           <strong class="font-semibold text-abeto">Inativo desde {{ quando(d.inativadoEm).toLowerCase() }}.</strong>

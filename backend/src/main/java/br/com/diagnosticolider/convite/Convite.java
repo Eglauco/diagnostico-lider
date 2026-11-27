@@ -7,6 +7,8 @@ import br.com.diagnosticolider.diagnostico.Diagnostico;
 import br.com.diagnosticolider.empresa.Cargo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -17,8 +19,10 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 /**
- * Convite nominal: o link pessoal de um líder (/i/{token}), com os dados que vieram da planilha
- * do RH. O diagnóstico nasce dele quando o líder confirma (ou corrige) os dados.
+ * Um líder da avaliação da empresa, com o link pessoal dele (/i/{token}). Vem da planilha do RH,
+ * do cadastro manual no painel ou do link aberto da empresa (quem começou sozinho vira cadastro
+ * na hora, ver {@link OrigemLider}). No convite, o diagnóstico nasce quando o líder confirma (ou
+ * corrige) os dados.
  */
 @Entity
 @Table(name = "convite")
@@ -40,6 +44,10 @@ public class Convite {
 
 	@Column(nullable = false)
 	private String email;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private OrigemLider origem;
 
 	private String whatsapp;
 
@@ -79,9 +87,10 @@ public class Convite {
 	protected Convite() {
 	}
 
-	Convite(Campanha campanha, String token, Dados dados, Instant agora) {
+	Convite(Campanha campanha, String token, Dados dados, OrigemLider origem, Instant agora) {
 		this.campanha = campanha;
 		this.token = token;
+		this.origem = origem;
 		this.criadoEm = agora;
 		atualizar(dados);
 	}
@@ -206,6 +215,10 @@ public class Convite {
 
 	public int getAcessos() {
 		return acessos;
+	}
+
+	public OrigemLider getOrigem() {
+		return origem;
 	}
 
 	public Diagnostico getDiagnostico() {

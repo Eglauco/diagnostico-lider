@@ -109,7 +109,7 @@ public class RelatorioEmpresaService {
 	 * Com data de encerramento, o relatório diz se é o resultado final (a avaliação encerrou) ou
 	 * parcial (ainda aberta, os números podem mudar). Sem data, não diz nada.
 	 */
-	private RelatorioEmpresaDados.Situacao situacao(Empresa empresa) {
+	public RelatorioEmpresaDados.Situacao situacao(Empresa empresa) {
 		if (empresa.getEncerraEm() == null) {
 			return null;
 		}
@@ -121,24 +121,42 @@ public class RelatorioEmpresaService {
 						"A avaliação vai até " + data + ": este é um resultado parcial, e os números ainda podem mudar.");
 	}
 
-	public RelatorioEmpresaDados montar(Long empresaId) {
-		return montar(empresaId, null);
-	}
-
 	/**
 	 * Todos os líderes convidados responderam antes do prazo: o resultado não vai mudar por falta
 	 * de resposta, então o relatório diz isso em vez de "resultado parcial".
 	 */
-	public RelatorioEmpresaDados montarComTodosRespondidos(Long empresaId, int convidados) {
-		return montar(empresaId, new RelatorioEmpresaDados.Situacao("todos responderam",
+	public static RelatorioEmpresaDados.Situacao todosResponderam(int convidados) {
+		return new RelatorioEmpresaDados.Situacao("todos responderam",
 				(convidados == 1 ? "O líder convidado respondeu" : "Todos os %d líderes convidados responderam".formatted(convidados))
-						+ " antes do prazo: a participação está completa."));
+						+ " antes do prazo: a participação está completa.");
 	}
 
-	private RelatorioEmpresaDados montar(Long empresaId, RelatorioEmpresaDados.Situacao situacao) {
+	/** Média de todos os líderes (e de cada dimensão) num momento: a foto do resultado congela isso. */
+	public record ReferenciaGeral(Double media, int lideres, Map<String, Double> dimensoes) {
+	}
+
+	public ReferenciaGeral referenciaAgora() {
+		MediaGeral geral = diagnosticos.mediaGeral();
+		Map<String, Double> dimensoes = diagnosticos.mediaGeralPorDimensao()
+			.stream()
+			.filter(m -> m.media() != null)
+			.collect(Collectors.toMap(MediaDimensao::codigo, MediaDimensao::media));
+		return new ReferenciaGeral(geral.media(), (int) geral.lideres(), dimensoes);
+	}
+
+	/**
+	 * Monta o relatório com os diagnósticos de uma foto do resultado da empresa (quem chama decide
+	 * quais entram: ver acompanhamento.RegraDaFoto).
+	 *
+	 * @param geral    a média geral de referência congelada na foto (null: sem comparação)
+	 * @param completo com a análise por cargo e por pergunta (só no resultado final)
+	 * @param situacao null: a do prazo da empresa (parcial ou final)
+	 * @param nota     o que o relatório explica sobre o anonimato (null: nada a dizer)
+	 */
+	public RelatorioEmpresaDados montar(Long empresaId, List<Diagnostico> concluidos, ReferenciaGeral geral,
+			boolean completo, RelatorioEmpresaDados.Situacao situacao, String nota) {
 		Empresa empresa = empresas.findById(empresaId)
 			.orElseThrow(() -> new NaoEncontradoException("Empresa não encontrada."));
-		List<Diagnostico> concluidos = diagnosticos.findByEmpresaIdAndStatusAndInativadoEmIsNull(empresaId, StatusDiagnostico.CONCLUIDO);
 		int n = concluidos.size();
 		if (n < MINIMO_LIDERES) {
 			throw RegraNegocioException.conflito(("O relatório consolidado precisa de pelo menos %d diagnósticos "
@@ -172,27 +190,28 @@ public class RelatorioEmpresaService {
 		var limites = new Limites(faixasDaVersao.size() > 1 ? faixasDaVersao.get(1).getPontuacaoMinima() : 40,
 				faixasDaVersao.getLast().getPontuacaoMinima());
 
-		MediaGeral geral = diagnosticos.mediaGeral();
-		Referencia referencia = geral.lideres() > n && geral.media() != null ? referencia(indice.media(), geral) : null;
-		Map<String, Double> geralPorDimensao = referencia == null ? Map.of()
-				: diagnosticos.mediaGeralPorDimensao()
-					.stream()
-					.filter(m -> m.media() != null)
-					.collect(Collectors.toMap(MediaDimensao::codigo, MediaDimensao::media));
+		Referencia referencia = geral != null && geral.media() != null && geral.lideres() > n
+				? referencia(indice.media(), geral.media(), geral.lideres()) : null;
+		Map<String, Double> geralPorDimensao = referencia == null ? Map.of() : geral.dimensoes();
 
 		List<DimensaoResumo> dimensoes = dimensoes(versao, concluidos, limites, geralPorDimensao);
 		DimensaoResumo maisFragil = dimensoes.stream().filter(d -> "fragil".equals(d.destaque())).findFirst().orElse(null);
 		DimensaoResumo maisForte = dimensoes.stream().filter(d -> "forte".equals(d.destaque())).findFirst().orElse(null);
 
-		int iniciaram = (int) diagnosticos.countByEmpresaIdAndInativadoEmIsNull(empresaId);
-		var participacao = new Participacao(iniciaram, n, iniciaram - n, Math.round(100f * n / iniciaram),
+		// Conta pela foto, para o relatório fechar com ele mesmo: quem concluiu e ainda não entrou no
+		// resultado não aparece como concluído; quem está no meio, aparece.
+		int emAndamento = Math.max(0, (int) (diagnosticos.countByEmpresaIdAndInativadoEmIsNull(empresaId)
+				- diagnosticos.countByEmpresaIdAndStatusAndInativadoEmIsNull(empresaId, StatusDiagnostico.CONCLUIDO)));
+		int iniciaram = n + emAndamento;
+		var participacao = new Participacao(iniciaram, n, emAndamento, Math.round(100f * n / iniciaram),
 				tempoMediano(concluidos));
 
-		PorCargo porCargo = AnaliseCargos.montar(linhas(concluidos), faixas,
-				dimensoes.stream().map(d -> new AnaliseCargos.DimensaoInfo(d.codigo(), d.nome())).toList(),
-				MINIMO_LIDERES);
+		PorCargo porCargo = !completo ? null
+				: AnaliseCargos.montar(linhas(concluidos), faixas,
+						dimensoes.stream().map(d -> new AnaliseCargos.DimensaoInfo(d.codigo(), d.nome())).toList(),
+						MINIMO_LIDERES);
 
-		List<PerguntaResumo> perguntas = perguntas(versao, daVersao);
+		List<PerguntaResumo> perguntas = completo ? perguntas(versao, daVersao) : List.of();
 		List<List<DimensaoResumo>> paginasDimensoes = paginar(dimensoes, DIMENSOES_POR_PAGINA);
 		List<List<PerguntaResumo>> paginasPerguntas = paginar(perguntas, PERGUNTAS_POR_PAGINA);
 		// Por cargo: 2 páginas logo depois do resumo executivo (escada; mapa e tempo no cargo).
@@ -207,18 +226,22 @@ public class RelatorioEmpresaService {
 						+ "faixas e nas dimensões, mas não na análise por pergunta.")
 					.formatted(n - daVersao.size(), n);
 
+		// Os pontos da curva vão em ordem de índice: a ordem de chegada ligaria cada ponto a quem respondeu.
+		List<Lider> pontos = concluidos.stream()
+			.map(d -> new Lider(d.getPontuacao(), d.getFaixa().getCodigo()))
+			.sorted(Comparator.comparingInt(Lider::indice))
+			.toList();
 		return new RelatorioEmpresaDados(empresa.getNome(), DATA.format(LocalDate.now(FUSO)), periodo(concluidos),
 				"%s, versão %d".formatted(versao.getQuestionario().getTitulo(), versao.getNumero()), n, participacao,
 				indice, referencia, faixaDaMedia, faixas,
 				destaques(n, indice, referencia, faixas, faixaDaMedia, maisForte, maisFragil, limites, participacao,
 						porCargo, pCargos),
-				curva(concluidos.stream().map(d -> new Lider(d.getPontuacao(), d.getFaixa().getCodigo())).toList(), indice.media()), histograma(indices, faixasDaVersao), limites, paginasDimensoes,
+				curva(pontos, indice.media()), histograma(indices, faixasDaVersao), limites, paginasDimensoes,
 				maisFragil, paginasPerguntas, notaVersoes, MINIMO_LIDERES, paginas,
 				"relatorio-consolidado-" + CodigoCampanha.normalizar(empresa.getNome()) + ".pdf", empresa.tema(),
 				MarcaEmpresa.siglaDe(empresa.getNome()), logomarcas.dataUri(empresa),
 				logomarcas.logo(empresa) != null && logomarcas.logo(empresa).pedeNome(), porCargo,
-				situacao != null && !empresa.encerrada(Instant.now(clock)) ? situacao
-						: situacao(empresa));
+				situacao != null ? situacao : situacao(empresa), nota, completo, pontos);
 	}
 
 	/** O que a análise por cargo usa de cada diagnóstico concluído. */
@@ -469,13 +492,13 @@ public class RelatorioEmpresaService {
 		return lista;
 	}
 
-	private static Referencia referencia(int mediaEmpresa, MediaGeral geral) {
-		int mediaGeral = (int) Math.round(geral.media());
+	private static Referencia referencia(int mediaEmpresa, double media, int lideres) {
+		int mediaGeral = (int) Math.round(media);
 		int diferenca = mediaEmpresa - mediaGeral;
 		String comparacao = diferenca == 0 ? "a empresa está na média"
 				: "a empresa está %d %s %s".formatted(Math.abs(diferenca), Math.abs(diferenca) == 1 ? "ponto" : "pontos",
 						diferenca > 0 ? "acima" : "abaixo");
-		return new Referencia(mediaGeral, (int) geral.lideres(), comparacao);
+		return new Referencia(mediaGeral, lideres, comparacao);
 	}
 
 	private static String periodo(List<Diagnostico> concluidos) {

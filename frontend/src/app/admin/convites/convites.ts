@@ -1,6 +1,6 @@
 import { problemaEmail } from '../../compartilhado/email';
 import { mascararTelefone, problemaTelefone } from '../../compartilhado/entrada-telefone';
-import { LinhaImportada, NovoConvite, StatusConvite, TipoEventoConvite } from '../admin-modelos';
+import { LinhaImportada, NovoConvite, OrigemLider, StatusConvite, TipoEventoConvite } from '../admin-modelos';
 
 export const OUTRO_CARGO = 'outro';
 
@@ -43,6 +43,14 @@ export const ROTULO_EVENTO: Record<TipoEventoConvite, string> = {
   LEMBRETE: 'Lembrete enviado',
   INATIVADO: 'Líder inativado',
   REATIVADO: 'Líder reativado',
+  COMECOU_PELO_LINK: 'Começou pelo link da empresa',
+  RESPONDEU_DE_NOVO: 'Respondeu de novo',
+};
+
+export const ROTULO_ORIGEM: Record<OrigemLider, string> = {
+  PLANILHA: 'Planilha',
+  MANUAL: 'Cadastro manual',
+  LINK: 'Link da empresa',
 };
 
 /** Uma linha da revisão da planilha, já no formato que a pessoa edita. cargo: id, OUTRO_CARGO ou ''. */

@@ -56,7 +56,13 @@ public class DiagnosticoService {
 	}
 
 	public DiagnosticoDto iniciar(String codigoCampanha, IniciarRequest req) {
-		return DiagnosticoDto.de(criar(campanhas.campanhaAtiva(codigoCampanha), req));
+		Campanha campanha = campanhas.campanhaAtiva(codigoCampanha);
+		Diagnostico diagnostico = criar(campanha, req);
+		if (campanha.vinculadaAEmpresa()) {
+			// Link aberto da empresa: o líder entra no cadastro dela (ou no convite que já tinha).
+			eventos.publishEvent(new DiagnosticoIniciadoPeloLink(diagnostico.getId()));
+		}
+		return DiagnosticoDto.de(diagnostico);
 	}
 
 	/** Diagnóstico novo no link (também a partir de um convite nominal, que aponta para o link). */

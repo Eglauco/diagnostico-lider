@@ -53,12 +53,23 @@ public final class ConviteDtos {
 	public record ConviteItem(Long id, String nome, String email, String whatsapp, Long cargoId, boolean cargoOutro,
 			String cargo, StatusConvite status, Instant criadoEm, Instant enviadoEm, int envios,
 			Instant ultimoAcessoEm, int acessos, Instant concluidoEm, String link, UUID diagnosticoId, String falhaEnvio,
-			String bloqueio, String bloqueioMotivo) {
+			String bloqueio, String bloqueioMotivo, OrigemLider origem, NovaTentativa novaTentativa) {
 	}
 
-	/** O funil: cada número conta quem chegou pelo menos até ali (inativos à parte, fora dos cálculos). */
+	/**
+	 * O líder já tinha concluído e está respondendo de novo pelo link aberto: a resposta concluída
+	 * vale até esta terminar. nome: como ele se identificou agora.
+	 */
+	public record NovaTentativa(String nome, Instant iniciadoEm, int respondidas, int perguntas) {
+	}
+
+	/**
+	 * O funil dos convidados (planilha e cadastro manual): cada número conta quem chegou pelo menos até
+	 * ali. Quem começou pelo link aberto da empresa fica à parte (peloLink), porque não recebeu convite.
+	 * total: todos os líderes ativos, das duas origens. Inativos à parte, fora dos cálculos.
+	 */
 	public record Resumo(int total, int aguardandoEnvio, int enviados, int abriram, int comecaram, int concluiram,
-			int inativos) {
+			int inativos, int convidados, int peloLink, int peloLinkConcluiram) {
 	}
 
 	/**
@@ -97,7 +108,7 @@ public final class ConviteDtos {
 	 * cargo: id do cargo, "outro" ou null.
 	 */
 	public record ConvitePublico(String nome, String email, String whatsapp, String cargo,
-			CampanhaPublicaDto campanha, UUID diagnosticoId) {
+			CampanhaPublicaDto campanha, UUID diagnosticoId, OrigemLider origem) {
 	}
 
 	public record Acesso(String dispositivo) {

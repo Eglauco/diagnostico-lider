@@ -18,11 +18,12 @@ import br.com.diagnosticolider.empresa.PaletaMarca;
  * @param consolidado números do grupo no final (null no diário ou sem o mínimo de líderes)
  * @param aviso      no final sem o mínimo: por que o consolidado não foi
  * @param anexos     nomes legíveis do que vai anexado
+ * @param urlAoVivo  a página do RH (/acompanhar), para ver a participação e o resultado a qualquer hora
  */
 public record GestorEmail(String empresa, String sigla, ConviteEmail.Logo logo, PaletaMarca.Tema tema, boolean fim,
 		String rotulo, String titulo, String subtitulo, String novidade, String prazo, List<Parte> placar,
 		List<Pendente> pendentes, int outrosPendentes, List<Devolvido> devolvidos, Consolidado consolidado, String aviso,
-		List<String> anexos, String rodape) {
+		List<String> anexos, String rodape, String urlAoVivo) {
 
 	public record Parte(String rotulo, int quantidade, int percentual, String cor) {
 	}

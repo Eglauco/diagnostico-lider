@@ -173,6 +173,59 @@ public class ParticipacaoService {
 				conta.getOrDefault(SituacaoParticipacao.NAO_ABRIU, 0L).intValue(), convidados, pendentes, devolvidos);
 	}
 
+	/** A participação para a tela do RH: os grupos do PDF, com as datas de verdade. */
+	@Transactional(readOnly = true)
+	public ParticipacaoAoVivo aoVivo(Long empresaId) {
+		Instant agora = clock.instant();
+		List<Convite> todos = convites.daEmpresa(empresaId);
+		int inativos = (int) todos.stream().filter(Convite::inativo).count();
+		var bloqueados = bloqueios.de(todos);
+		Collator alfabetica = Collator.getInstance(PT_BR);
+		alfabetica.setStrength(Collator.PRIMARY);
+		Map<String, br.com.diagnosticolider.diagnostico.Diagnostico> tentativas = conviteService.novasTentativas(empresaId);
+		List<ParticipacaoAoVivo.Lider> lideres = new ArrayList<>();
+		for (Convite c : todos) {
+			Lider l = lider(c, bloqueados.get(c.getId()));
+			if (l == null) {
+				continue;
+			}
+			var d = c.getDiagnostico();
+			boolean comecou = d != null && l.situacao() == SituacaoParticipacao.COMECOU;
+			var nova = ConviteService.novaTentativa(c, tentativas);
+			lideres.add(new ParticipacaoAoVivo.Lider(c.getId(), l.nome(), l.cargo(), l.email(), l.whatsapp(),
+					l.situacao().name(), l.enviadoEm(), l.envios(), l.primeiroAcessoEm(), l.ultimoAcessoEm(), l.acessos(),
+					l.respondeuEm(),
+					nova != null ? Integer.valueOf(nova.respondidas()) : comecou ? Integer.valueOf(d.perguntasRespondidas()) : null,
+					nova != null ? Integer.valueOf(nova.perguntas()) : comecou ? Integer.valueOf(d.getVersao().getPerguntas().size()) : null,
+					l.link(), l.alerta(), l.origem().name(), nova != null));
+		}
+		// Quem falta: em ordem alfabética. Quem respondeu: o mais recente primeiro.
+		Map<String, List<ParticipacaoAoVivo.Lider>> porSituacao = lideres.stream()
+			.collect(Collectors.groupingBy(ParticipacaoAoVivo.Lider::situacao));
+		List<ParticipacaoAoVivo.Grupo> grupos = new ArrayList<>();
+		for (SituacaoParticipacao s : SituacaoParticipacao.values()) {
+			List<ParticipacaoAoVivo.Lider> doGrupo = new ArrayList<>(porSituacao.getOrDefault(s.name(), List.of()));
+			if (doGrupo.isEmpty()) {
+				continue;
+			}
+			doGrupo.sort(s == SituacaoParticipacao.RESPONDEU
+					? Comparator.comparing(ParticipacaoAoVivo.Lider::respondeuEm, Comparator.nullsLast(Comparator.reverseOrder()))
+					: Comparator.comparing(ParticipacaoAoVivo.Lider::nome, alfabetica));
+			grupos.add(new ParticipacaoAoVivo.Grupo(s.name(), s.titulo(), s.dica(), List.copyOf(doGrupo)));
+		}
+		Instant inicioDoDia = LocalDate.ofInstant(agora, Datas.FUSO).atStartOfDay(Datas.FUSO).toInstant();
+		List<Instant> respostas = lideres.stream().map(ParticipacaoAoVivo.Lider::respondeuEm).filter(Objects::nonNull).toList();
+		int conta = (int) lideres.stream().filter(l -> l.situacao().equals(SituacaoParticipacao.RESPONDEU.name())).count();
+		return new ParticipacaoAoVivo(lideres.size(), conta, quantos(porSituacao, SituacaoParticipacao.COMECOU),
+				quantos(porSituacao, SituacaoParticipacao.ABRIU), quantos(porSituacao, SituacaoParticipacao.NAO_ABRIU),
+				(int) lideres.stream().filter(l -> OrigemLider.LINK.name().equals(l.origem())).count(), (int) respostas.stream().filter(r -> !r.isBefore(inicioDoDia)).count(),
+				respostas.stream().max(Comparator.naturalOrder()).orElse(null), inativos, grupos);
+	}
+
+	private static int quantos(Map<String, List<ParticipacaoAoVivo.Lider>> porSituacao, SituacaoParticipacao s) {
+		return porSituacao.getOrDefault(s.name(), List.of()).size();
+	}
+
 	/** "O convite não chegou. O endereço não existe…" vira "O endereço não existe…". */
 	private static String motivo(String detalhe) {
 		if (detalhe == null) {
@@ -296,7 +349,7 @@ public class ParticipacaoService {
 					case DEVOLVIDO -> "O e-mail voltou";
 					case SPAM -> "Marcou o convite como spam";
 					case BLOQUEADO -> "E-mail bloqueado";
-				});
+				}, c.getOrigem());
 	}
 
 	private static Linha linha(Lider l, Instant agora) {
@@ -312,6 +365,9 @@ public class ParticipacaoService {
 					: "Convite enviado em " + Datas.porExtenso(l.enviadoEm(), agora)
 							+ (l.envios() > 1 ? " · " + l.envios() + " envios" : "");
 		};
+		if (l.origem() == OrigemLider.LINK) {
+			detalhe = detalhe == null ? "Pelo link aberto da empresa" : detalhe + " · pelo link aberto da empresa";
+		}
 		if (l.alerta() != null) {
 			// Sem e-mail que chegue: o RH precisa mandar o link por outro canal.
 			detalhe = l.alerta() + ": mande o link por WhatsApp";

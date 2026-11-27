@@ -27,7 +27,7 @@ public class EmailEnviado {
 	private static final int MAXIMO_DETALHE = 500;
 
 	public enum Tipo {
-		CONVITE, LEMBRETE, RESULTADO, GESTOR_DIARIO, GESTOR_FINAL
+		CONVITE, LEMBRETE, RESULTADO, GESTOR_DIARIO, GESTOR_FINAL, ACESSO_RH
 	}
 
 	/** ENVIADO: o Resend aceitou; os outros vêm dos avisos dele. */

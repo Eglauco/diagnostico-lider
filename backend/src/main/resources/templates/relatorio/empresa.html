@@ -389,10 +389,11 @@
         <li><span>O retrato do grupo e a participação</span><span>2</span></li>
         <li th:if="${r.porCargo != null}"><span>Em que nível a carreira trava, por cargo</span><span th:text="${r.paginas.cargos}">3</span></li>
         <li><span>Forças e pontos de apoio por dimensão</span><span th:text="${r.paginas.dimensoes}">3</span></li>
-        <li><span>O que os líderes responderam</span><span th:text="${r.paginas.perguntas}">4</span></li>
+        <li th:if="${!r.paginasPerguntas.isEmpty()}"><span>O que os líderes responderam</span><span th:text="${r.paginas.perguntas}">4</span></li>
         <li><span>O que fazer com cada grupo</span><span th:text="${r.paginas.faixas}">5</span></li>
         <li><span>Como ler este relatório</span><span th:text="${r.paginas.metodologia}">6</span></li>
       </ol>
+      <p th:if="${!r.completo}" style="margin-top:8px;font-size:11.5px;line-height:1.45;color:var(--abeto-2);">Cargos e perguntas entram no resultado final. Enquanto a avaliação está aberta, o resultado só muda a cada 3 respostas novas, para ninguém ser identificado.</p>
     </nav>
 
     <footer th:replace="~{:: rodape(1)}"></footer>
@@ -708,6 +709,7 @@
       <p>Quem começou e não terminou entra só na taxa de conclusão.</p>
       <p th:if="${r.situacao != null}" th:text="${r.situacao.explicacao}">Situação</p>
       <p th:if="${r.notaVersoes}" th:text="${r.notaVersoes}">Nota</p>
+      <p th:if="${r.notaAnonimato}" th:text="${r.notaAnonimato}">Nota de anonimato</p>
     </section>
     <section th:if="${r.porCargo != null}">
       <h4>Cargos e tempo no cargo</h4>

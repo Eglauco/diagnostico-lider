@@ -66,6 +66,10 @@ export interface EmpresaDetalhe {
     emAndamento: number;
     indiceMedio: number | null;
     porFaixa: Record<string, number>;
+    /** O cadastro de líderes: convidados (planilha e manual) e quem começou pelo link aberto. */
+    lideres: number;
+    convidados: number;
+    peloLink: number;
   };
   /** Diagnósticos concluídos necessários para o relatório consolidado (anonimato). */
   minimoRelatorio: number;
@@ -141,6 +145,8 @@ export interface Detalhe {
   } | null;
   /** Inativado: fica guardado, mas fora de todos os cálculos. */
   inativadoEm: string | null;
+  /** O líder respondeu de novo: vale esta outra resposta (esta saiu dos cálculos). */
+  substituidoPor: string | null;
   respostas: {
     perguntaId: number;
     numero: number;
@@ -154,6 +160,9 @@ export interface Detalhe {
 // Convites nominais -----------------------------------------------------------
 
 export type StatusConvite = 'AGUARDANDO_ENVIO' | 'ENVIADO' | 'ABRIU' | 'COMECOU' | 'CONCLUIDO' | 'INATIVO';
+
+/** Como o líder entrou na avaliação: planilha do RH, cadastro manual ou o link aberto da empresa. */
+export type OrigemLider = 'PLANILHA' | 'MANUAL' | 'LINK';
 
 export interface CargoOpcao {
   id: number;
@@ -187,9 +196,15 @@ export interface ConviteItem {
   bloqueio: 'DEVOLVIDO' | 'SPAM' | 'BLOQUEADO' | null;
   /** O que fazer, para mostrar ao lado do botão de envio. */
   bloqueioMotivo: string | null;
+  origem: OrigemLider;
+  /** Já concluiu e está respondendo de novo pelo link aberto (a resposta concluída vale até esta terminar). */
+  novaTentativa: { nome: string; iniciadoEm: string; respondidas: number; perguntas: number } | null;
 }
 
-/** O funil: cada número conta quem chegou pelo menos até ali (inativos à parte, fora dos cálculos). */
+/**
+ * O funil dos convidados: cada número conta quem chegou pelo menos até ali. Quem começou pelo link
+ * aberto fica à parte (peloLink). total: todos os líderes ativos. Inativos fora dos cálculos.
+ */
 export interface ResumoConvites {
   total: number;
   aguardandoEnvio: number;
@@ -198,6 +213,9 @@ export interface ResumoConvites {
   comecaram: number;
   concluiram: number;
   inativos: number;
+  convidados: number;
+  peloLink: number;
+  peloLinkConcluiram: number;
 }
 
 export interface Convites {
@@ -257,7 +275,9 @@ export type TipoEventoConvite =
   | 'CONCLUIDO'
   | 'LEMBRETE'
   | 'INATIVADO'
-  | 'REATIVADO';
+  | 'REATIVADO'
+  | 'COMECOU_PELO_LINK'
+  | 'RESPONDEU_DE_NOVO';
 
 export interface EventoConvite {
   tipo: TipoEventoConvite;
@@ -293,6 +313,20 @@ export interface PainelAcompanhamento {
   /** Uma frase para cada lembrete aos líderes; null sem prazo. */
   lembretes: { tresDias: string; umDia: string } | null;
   historico: ItemAcompanhamento[];
+}
+
+/** A página do RH (/acompanhar): cada gestor, quando entrou e quando o acesso foi mandado. */
+export interface AcessosRh {
+  pagina: string;
+  gestores: AcessoDoGestor[];
+}
+
+export interface AcessoDoGestor {
+  email: string;
+  ultimoAcesso: string | null;
+  aparelho: string | null;
+  acessos: number;
+  conviteEnviadoEm: string | null;
 }
 
 export interface ItemAcompanhamento {

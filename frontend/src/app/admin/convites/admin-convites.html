@@ -11,10 +11,10 @@
 
   <header class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div class="min-w-0">
-      <p class="rotulo text-brasa-escura">Convites</p>
-      <h1 class="display mt-2 text-[36px] leading-[1] font-bold sm:text-[48px]">Convites por e-mail</h1>
+      <p class="rotulo text-brasa-escura">Líderes</p>
+      <h1 class="display mt-2 text-[36px] leading-[1] font-bold sm:text-[48px]">Líderes da avaliação</h1>
       <p class="mt-3 max-w-2xl text-[16px] text-abeto-2">
-        Cada líder recebe um link só dele, com os dados já preenchidos para confirmar. Você acompanha quem abriu e quem concluiu.
+        Quem vem da planilha ou do cadastro manual recebe um link só dele, com os dados já preenchidos. Quem começa pelo link aberto da empresa entra aqui sozinho. Você acompanha todos num lugar só.
       </p>
     </div>
     @if (convites.hasValue() && convites.value().convites.length) {
@@ -163,16 +163,12 @@
         </section>
       } @else {
         <!-- Funil -->
-        <dl class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          @for (f of funil(); track f.rotulo) {
-            <div class="cartao kpi">
+        <dl class="mt-6 grid grid-cols-2 gap-3" [class]="funil().length > 4 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'">
+          @for (f of funil(); track f.rotulo; let ultimo = $last) {
+            <div class="cartao kpi" [class]="ultimo && funil().length % 2 === 1 ? 'col-span-2 lg:col-span-1' : ''">
               <dt>{{ f.rotulo }}</dt>
               <dd>{{ f.valor }}</dd>
-              @if (f.pct !== null) {
-                <p>{{ f.pct }}% dos convidados</p>
-              } @else {
-                <p>{{ d.resumo.inativos ? d.resumo.inativos + ' inativo' + (d.resumo.inativos === 1 ? '' : 's') + ' fora dos cálculos' : 'com link pessoal' }}</p>
-              }
+              <p>{{ f.sub }}</p>
             </div>
           }
         </dl>
@@ -226,6 +222,15 @@
         </div>
 
         <!-- Filtros e busca -->
+        @if (chipsOrigem().length) {
+          <div class="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0" role="group" aria-label="Filtrar por origem">
+            @for (c of chipsOrigem(); track c.valor) {
+              <button type="button" class="chip" [attr.aria-pressed]="filtroOrigem() === c.valor" (click)="filtroOrigem.set(c.valor); filtro.set('todos')">
+                {{ c.texto }} <span class="contagem">{{ c.total }}</span>
+              </button>
+            }
+          </div>
+        }
         <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
           <div class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0" role="group" aria-label="Filtrar por situação">
             @for (c of chips(); track c.valor) {
@@ -248,18 +253,23 @@
               <button type="button" class="cartao flex w-full items-center gap-4 p-4 text-left transition-shadow hover:shadow-[inset_0_0_0_1.5px_var(--color-abeto-3)]" (click)="selecionado.set(c.id)">
                 <div class="min-w-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-4">
                   <div class="min-w-0">
-                    <p class="truncate text-[16px] font-semibold" [class.text-abeto-3]="c.status === 'INATIVO'">{{ c.nome }}</p>
+                    <p class="flex min-w-0 items-center gap-2">
+                      <span class="truncate text-[16px] font-semibold" [class.text-abeto-3]="c.status === 'INATIVO'">{{ c.nome }}</span>
+                      @if (c.origem === 'LINK') {
+                        <span class="inline-flex min-h-6 shrink-0 items-center rounded-full bg-nevoa-2 px-2 text-[12px] font-semibold text-abeto-2 ring-1 ring-linha">pelo link</span>
+                      }
+                    </p>
                     <p class="truncate text-[14px] text-abeto-2">{{ c.email }}</p>
                   </div>
                   <p class="mt-1 truncate text-[14px] text-abeto-2 lg:mt-0">{{ c.cargo || 'Sem cargo' }}</p>
-                  <p class="mt-1 truncate text-[13px] lg:mt-0 lg:text-[14px]" [class]="c.falhaEnvio || c.bloqueio ? 'font-semibold text-travada' : 'text-abeto-3'">{{ ultimaAtividade(c) }}</p>
+                  <p class="mt-1 truncate text-[13px] lg:mt-0 lg:text-[14px]" [class]="c.falhaEnvio || c.bloqueio ? 'font-semibold text-travada' : c.novaTentativa ? 'font-semibold text-[#7A4D00]' : 'text-abeto-3'">{{ ultimaAtividade(c) }}</p>
                 </div>
                 <span class="inline-flex min-h-7 shrink-0 items-center rounded-full px-2.5 text-[13px] font-semibold" [class]="CLASSE_STATUS[c.status]">{{ ROTULO_STATUS[c.status] }}</span>
                 <svg class="hidden shrink-0 text-abeto-3 sm:block" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
               </button>
             </li>
           } @empty {
-            <li class="cartao p-6 text-center text-[15px] text-abeto-2">Nenhum convite com esse filtro.</li>
+            <li class="cartao p-6 text-center text-[15px] text-abeto-2">Nenhum líder com esse filtro.</li>
           }
         </ul>
       }

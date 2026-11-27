@@ -40,7 +40,7 @@ public record RelatorioParticipacao(String empresa, String sigla, String logo, b
 	/** Um líder com tudo que a planilha precisa (datas de verdade, para filtrar e ordenar). */
 	record Lider(String nome, String cargo, String email, String whatsapp, SituacaoParticipacao situacao,
 			Instant enviadoEm, int envios, Instant primeiroAcessoEm, Instant ultimoAcessoEm, int acessos,
-			Instant respondeuEm, String link, String alerta) {
+			Instant respondeuEm, String link, String alerta, OrigemLider origem) {
 	}
 
 }

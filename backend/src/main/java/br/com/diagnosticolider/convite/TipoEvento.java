@@ -21,7 +21,9 @@ public enum TipoEvento {
 	EMAIL_SPAM("Marcou o e-mail como spam"),
 	PDF_BAIXADO_PAINEL("PDF individual baixado no painel"),
 	INATIVADO("Líder inativado"),
-	REATIVADO("Líder reativado");
+	REATIVADO("Líder reativado"),
+	COMECOU_PELO_LINK("Começou pelo link da empresa"),
+	RESPONDEU_DE_NOVO("Respondeu de novo");
 
 	private final String rotulo;
 

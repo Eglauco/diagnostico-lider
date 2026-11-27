@@ -25,6 +25,11 @@ export const routes: Routes = [
     title: 'Seu diagnóstico de carreira',
     loadComponent: () => import('./resultado/resultado-pagina').then((m) => m.ResultadoPagina),
   },
+  // Página do RH: os gestores da empresa acompanham a avaliação, sem senha (código por e-mail).
+  {
+    path: 'acompanhar',
+    loadChildren: () => import('./acompanhar/acompanhar.routes').then((m) => m.ROTAS_ACOMPANHAR),
+  },
   // Painel administrativo (com login: ver admin/acesso/sessao.ts).
   {
     path: 'administrador',

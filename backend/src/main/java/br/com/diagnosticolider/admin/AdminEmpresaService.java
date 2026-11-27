@@ -33,6 +33,7 @@ import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import br.com.diagnosticolider.config.AppProperties;
 import br.com.diagnosticolider.diagnostico.ContagemPorEmpresa;
 import br.com.diagnosticolider.diagnostico.DiagnosticoRepository;
+import br.com.diagnosticolider.convite.ConviteService;
 import br.com.diagnosticolider.empresa.CargoService;
 import br.com.diagnosticolider.empresa.Empresa;
 import br.com.diagnosticolider.empresa.EmpresaRepository;
@@ -69,10 +70,13 @@ public class AdminEmpresaService {
 
 	private final Clock clock;
 
+	private final ConviteService convites;
+
 	AdminEmpresaService(EmpresaRepository empresas, CampanhaRepository campanhas, QuestionarioRepository questionarios,
 			DiagnosticoRepository diagnosticos, AppProperties propriedades, LogomarcaService logomarcas,
-			CargoService cargos, Clock clock) {
+			CargoService cargos, Clock clock, ConviteService convites) {
 		this.clock = clock;
+		this.convites = convites;
 		this.empresas = empresas;
 		this.campanhas = campanhas;
 		this.questionarios = questionarios;
@@ -99,8 +103,9 @@ public class AdminEmpresaService {
 	public EmpresaDetalhe detalhe(Long id) {
 		Empresa empresa = empresas.findById(id).orElseThrow(() -> new NaoEncontradoException("Empresa não encontrada."));
 		var resumo = Resumo.de(diagnosticos.resumoDaEmpresa(id));
+		var lideres = convites.lideresPorOrigem(id);
 		var indicadores = new Indicadores(resumo.total(), resumo.concluidos(), resumo.emAndamento(),
-				resumo.indiceMedio(), resumo.porFaixa());
+				resumo.indiceMedio(), resumo.porFaixa(), lideres.total(), lideres.convidados(), lideres.peloLink());
 		return new EmpresaDetalhe(empresa.getId(), empresa.getNome(), empresa.getCriadoEm(),
 				link(linksPrincipais(List.of(id)).get(id)), indicadores, RelatorioEmpresaService.MINIMO_LIDERES,
 				cores(empresa), empresa.tema(), logomarcas.logo(empresa), cargos.itens(id), encerramento(empresa),

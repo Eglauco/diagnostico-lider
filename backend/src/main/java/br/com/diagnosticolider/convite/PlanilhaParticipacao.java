@@ -37,9 +37,9 @@ import br.com.diagnosticolider.convite.RelatorioParticipacao.Lider;
 class PlanilhaParticipacao {
 
 	private static final String[] COLUNAS = { "Nome", "Cargo", "E-mail", "WhatsApp", "Situação", "Convite enviado em",
-			"Último acesso", "Respondeu em", "Link pessoal" };
+			"Último acesso", "Respondeu em", "Link pessoal", "Origem" };
 
-	private static final int[] LARGURAS = { 34, 22, 34, 18, 24, 20, 20, 20, 56 };
+	private static final int[] LARGURAS = { 34, 22, 34, 18, 24, 20, 20, 20, 56, 18 };
 
 	/** Linha (base 0) do cabeçalho da tabela; os líderes começam na seguinte. */
 	private static final int CABECALHO = 6;
@@ -119,6 +119,7 @@ class PlanilhaParticipacao {
 				data(linha, 5, l.enviadoEm(), e);
 				data(linha, 6, l.ultimoAcessoEm(), e);
 				data(linha, 7, l.respondeuEm(), e);
+				celula(linha, 9, l.origem() == null ? null : l.origem().rotulo(), e.texto);
 				Cell link = celula(linha, 8, l.link(), l.link() == null ? e.texto : e.link);
 				if (l.link() != null) {
 					XSSFHyperlink destino = pasta.getCreationHelper().createHyperlink(HyperlinkType.URL);

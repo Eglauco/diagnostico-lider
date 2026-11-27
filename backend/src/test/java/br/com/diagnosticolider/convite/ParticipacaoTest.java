@@ -59,11 +59,11 @@ class ParticipacaoTest {
 		Instant agora = Instant.parse("2026-11-23T15:00:00Z");
 		var lideres = List.of(
 				new Lider("Ana", "Gerente", "ana@a.com", "(11) 98765-4321", SituacaoParticipacao.COMECOU, null, 0, agora,
-						agora, 2, null, "https://app/i/abc", null),
+						agora, 2, null, "https://app/i/abc", null, OrigemLider.PLANILHA),
 				new Lider("Bruno", null, "bruno@a.com", null, SituacaoParticipacao.NAO_ABRIU, null, 0, null, null, 0, null,
-						"https://app/i/def", "O e-mail voltou"),
+						"https://app/i/def", "O e-mail voltou", OrigemLider.MANUAL),
 				new Lider("Carla", "Diretor", "carla@a.com", null, SituacaoParticipacao.RESPONDEU, agora, 1, agora, agora, 3,
-						agora, null, null));
+						agora, null, null, OrigemLider.LINK));
 		byte[] xlsx = new PlanilhaParticipacao().gerar("ACME", "Atualizado agora", null, lideres, 1);
 
 		try (var pasta = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {

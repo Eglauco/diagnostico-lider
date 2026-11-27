@@ -105,6 +105,10 @@ public class Diagnostico {
 	@Column(name = "inativado_em")
 	private Instant inativadoEm;
 
+	/** O mesmo líder respondeu de novo: esta resposta saiu dos cálculos, e vale a apontada aqui. */
+	@Column(name = "substituido_por")
+	private UUID substituidoPor;
+
 	/** Cargo informado no link da empresa (nulo no link geral e em "Outro cargo"). */
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "cargo_id")
@@ -158,6 +162,16 @@ public class Diagnostico {
 
 	public void reativar() {
 		inativadoEm = null;
+	}
+
+	/** Uma resposta mais recente do mesmo líder fica no lugar desta (que sai dos cálculos). */
+	public void substituirPor(Diagnostico novo, Instant agora) {
+		inativar(agora);
+		substituidoPor = novo.getId();
+	}
+
+	public UUID getSubstituidoPor() {
+		return substituidoPor;
 	}
 
 	public Instant getInativadoEm() {

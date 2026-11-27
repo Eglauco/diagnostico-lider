@@ -45,11 +45,13 @@ import br.com.diagnosticolider.convite.ConviteDtos.EnvioIniciado;
 import br.com.diagnosticolider.convite.ConviteDtos.Evento;
 import br.com.diagnosticolider.convite.ConviteDtos.Importacao;
 import br.com.diagnosticolider.convite.ConviteDtos.LinhaImportada;
+import br.com.diagnosticolider.convite.ConviteDtos.NovaTentativa;
 import br.com.diagnosticolider.convite.ConviteDtos.NovoConvite;
 import br.com.diagnosticolider.convite.ConviteDtos.Resumo;
 import br.com.diagnosticolider.diagnostico.Diagnostico;
 import br.com.diagnosticolider.diagnostico.DiagnosticoConcluido;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.DiagnosticoDto;
+import br.com.diagnosticolider.diagnostico.DiagnosticoIniciadoPeloLink;
 import br.com.diagnosticolider.diagnostico.DiagnosticoDtos.IniciarRequest;
 import br.com.diagnosticolider.diagnostico.DiagnosticoRepository;
 import br.com.diagnosticolider.diagnostico.DiagnosticoService;
@@ -63,9 +65,11 @@ import br.com.diagnosticolider.notificacao.EmailEnviadoRepository;
 import br.com.diagnosticolider.notificacao.EmailSender;
 
 /**
- * Convites nominais: a planilha do RH vira um link pessoal por líder, com os dados para ele só
- * confirmar, e cada passo do link fica na auditoria. Os convites vão no link principal da empresa
- * (o mais antigo), então os diagnósticos entram no relatório dela como os do link aberto.
+ * Os líderes da avaliação de cada empresa. A planilha do RH (ou o cadastro manual) vira um link
+ * pessoal por líder, com os dados para ele só confirmar, e cada passo do link fica na auditoria.
+ * Quem começa pelo link aberto da empresa também vira cadastro (origem LINK), ou entra no convite
+ * que já tinha com o mesmo e-mail. Os convites vão no link principal da empresa (o mais antigo),
+ * então os diagnósticos entram no relatório dela como os do link aberto.
  */
 @Service
 @Transactional(readOnly = true)
@@ -144,11 +148,31 @@ public class ConviteService {
 		List<Convite> daEmpresa = convites.daEmpresa(empresaId);
 		Map<Long, EventoConvite> falhas = problemasDeEntrega(daEmpresa);
 		Map<Long, BloqueioDeEnvio.Bloqueio> bloqueados = bloqueios.de(daEmpresa);
+		Map<String, Diagnostico> tentativas = novasTentativas(empresaId);
 		List<ConviteItem> itens = daEmpresa.stream()
-			.map(c -> item(c, falhas.get(c.getId()), bloqueados.get(c.getId())))
+			.map(c -> item(c, falhas.get(c.getId()), bloqueados.get(c.getId()), tentativas))
 			.toList();
 		return new Convites(email.ativo(), empresa.getEncerraEm(), empresa.encerrada(agora()), resumo(itens), itens,
 				opcoes(empresaId));
+	}
+
+	/** Quantos líderes ativos a empresa tem: convidados (planilha e cadastro manual) e pelo link aberto. */
+	public record LideresPorOrigem(int total, int convidados, int peloLink) {
+	}
+
+	public LideresPorOrigem lideresPorOrigem(Long empresaId) {
+		int convidados = 0;
+		int peloLink = 0;
+		for (Object[] linha : convites.origensDaEmpresa(empresaId)) {
+			int n = ((Long) linha[1]).intValue();
+			if (linha[0] == OrigemLider.LINK) {
+				peloLink += n;
+			}
+			else {
+				convidados += n;
+			}
+		}
+		return new LideresPorOrigem(convidados + peloLink, convidados, peloLink);
 	}
 
 	/** A planilha modelo, com os cargos da empresa na lista suspensa. */
@@ -185,6 +209,7 @@ public class ConviteService {
 		List<Cargo> lista = cargos.ativos(empresaId);
 		Set<String> existentes = new HashSet<>(convites.emailsDoLink(link.getId()));
 		Set<String> inativos = new HashSet<>(convites.emailsInativos(link.getId()));
+		Set<String> peloLink = new HashSet<>(convites.emailsDoLinkAberto(link.getId()));
 		Map<String, String> erros = new LinkedHashMap<>();
 		Set<String> nestaLista = new HashSet<>();
 		List<Convite.Dados> validos = new ArrayList<>();
@@ -197,7 +222,9 @@ public class ConviteService {
 				if (existentes.contains(dados.email())) {
 					throw new RegraNegocioException(inativos.contains(dados.email())
 							? "Esse líder já está na lista, inativo: reative em vez de convidar de novo."
-							: "Esse e-mail já tem convite.");
+							: peloLink.contains(dados.email())
+									? "Esse líder já está na lista: começou pelo link aberto da empresa."
+									: "Esse e-mail já tem convite.");
 				}
 				validos.add(dados);
 			}
@@ -214,8 +241,9 @@ public class ConviteService {
 		Instant agora = agora();
 		String autor = quemEsta.nome();
 		String origem = pedido.daPlanilha() ? "Importado da planilha." : "Adicionado no painel.";
+		OrigemLider de = pedido.daPlanilha() ? OrigemLider.PLANILHA : OrigemLider.MANUAL;
 		for (Convite.Dados dados : validos) {
-			Convite convite = convites.save(new Convite(link, novoToken(), dados, agora));
+			Convite convite = convites.save(new Convite(link, novoToken(), dados, de, agora));
 			registrar(convite, TipoEvento.CRIADO, agora, origem, autor);
 		}
 		return new Criados(validos.size());
@@ -295,6 +323,10 @@ public class ConviteService {
 	public void reativarDiagnostico(UUID id) {
 		Diagnostico diagnostico = diagnosticoRepositorio.findById(id)
 			.orElseThrow(() -> new NaoEncontradoException("Não encontramos este diagnóstico."));
+		if (diagnostico.getSubstituidoPor() != null) {
+			throw RegraNegocioException.conflito(
+					"O líder respondeu de novo depois desta resposta, e vale a mais recente. Para voltar a esta, inative a outra antes.");
+		}
 		diagnostico.reativar();
 		convites.findByDiagnosticoId(id).filter(Convite::inativo).ifPresent(c -> {
 			c.reativar();
@@ -422,7 +454,7 @@ public class ConviteService {
 		String cargo = convite.isCargoOutro() ? CARGO_OUTRO
 				: convite.getCargo() == null ? null : String.valueOf(convite.getCargo().getId());
 		return new ConvitePublico(convite.getNome(), convite.getEmail(), convite.getWhatsapp(), cargo, campanha,
-				convite.getDiagnostico() == null ? null : convite.getDiagnostico().getId());
+				convite.getDiagnostico() == null ? null : convite.getDiagnostico().getId(), convite.getOrigem());
 	}
 
 	/** O líder abriu o link (a página carregou no aparelho dele; a prévia do WhatsApp não conta). */
@@ -478,25 +510,194 @@ public class ConviteService {
 		return diagnostico;
 	}
 
-	/** Diagnóstico de um convite concluído: entra na auditoria (na mesma transação). */
+	/**
+	 * Diagnóstico concluído: entra na auditoria do líder (na mesma transação). Pelo link aberto,
+	 * o líder entra no cadastro agora, se ainda não entrou (respondeu de novo: vale esta resposta).
+	 */
 	@EventListener
 	@Transactional
 	public void aoConcluir(DiagnosticoConcluido evento) {
-		convites.findByDiagnosticoId(evento.diagnosticoId())
-			.ifPresent(c -> registrar(c, TipoEvento.CONCLUIDO, agora(), null));
+		Diagnostico d = diagnosticoRepositorio.findById(evento.diagnosticoId()).orElse(null);
+		if (d == null) {
+			return;
+		}
+		if (convites.findByDiagnosticoId(d.getId()).isEmpty()) {
+			entrarNoCadastro(d, agora(), false);
+		}
+		convites.findByDiagnosticoId(d.getId()).ifPresent(c -> {
+			if (c.getOrigem() == OrigemLider.LINK) {
+				atualizarPeloDiagnostico(c, d);
+			}
+			registrar(c, TipoEvento.CONCLUIDO, agora(), null);
+			substituirAnteriores(c, d, agora());
+		});
+	}
+
+	/** Começou pelo link aberto da empresa: vira líder do cadastro (ou entra no convite do mesmo e-mail). */
+	@EventListener
+	@Transactional
+	public void aoComecarPeloLink(DiagnosticoIniciadoPeloLink evento) {
+		diagnosticoRepositorio.findById(evento.diagnosticoId()).ifPresent(d -> entrarNoCadastro(d, agora(), false));
+	}
+
+	/**
+	 * Põe um diagnóstico de link de empresa no cadastro de líderes. Sem líder com o mesmo e-mail na
+	 * empresa, cria um (origem LINK). Com líder, decide qual resposta vale: a concluída vence a que
+	 * ficou pela metade, e entre duas iguais vale a mais recente; a outra sai dos cálculos
+	 * ({@link Diagnostico#substituirPor}). Quem já tinha concluído e está respondendo de novo fica de
+	 * fora até terminar (aí a nova vence, em {@link #aoConcluir}).
+	 *
+	 * @param quando    a hora de agora (sai na troca de resposta)
+	 * @param historico carga de quem começou antes do cadastro existir: a linha do tempo usa as datas do
+	 *                  próprio diagnóstico, inclusive a conclusão (no fluxo normal, ela entra em aoConcluir)
+	 */
+	@Transactional
+	public void entrarNoCadastro(Diagnostico d, Instant quando, boolean historico) {
+		if (d.getEmpresa() == null || d.getSubstituidoPor() != null
+				|| convites.findByDiagnosticoId(d.getId()).isPresent()) {
+			return;
+		}
+		String email = d.getRespondente().getEmail().strip().toLowerCase(Locale.ROOT);
+		Convite lider = convites.daEmpresaPorEmail(d.getEmpresa().getId(), email).stream().findFirst().orElse(null);
+		if (lider == null) {
+			Convite novo = convites.save(new Convite(d.getCampanha(), novoToken(),
+					new Convite.Dados(nome(d.getRespondente().getNome()), email, whatsapp(d.getRespondente().getWhatsapp()),
+							d.getCargo(), d.isCargoOutro()),
+					OrigemLider.LINK, d.getIniciadoEm()));
+			novo.vincular(d);
+			registrar(novo, TipoEvento.COMECOU_PELO_LINK, d.getIniciadoEm(),
+					"Entrou na lista ao começar pelo link aberto da empresa, sem convite.");
+			if (historico && d.concluido()) {
+				registrar(novo, TipoEvento.CONCLUIDO, d.getConcluidoEm(), null);
+			}
+			if (d.getInativadoEm() != null) {
+				novo.inativar(d.getInativadoEm());
+			}
+			return;
+		}
+
+		Diagnostico atual = lider.getDiagnostico();
+		if (atual == null) {
+			lider.vincular(d);
+			registrar(lider, TipoEvento.COMECOU_PELO_LINK, d.getIniciadoEm(),
+					"Respondeu pelo link aberto da empresa, não pelo link pessoal.");
+			if (historico && d.concluido()) {
+				registrar(lider, TipoEvento.CONCLUIDO, d.getConcluidoEm(), null);
+			}
+		}
+		else {
+			boolean novaVence = vence(d, atual);
+			Diagnostico vale = novaVence ? d : atual;
+			Diagnostico sai = novaVence ? atual : d;
+			if (!sai.concluido() && vale.concluido() && sai.getIniciadoEm().isAfter(vale.getIniciadoEm())) {
+				// Já tinha concluído e está respondendo de novo: a resposta concluída vale até esta
+				// terminar (aí decide, em aoConcluir). O cadastro já mostra os dados que ele digitou agora.
+				if (sai == d) {
+					if (lider.getOrigem() == OrigemLider.LINK) {
+						atualizarPeloDiagnostico(lider, d);
+					}
+					if (!historico) {
+						registrar(lider, TipoEvento.COMECOU_PELO_LINK, quando,
+								"Começou a responder de novo pelo link aberto da empresa. A resposta anterior vale até esta terminar.");
+					}
+				}
+				return;
+			}
+			sai.substituirPor(vale, quando);
+			if (novaVence) {
+				lider.vincular(d);
+				Instant em = !historico ? quando : d.concluido() ? d.getConcluidoEm() : d.getIniciadoEm();
+				registrar(lider, d.concluido() ? TipoEvento.RESPONDEU_DE_NOVO : TipoEvento.COMECOU_PELO_LINK, em,
+						d.concluido() ? "Respondeu de novo pelo link aberto da empresa: vale a resposta mais recente, e a anterior saiu dos cálculos."
+								: "Começou de novo pelo link aberto da empresa.");
+			}
+		}
+		if (lider.inativo()) {
+			// Líder inativado: a resposta nova também fica fora dos cálculos até ele ser reativado.
+			lider.getDiagnostico().inativar(lider.getInativadoEm());
+		}
+	}
+
+	/** A concluída vence a que ficou pela metade; entre duas iguais, a mais recente. */
+	static boolean vence(Diagnostico a, Diagnostico b) {
+		return vence(new Tentativa(a.getIniciadoEm(), a.getConcluidoEm()), new Tentativa(b.getIniciadoEm(), b.getConcluidoEm()));
+	}
+
+	/** Uma resposta do líder: quando começou e quando concluiu (null: ficou pela metade). */
+	record Tentativa(Instant iniciadoEm, Instant concluidoEm) {
+
+		boolean concluida() {
+			return concluidoEm != null;
+		}
+
+	}
+
+	static boolean vence(Tentativa a, Tentativa b) {
+		if (a.concluida() != b.concluida()) {
+			return a.concluida();
+		}
+		return a.concluida() ? a.concluidoEm().isAfter(b.concluidoEm()) : a.iniciadoEm().isAfter(b.iniciadoEm());
+	}
+
+	/**
+	 * O líder concluiu: respostas mais antigas dele pelo link aberto que ficaram sem cadastro (de
+	 * antes de existir o cadastro, por exemplo) saem dos cálculos, para não contar duas vezes.
+	 */
+	private void substituirAnteriores(Convite lider, Diagnostico vale, Instant quando) {
+		for (Diagnostico outro : diagnosticoRepositorio.daEmpresaPorEmail(vale.getEmpresa().getId(), lider.getEmail())) {
+			if (outro != vale && outro.getSubstituidoPor() == null && outro.getInativadoEm() == null
+					&& outro.getIniciadoEm().isBefore(vale.getIniciadoEm())
+					&& convites.findByDiagnosticoId(outro.getId()).isEmpty()) {
+				outro.substituirPor(vale, quando);
+			}
+		}
+	}
+
+	/** Quem entrou pelo link aberto pode ter corrigido os dados antes de terminar: o cadastro acompanha. */
+	private void atualizarPeloDiagnostico(Convite lider, Diagnostico d) {
+		String email = d.getRespondente().getEmail().strip().toLowerCase(Locale.ROOT);
+		boolean emailLivre = email.equals(lider.getEmail().toLowerCase(Locale.ROOT))
+				|| convites.daEmpresaPorEmail(d.getEmpresa().getId(), email).isEmpty();
+		lider.atualizar(new Convite.Dados(nome(d.getRespondente().getNome()), emailLivre ? email : lider.getEmail(),
+				whatsapp(d.getRespondente().getWhatsapp()), d.getCargo(), d.isCargoOutro()));
 	}
 
 	// ================================================================== apoio
 
 	private ConviteItem item(Convite c) {
-		return item(c, problemasDeEntrega(List.of(c)).get(c.getId()), bloqueios.de(c).orElse(null));
+		return item(c, problemasDeEntrega(List.of(c)).get(c.getId()), bloqueios.de(c).orElse(null),
+				novasTentativas(c.getCampanha().getEmpresa().getId()));
+	}
+
+	/**
+	 * Quem concluiu e está respondendo de novo pelo link aberto, por e-mail (em minúsculas): a
+	 * tentativa mais recente de cada um.
+	 */
+	Map<String, Diagnostico> novasTentativas(Long empresaId) {
+		Map<String, Diagnostico> porEmail = new HashMap<>();
+		for (Diagnostico d : convites.tentativasSemCadastro(empresaId)) {
+			porEmail.put(d.getRespondente().getEmail().strip().toLowerCase(Locale.ROOT), d);
+		}
+		return porEmail;
+	}
+
+	/** A tentativa nova do líder, se ele concluiu e está respondendo de novo (null se não). */
+	static NovaTentativa novaTentativa(Convite c, Map<String, Diagnostico> tentativas) {
+		Diagnostico atual = c.getDiagnostico();
+		Diagnostico nova = tentativas.get(c.getEmail().strip().toLowerCase(Locale.ROOT));
+		if (atual == null || !atual.concluido() || nova == null || !nova.getIniciadoEm().isAfter(atual.getIniciadoEm())) {
+			return null;
+		}
+		return new NovaTentativa(nova.getRespondente().getNome(), nova.getIniciadoEm(), nova.perguntasRespondidas(),
+				nova.getVersao().getPerguntas().size());
 	}
 
 	/**
 	 * ultimaFalha: a falha de envio mais recente do convite. A lista mostra o motivo enquanto o
 	 * e-mail não sair (um envio depois da falha, ou o líder já ter aberto o link, apaga o aviso).
 	 */
-	private ConviteItem item(Convite c, EventoConvite ultimaFalha, BloqueioDeEnvio.Bloqueio bloqueio) {
+	private ConviteItem item(Convite c, EventoConvite ultimaFalha, BloqueioDeEnvio.Bloqueio bloqueio,
+			Map<String, Diagnostico> tentativas) {
 		StatusConvite status = c.status();
 		boolean semEnvioDepois = ultimaFalha != null
 				&& (c.getEnviadoEm() == null || ultimaFalha.getQuando().isAfter(c.getEnviadoEm()));
@@ -510,7 +711,7 @@ public class ConviteService {
 				c.getCriadoEm(), c.getEnviadoEm(), c.getEnvios(), c.getUltimoAcessoEm(), c.getAcessos(), concluidoEm,
 				link(c), c.getDiagnostico() == null ? null : c.getDiagnostico().getId(), falhaEnvio,
 				bloqueio == null || !podeReceber(c) ? null : bloqueio.motivo().name(),
-				bloqueio == null || !podeReceber(c) ? null : bloqueio.texto());
+				bloqueio == null || !podeReceber(c) ? null : bloqueio.texto(), c.getOrigem(), novaTentativa(c, tentativas));
 	}
 
 	/**
@@ -558,8 +759,9 @@ public class ConviteService {
 		return urlPublica + "/i/" + convite.getToken();
 	}
 
-	private static Resumo resumo(List<ConviteItem> itens) {
+	static Resumo resumo(List<ConviteItem> itens) {
 		int inativos = 0, aguardando = 0, enviados = 0, abriram = 0, comecaram = 0, concluiram = 0;
+		int convidados = 0, peloLink = 0, peloLinkConcluiram = 0;
 		for (ConviteItem i : itens) {
 			switch (i.status()) {
 				case INATIVO -> inativos++;
@@ -570,6 +772,14 @@ public class ConviteService {
 			if (i.status() == StatusConvite.INATIVO) {
 				continue;
 			}
+			if (i.origem() == OrigemLider.LINK) {
+				peloLink++;
+				if (i.status() == StatusConvite.CONCLUIDO) {
+					peloLinkConcluiram++;
+				}
+				continue;
+			}
+			convidados++;
 			if (i.enviadoEm() != null) {
 				enviados++;
 			}
@@ -583,7 +793,8 @@ public class ConviteService {
 				concluiram++;
 			}
 		}
-		return new Resumo(itens.size() - inativos, aguardando, enviados, abriram, comecaram, concluiram, inativos);
+		return new Resumo(itens.size() - inativos, aguardando, enviados, abriram, comecaram, concluiram, inativos,
+				convidados, peloLink, peloLinkConcluiram);
 	}
 
 	private static boolean podeReceber(Convite c) {

@@ -16,6 +16,7 @@ import { NovoConvite } from './novo-convite';
 import { RevisaoImportacao } from './revisao-importacao';
 
 type Filtro = 'todos' | StatusConvite;
+type FiltroOrigem = 'todas' | 'convidados' | 'link';
 
 /**
  * Convites por e-mail de uma empresa: a planilha (modelo e importação com revisão), o disparo
@@ -45,6 +46,7 @@ export class AdminConvites {
   protected readonly CLASSE_STATUS = CLASSE_STATUS;
   protected readonly quando = quando;
   protected readonly filtro = signal<Filtro>('todos');
+  protected readonly filtroOrigem = signal<FiltroOrigem>('todas');
   protected readonly busca = signal('');
   protected readonly selecionado = signal<number | null>(null);
   protected readonly importacao = signal<Importacao | null>(null);
@@ -60,7 +62,7 @@ export class AdminConvites {
   /** Quantos ainda não responderam (ativos), para o texto do cartão de exportar. */
   protected readonly faltamResponder = computed(() => {
     const r = this.dados()?.resumo;
-    return r ? r.total - r.concluiram : 0;
+    return r ? r.total - r.concluiram - r.peloLinkConcluiram : 0;
   });
   protected readonly aviso = signal<{ tipo: 'ok' | 'info' | 'erro'; texto: string } | null>(null);
   /** HTML do nosso próprio template de e-mail, mostrado num iframe sem scripts (sandbox). */
@@ -79,17 +81,26 @@ export class AdminConvites {
   protected readonly funil = computed(() => {
     const r = this.dados()?.resumo;
     if (!r) return [];
-    const pct = (n: number) => (r.total ? Math.round((n / r.total) * 100) : 0);
-    return [
-      { rotulo: 'Convidados', valor: r.total, pct: null },
-      { rotulo: 'Abriram o link', valor: r.abriram, pct: pct(r.abriram) },
-      { rotulo: 'Começaram', valor: r.comecaram, pct: pct(r.comecaram) },
-      { rotulo: 'Concluíram', valor: r.concluiram, pct: pct(r.concluiram) },
+    const pct = (n: number) => (r.convidados ? Math.round((n / r.convidados) * 100) : 0);
+    const inativos = r.inativos ? r.inativos + ' inativo' + (r.inativos === 1 ? '' : 's') + ' fora dos cálculos' : 'com link pessoal';
+    const funil = [
+      { rotulo: 'Convidados', valor: r.convidados, sub: inativos },
+      { rotulo: 'Abriram o link', valor: r.abriram, sub: pct(r.abriram) + '% dos convidados' },
+      { rotulo: 'Começaram', valor: r.comecaram, sub: pct(r.comecaram) + '% dos convidados' },
+      { rotulo: 'Concluíram', valor: r.concluiram, sub: pct(r.concluiram) + '% dos convidados' },
     ];
+    if (r.peloLink) {
+      funil.push({
+        rotulo: 'Pelo link da empresa',
+        valor: r.peloLink,
+        sub: r.peloLinkConcluiram === r.peloLink ? 'todos concluíram' : r.peloLinkConcluiram + ' concluíram',
+      });
+    }
+    return funil;
   });
 
   protected readonly chips = computed(() => {
-    const lista = this.dados()?.convites ?? [];
+    const lista = (this.dados()?.convites ?? []).filter((c) => this.daOrigem(c));
     const contar = (s: StatusConvite) => lista.filter((c) => c.status === s).length;
     // "Todos" são os ativos: o inativo sai da lista (e dos cálculos) e fica no filtro próprio.
     const todos: { valor: Filtro; texto: string; total: number }[] = [
@@ -107,10 +118,30 @@ export class AdminConvites {
     const filtro = this.filtro();
     return (this.dados()?.convites ?? []).filter(
       (c) =>
+        this.daOrigem(c) &&
         (filtro === 'todos' ? c.status !== 'INATIVO' : c.status === filtro) &&
-        (!termo || c.nome.toLowerCase().includes(termo) || c.email.toLowerCase().includes(termo)),
+        (!termo ||
+          c.nome.toLowerCase().includes(termo) ||
+          c.email.toLowerCase().includes(termo) ||
+          !!c.novaTentativa?.nome.toLowerCase().includes(termo)),
     );
   });
+
+  /** Os dois jeitos de entrar na lista, quando a empresa tem os dois. */
+  protected readonly chipsOrigem = computed(() => {
+    const r = this.dados()?.resumo;
+    if (!r || !r.peloLink || !r.convidados) return [];
+    return [
+      { valor: 'todas' as FiltroOrigem, texto: 'Todas as origens', total: r.total },
+      { valor: 'convidados' as FiltroOrigem, texto: 'Convidados', total: r.convidados },
+      { valor: 'link' as FiltroOrigem, texto: 'Pelo link da empresa', total: r.peloLink },
+    ];
+  });
+
+  private daOrigem(c: ConviteItem): boolean {
+    const origem = this.filtroOrigem();
+    return origem === 'todas' || (origem === 'link' ? c.origem === 'LINK' : c.origem !== 'LINK');
+  }
 
   protected readonly pendentesDeEnvio = computed(() => this.dados()?.resumo.aguardandoEnvio ?? 0);
 
@@ -136,6 +167,7 @@ export class AdminConvites {
     if (c.bloqueio === 'SPAM') return 'Marcou o convite como spam';
     if (c.bloqueio) return 'O e-mail voltou';
     if (c.falhaEnvio) return 'O e-mail não chegou';
+    if (c.novaTentativa) return `Respondendo de novo · ${c.novaTentativa.respondidas} de ${c.novaTentativa.perguntas}`;
     if (c.concluidoEm) return `Concluiu ${quando(c.concluidoEm).toLowerCase()}`;
     if (c.ultimoAcessoEm) return `Abriu ${quando(c.ultimoAcessoEm).toLowerCase()}`;
     if (c.enviadoEm) return `E-mail ${quando(c.enviadoEm).toLowerCase()}`;

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title th:text="${a.convite} ? 'Acompanhe a avaliação dos líderes' : 'Seu código de acesso'">Seu código de acesso</title>
+</head>
+<!-- Entrada do RH na página de acompanhamento: o código pedido na tela (com o botão) ou o convite
+     mandado pelo administrador (só o botão). Estilos inline e tabelas: é o que todo cliente de e-mail entende. -->
+<body th:with="t=${a.tema}" th:style="|margin:0;padding:0;background:${t.fundo};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${t.tinta};|"
+      style="margin:0;padding:0;background:#EDF2EF;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F2B26;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;"
+      th:text="${a.convite} ? 'Veja quem já respondeu e o resultado do grupo, sem senha.' : |Digite ${a.codigo} na tela ou toque em Entrar. Vale por ${a.validade}.|">Resumo.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" th:style="|background:${t.fundo};|" style="background:#EDF2EF;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border-radius:20px;">
+        <!-- Marca: a da empresa, ou a do Diagnóstico para quem acompanha mais de uma -->
+        <tr>
+          <td style="padding:28px 32px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <th:block th:if="${a.logo != null}">
+                <td><img th:src="${a.logo.url}" th:alt="${a.empresa}" alt="Empresa"
+                         th:width="${a.logo.largura}" th:height="${a.logo.altura}"
+                         th:style="|display:block;width:${a.logo.largura}px;height:${a.logo.altura}px;border:0;|"
+                         style="display:block;height:34px;width:auto;border:0;"></td>
+                <td th:if="${a.logo.pedeNome}" style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${a.empresa}">Empresa</td>
+              </th:block>
+              <th:block th:if="${a.logo == null}">
+                <td th:style="|width:30px;height:30px;background:${t.acao};color:${t.sobreAcao};border-radius:8px;text-align:center;font-size:12px;font-weight:700;|"
+                    style="width:30px;height:30px;background:#0F2B26;color:#FFFFFF;border-radius:8px;text-align:center;font-size:12px;font-weight:700;"
+                    th:text="${a.sigla}">DL</td>
+                <td style="padding-left:10px;font-size:15px;font-weight:600;" th:text="${a.empresa ?: 'Diagnóstico do Líder'}">Empresa</td>
+              </th:block>
+            </tr></table>
+          </td>
+        </tr>
+
+        <!-- Código pedido na tela -->
+        <tr th:unless="${a.convite}">
+          <td style="padding:28px 32px 0;">
+            <p th:style="|margin:0;font-size:12px;line-height:1.4;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${t.tinta3};|"
+               style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#7D918B;">Acompanhamento da avaliação</p>
+            <h1 style="margin:10px 0 0;font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-0.02em;">Seu código de acesso</h1>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;" th:style="|margin-top:20px;background:${t.fundo2};border-radius:16px;|">
+              <tr>
+                <td align="center" style="padding:22px 12px;">
+                  <span style="font-family:'SF Mono','Roboto Mono',Menlo,Consolas,monospace;font-size:38px;line-height:1;font-weight:700;letter-spacing:0.14em;"
+                        th:text="${a.codigo}">482 913</span>
+                </td>
+              </tr>
+            </table>
+            <p th:style="|margin:14px 0 0;font-size:15px;line-height:1.55;color:${t.tinta2};|" style="margin:14px 0 0;font-size:15px;line-height:1.55;color:#4A635C;"
+               th:text="|Digite na tela em que você pediu. Vale por ${a.validade} e funciona uma vez.|">Digite na tela em que você pediu.</p>
+            <p style="margin:18px 0 0;font-size:14px;line-height:1.5;" th:style="|margin:18px 0 0;font-size:14px;line-height:1.5;color:${t.tinta2};|">No celular, o botão entra sem digitar:</p>
+          </td>
+        </tr>
+
+        <!-- Convite mandado pelo painel -->
+        <tr th:if="${a.convite}">
+          <td style="padding:28px 32px 0;">
+            <p th:style="|margin:0;font-size:12px;line-height:1.4;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${t.tinta3};|"
+               style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#7D918B;">Acompanhamento da avaliação</p>
+            <h1 style="margin:10px 0 0;font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-0.02em;">Acompanhe a avaliação dos líderes ao vivo</h1>
+            <p th:style="|margin:12px 0 0;font-size:16px;line-height:1.55;color:${t.tinta2};|" style="margin:12px 0 0;font-size:16px;line-height:1.55;color:#4A635C;"
+               th:text="|Você está cadastrado como gestor ${a.empresa != null ? 'da ' + a.empresa : ''} no Diagnóstico do Líder. Na página você vê quem já respondeu, manda o link pessoal para quem falta pelo WhatsApp e acompanha o resultado do grupo. Nenhuma resposta individual aparece.|">Você está cadastrado como gestor.</p>
+          </td>
+        </tr>
+
+        <!-- Botão -->
+        <tr>
+          <td style="padding:18px 32px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td th:style="|border-radius:999px;background:${t.acao};|" style="border-radius:999px;background:#0F2B26;">
+                <a th:href="${a.link}" href="#" th:style="|display:inline-block;padding:15px 28px;font-size:16px;line-height:1.2;font-weight:700;color:${t.sobreAcao};text-decoration:none;border-radius:999px;|"
+                   style="display:inline-block;padding:15px 28px;font-size:16px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:999px;"
+                   th:text="${a.convite} ? 'Abrir o acompanhamento' : 'Entrar'">Entrar</a>
+              </td>
+            </tr></table>
+            <p th:if="${a.convite}" th:style="|margin:12px 0 0;font-size:14px;line-height:1.5;color:${t.tinta2};|" style="margin:12px 0 0;font-size:14px;line-height:1.5;color:#4A635C;"
+               th:text="|O botão vale por ${a.validade} e entra uma vez. Depois, abra ${a.pagina} e digite este e-mail: o código de acesso chega na hora, sem senha.|">O botão vale por 7 dias.</p>
+          </td>
+        </tr>
+
+        <!-- Rodapé -->
+        <tr>
+          <td style="padding:28px 32px 28px;">
+            <p th:style="|margin:0;padding-top:18px;border-top:1px solid ${t.linha};font-size:12px;line-height:1.5;color:${t.tinta3};|"
+               style="margin:0;padding-top:18px;border-top:1px solid #D2DDD8;font-size:12px;line-height:1.5;color:#7D918B;"
+               th:text="${a.convite} ? 'Se você não acompanha esta avaliação, ignore este e-mail.' : 'Se não foi você que pediu, ignore este e-mail: ninguém entra sem o código.'">Se não foi você que pediu, ignore este e-mail.</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

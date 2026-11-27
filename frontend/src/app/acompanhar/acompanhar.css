@@ -1,0 +1,169 @@
+/* Página do RH (/acompanhar). Cores pelos tokens: a marca da empresa troca tudo menos as faixas. */
+
+.cartao-rh {
+  border-radius: 24px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-linha) 80%, transparent),
+    0 18px 36px -32px rgb(15 43 38 / 0.55);
+}
+
+/* Abas: no topo (computador) e no rodapé (celular, no alcance do polegar). */
+.aba-topo {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  color: var(--color-abeto-2);
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 180ms, color 180ms;
+}
+.aba-topo:hover {
+  color: var(--color-abeto);
+}
+.aba-topo[aria-selected='true'] {
+  background: var(--color-acao);
+  color: var(--color-sobre-acao);
+}
+
+.abas-rodape {
+  padding-bottom: env(safe-area-inset-bottom);
+  background: color-mix(in srgb, #fff 92%, transparent);
+  box-shadow: 0 -1px 0 var(--color-linha);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.aba-rodape {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 62px;
+  color: var(--color-abeto-3);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: color 180ms;
+}
+.aba-rodape[aria-selected='true'] {
+  color: var(--color-acao);
+}
+.aba-rodape[aria-selected='true']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 36px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: var(--color-acao);
+  transform: translateX(-50%);
+}
+
+/* Ação redonda de uma linha (WhatsApp, copiar, e-mail): 48 px de alvo. */
+.acao-linha {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  color: var(--color-abeto);
+  background: var(--color-nevoa-2);
+  box-shadow: inset 0 0 0 1px var(--color-linha);
+  transition: background-color 180ms, box-shadow 180ms, transform 160ms var(--ease-mola);
+}
+.acao-linha:hover {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--color-abeto-3);
+}
+.acao-linha:active {
+  transform: scale(0.94);
+}
+.acao-whatsapp {
+  background: #e7f7ee;
+  box-shadow: inset 0 0 0 1px #bfe6cf;
+  color: #12804a;
+}
+.acao-whatsapp:hover {
+  background: #d8f2e3;
+  box-shadow: inset 0 0 0 1px #8fd3ad;
+}
+.acao-feita {
+  background: var(--color-acao);
+  box-shadow: none;
+  color: var(--color-sobre-acao);
+}
+
+/* Ponto "ao vivo" ao lado do horário da última atualização. */
+.ao-vivo {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-ascensao);
+}
+.ao-vivo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: pulsar 2s ease-out infinite;
+}
+
+/* Filtro por origem (Todos · Convidados · Pelo link). */
+.chip-rh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--color-linha);
+  color: var(--color-abeto-2);
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 180ms, color 180ms, box-shadow 180ms;
+}
+.chip-rh[aria-pressed='true'] {
+  background: var(--color-acao);
+  box-shadow: none;
+  color: var(--color-sobre-acao);
+}
+
+/* "pelo link": começou sozinho pelo link aberto da empresa, sem convite. */
+.etiqueta-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-nevoa-2);
+  box-shadow: inset 0 0 0 1px var(--color-linha);
+  color: var(--color-abeto-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.secao-titulo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-abeto-2);
+}
+
+details.dobra > summary::-webkit-details-marker {
+  display: none;
+}
+details.dobra > summary .seta {
+  transition: transform 220ms var(--ease-mola);
+}
+details.dobra[open] > summary .seta {
+  transform: rotate(180deg);
+}

@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { problemaDe } from '../../api/diagnostico-api';
 import { quando } from '../../compartilhado/formatos';
-import { API_ADMIN, EnvioAcompanhamento, ItemAcompanhamento, PainelAcompanhamento } from '../admin-modelos';
+import { AcessosRh, API_ADMIN, EnvioAcompanhamento, ItemAcompanhamento, PainelAcompanhamento } from '../admin-modelos';
 
 const SELO: Record<PainelAcompanhamento['situacao'], { texto: string; classe: string }> = {
   ATIVO: { texto: 'Ligado', classe: 'bg-ascensao-suave text-[#17714A]' },
@@ -92,6 +92,54 @@ const TITULO_ITEM: Record<ItemAcompanhamento['tipo'], string> = {
           }
         </div>
 
+        @if (p.gestores.length && acessos.hasValue()) {
+          @let a = acessos.value();
+          <div class="mt-5 border-t border-linha pt-4">
+            <h3 class="text-[15px] font-semibold">Acompanhamento ao vivo</h3>
+            <p class="mt-1 text-[14px] text-abeto-2">
+              Os gestores também veem a participação e o resultado do grupo, sem nenhuma resposta individual, em
+              <span class="font-semibold break-all text-abeto">{{ semProtocolo(a.pagina) }}</span>. Entram com o próprio e-mail: o código chega na hora, sem senha.
+            </p>
+            <ul class="mt-3 space-y-2">
+              @for (g of a.gestores; track g.email) {
+                <li class="flex flex-col gap-2 rounded-2xl bg-nevoa-2 px-4 py-3 sm:flex-row sm:items-center">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[14.5px] font-semibold break-all">{{ g.email }}</p>
+                    <p class="text-[13.5px] text-abeto-2">
+                      @if (g.ultimoAcesso) {
+                        Último acesso {{ minuscula(quando(g.ultimoAcesso)) }}{{ aparelho(g.aparelho) ? ' · ' + aparelho(g.aparelho) : '' }}
+                      } @else {
+                        Ainda não entrou
+                      }
+                      @if (g.conviteEnviadoEm) {
+                        · acesso mandado {{ minuscula(quando(g.conviteEnviadoEm)) }}
+                      }
+                    </p>
+                  </div>
+                  <button type="button" class="botao-secundario min-h-11 shrink-0 px-4 text-[14px]" [attr.aria-busy]="mandando() === g.email" [disabled]="!!mandando()" (click)="mandarAcesso(g.email)">
+                    @if (mandando() === g.email) {
+                      <span class="size-4 animate-spin rounded-full border-2 border-linha border-t-abeto" aria-hidden="true"></span>
+                      Mandando…
+                    } @else {
+                      {{ g.conviteEnviadoEm ? 'Mandar de novo' : 'Mandar acesso' }}
+                    }
+                  </button>
+                </li>
+              }
+            </ul>
+            <div class="mt-2 flex flex-wrap gap-x-4">
+              <button type="button" class="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold text-abeto hover:underline" (click)="verEmail('acesso')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></svg>
+                Ver o e-mail de acesso
+              </button>
+              <button type="button" class="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold text-abeto hover:underline" (click)="copiarPagina(a.pagina)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+                {{ paginaCopiada() ? 'Endereço copiado' : 'Copiar o endereço' }}
+              </button>
+            </div>
+          </div>
+        }
+
         @if (p.lembretes; as l) {
           <div class="mt-5 border-t border-linha pt-4">
             <h3 class="text-[15px] font-semibold">Lembretes aos líderes que faltam</h3>
@@ -163,9 +211,9 @@ const TITULO_ITEM: Record<ItemAcompanhamento['tipo'], string> = {
       <div class="flex flex-col">
         <header class="flex items-start justify-between gap-4 border-b border-linha px-5 pt-5 pb-4 sm:px-7">
           <div>
-            <h2 id="gestor-email-titulo" class="display text-[24px] leading-tight font-bold">{{ previa() === 'lembrete' ? 'Lembrete ao líder' : 'E-mail para o gestor' }}</h2>
+            <h2 id="gestor-email-titulo" class="display text-[24px] leading-tight font-bold">{{ previa() === 'lembrete' ? 'Lembrete ao líder' : previa() === 'acesso' ? 'Acesso ao acompanhamento' : 'E-mail para o gestor' }}</h2>
             <p class="mt-1 text-[14px] text-abeto-2">
-              {{ previa() === 'lembrete' ? 'Como chega para quem ainda não respondeu, com o link pessoal dele.' : 'Como sairia agora. Os anexos (PDF e Excel) vão junto.' }}
+              {{ previa() === 'lembrete' ? 'Como chega para quem ainda não respondeu, com o link pessoal dele.' : previa() === 'acesso' ? 'O botão entra direto na página da empresa (vale 7 dias, uma vez).' : 'Como sairia agora. Os anexos (PDF e Excel) vão junto.' }}
             </p>
           </div>
           <button type="button" class="-mt-1 -mr-2 grid size-11 shrink-0 place-items-center rounded-full text-abeto-2 hover:bg-nevoa hover:text-abeto" aria-label="Fechar" (click)="dialogo.close()">
@@ -173,7 +221,7 @@ const TITULO_ITEM: Record<ItemAcompanhamento['tipo'], string> = {
           </button>
         </header>
         @if (html(); as conteudo) {
-          <iframe class="min-h-0 w-full flex-1 bg-nevoa" [title]="previa() === 'lembrete' ? 'Prévia do lembrete ao líder' : 'Prévia do e-mail para o gestor'" sandbox="" [srcdoc]="conteudo"></iframe>
+          <iframe class="min-h-0 w-full flex-1 bg-nevoa" [title]="previa() === 'lembrete' ? 'Prévia do lembrete ao líder' : previa() === 'acesso' ? 'Prévia do e-mail de acesso' : 'Prévia do e-mail para o gestor'" sandbox="" [srcdoc]="conteudo"></iframe>
         }
       </div>
     </dialog>
@@ -209,7 +257,15 @@ export class CartaoAcompanhamento {
     return `${API_ADMIN}/empresas/${this.empresaId()}/acompanhamento`;
   });
 
+  /** Quem da empresa acompanha pela página do RH e quando entrou. */
+  protected readonly acessos = httpResource<AcessosRh>(() => {
+    this.atualizacao();
+    return `${API_ADMIN}/empresas/${this.empresaId()}/acesso-rh`;
+  });
+
   protected readonly quando = quando;
+  protected readonly mandando = signal<string | null>(null);
+  protected readonly paginaCopiada = signal(false);
   protected readonly enviando = signal(false);
   protected readonly pausando = signal(false);
   protected readonly abrindo = signal(false);
@@ -217,7 +273,7 @@ export class CartaoAcompanhamento {
   /** HTML do nosso próprio template, num iframe sem scripts (sandbox). */
   protected readonly html = signal<SafeHtml | null>(null);
   /** Qual e-mail está na prévia. */
-  protected readonly previa = signal<'gestor' | 'lembrete'>('gestor');
+  protected readonly previa = signal<'gestor' | 'lembrete' | 'acesso'>('gestor');
 
   protected readonly selo = computed(() => SELO[this.painel.hasValue() ? this.painel.value().situacao : 'DESLIGADO']);
   protected readonly textoEnviar = computed(() => {
@@ -263,11 +319,55 @@ export class CartaoAcompanhamento {
     }
   }
 
-  protected async verEmail(qual: 'gestor' | 'lembrete') {
+  protected minuscula(texto: string) {
+    return texto.charAt(0).toLowerCase() + texto.slice(1);
+  }
+
+  protected semProtocolo(url: string) {
+    return url.replace(/^https?:\/\//, '');
+  }
+
+  /** "Mozilla/5.0 (iPhone; …)" → "iPhone". */
+  protected aparelho(ua: string | null): string | null {
+    if (!ua) return null;
+    if (/iPhone/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua)) return 'iPad';
+    if (/Android/i.test(ua)) return 'Android';
+    if (/Windows/i.test(ua)) return 'Windows';
+    if (/Macintosh|Mac OS/i.test(ua)) return 'Mac';
+    return null;
+  }
+
+  protected async mandarAcesso(email: string) {
+    if (this.mandando()) return;
+    this.mandando.set(email);
+    this.aviso.set(null);
+    try {
+      await firstValueFrom(this.http.post(`${API_ADMIN}/empresas/${this.empresaId()}/acesso-rh/convite`, { email }));
+      this.aviso.set({ ok: true, texto: `Acesso mandado para ${email}. O botão do e-mail vale por 7 dias.` });
+      this.acessos.reload();
+    } catch (e) {
+      this.aviso.set({ ok: false, texto: problemaDe(e).detail ?? 'Não foi possível mandar agora. Tente de novo.' });
+    } finally {
+      this.mandando.set(null);
+    }
+  }
+
+  protected async copiarPagina(pagina: string) {
+    try {
+      await navigator.clipboard.writeText(pagina);
+      this.paginaCopiada.set(true);
+      setTimeout(() => this.paginaCopiada.set(false), 2000);
+    } catch {
+      this.aviso.set({ ok: false, texto: 'Não deu para copiar. O endereço é ' + pagina });
+    }
+  }
+
+  protected async verEmail(qual: 'gestor' | 'lembrete' | 'acesso') {
     if (this.abrindo()) return;
     this.abrindo.set(true);
     this.previa.set(qual);
-    const caminho = qual === 'lembrete' ? 'convites/lembrete-previa' : 'acompanhamento/email-previa';
+    const caminho = qual === 'lembrete' ? 'convites/lembrete-previa' : qual === 'acesso' ? 'acesso-rh/convite-previa' : 'acompanhamento/email-previa';
     try {
       const html = await firstValueFrom(
         this.http.get(`${API_ADMIN}/empresas/${this.empresaId()}/${caminho}`, { responseType: 'text' }),

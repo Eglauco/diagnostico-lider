@@ -44,7 +44,8 @@ export function errosDeGestores(campos: Record<string, string> | undefined): Rec
       <legend class="text-[15px] font-semibold">Gestores da empresa</legend>
       <p class="mt-1 text-[14px] text-abeto-2">
         Recebem todo dia útil, às 8h, o relatório de participação em PDF e Excel para cobrar quem falta. Quando todos
-        responderem ou o prazo vencer, recebem o resultado consolidado.
+        responderem ou o prazo vencer, recebem o resultado consolidado. E acompanham tudo ao vivo na página do RH,
+        entrando com o próprio e-mail, sem senha.
       </p>
 
       @if (emails().length) {

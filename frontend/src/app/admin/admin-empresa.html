@@ -98,22 +98,26 @@
 
             <section class="cartao order-1 p-5 sm:p-6" aria-labelledby="titulo-convites">
               <div class="flex items-center justify-between gap-3">
-                <h2 id="titulo-convites" class="text-[17px] font-semibold">Convites por e-mail</h2>
+                <h2 id="titulo-convites" class="text-[17px] font-semibold">Líderes da avaliação</h2>
                 <a [routerLink]="['convites']" class="inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-abeto hover:underline">
                   Abrir <span aria-hidden="true">→</span>
                 </a>
               </div>
               @if (convites.hasValue() && convites.value().convites.length; as total) {
                 @let r = convites.value().resumo;
-                <p class="mt-1 text-[14px] text-abeto-2">Um link pessoal por líder, com o registro de quem abriu e de quem concluiu.</p>
+                <p class="mt-1 text-[14px] text-abeto-2">Todos num lugar só: quem você convidou, com o link pessoal, e quem começou pelo link aberto da empresa.</p>
                 <dl class="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Convidados</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.total }}</dd></div>
-                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Abriram</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.abriram }}</dd></div>
-                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Concluíram</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.concluiram }}</dd></div>
+                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Líderes</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.total }}</dd></div>
+                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Convidados</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.convidados }}</dd></div>
+                  <div class="rounded-2xl bg-nevoa-2 px-2 py-3"><dt class="text-[12px] font-semibold text-abeto-2">Pelo link</dt><dd class="display mt-1 text-[28px] leading-none font-bold tabular-nums">{{ r.peloLink }}</dd></div>
                 </dl>
+                <p class="mt-3 text-[14px] text-abeto-2">
+                  <strong class="font-semibold text-abeto tabular-nums">{{ r.concluiram + r.peloLinkConcluiram }} de {{ r.total }}</strong> já concluíram.
+                </p>
               } @else {
                 <p class="mt-1 text-[14px] text-abeto-2">Importe a planilha do RH: cada líder recebe um link só dele, já com os dados preenchidos, e você acompanha quem abriu e quem concluiu.</p>
                 <a [routerLink]="['convites']" class="botao-secundario mt-4 w-full sm:w-auto">Convidar líderes por e-mail</a>
+                <p class="mt-3 text-[13px] text-abeto-2">Quem começar pelo link aberto da empresa também aparece na lista, sozinho.</p>
               }
             </section>
 
@@ -184,6 +188,7 @@
                     <h3 class="text-[16px] font-semibold">Relatório consolidado</h3>
                     <p class="mt-0.5 text-[14px] text-abeto-2">
                       PDF para enviar à empresa, sem nomes: o grupo na curva, faixas, cargos, dimensões, cada pergunta e o que fazer com cada grupo.
+                      É o mesmo resultado que os gestores veem: só muda a cada 3 respostas novas, e cargos e perguntas entram no resultado final, para ninguém ser identificado.
                     </p>
                   </div>
                 </div>

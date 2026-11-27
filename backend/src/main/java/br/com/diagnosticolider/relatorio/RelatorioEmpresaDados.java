@@ -14,7 +14,7 @@ public record RelatorioEmpresaDados(String empresa, String emitidoEm, String per
 		Limites limites, List<List<DimensaoResumo>> paginasDimensoes, DimensaoResumo maisFragil,
 		List<List<PerguntaResumo>> paginasPerguntas, String notaVersoes, int minimoLideres, Paginacao paginas,
 		String nomeArquivo, PaletaMarca.Tema tema, String sigla, String logo, boolean logoPedeNome, PorCargo porCargo,
-		Situacao situacao) {
+		Situacao situacao, String notaAnonimato, boolean completo, List<RelatorioEmpresaService.Lider> pontos) {
 
 	/** Resultado final (avaliação encerrada) ou parcial (ainda aberta); null sem data de encerramento. */
 	public record Situacao(String rotulo, String explicacao) {
