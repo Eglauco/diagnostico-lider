@@ -27,13 +27,18 @@ public class QuemEsta {
 	}
 
 	public String nome() {
+		// Na página do RH, quem age é o gestor, mesmo que a mesma pessoa esteja com o painel do
+		// administrador aberto no mesmo navegador (o cookie da sessão do painel vai junto).
+		RequestAttributes requisicao = RequestContextHolder.getRequestAttributes();
+		Object gestor = requisicao == null ? null : requisicao.getAttribute(AUTOR_RH, RequestAttributes.SCOPE_REQUEST);
+		if (gestor instanceof String autor) {
+			return autor;
+		}
 		Authentication autenticacao = SecurityContextHolder.getContext().getAuthentication();
 		if (autenticacao != null && autenticacao.getPrincipal() instanceof UsuarioLogado logado) {
 			return usuarios.findById(logado.getId()).map(Usuario::getNome).orElse(logado.getUsername());
 		}
-		RequestAttributes requisicao = RequestContextHolder.getRequestAttributes();
-		Object gestor = requisicao == null ? null : requisicao.getAttribute(AUTOR_RH, RequestAttributes.SCOPE_REQUEST);
-		return gestor instanceof String autor ? autor : null;
+		return null;
 	}
 
 	/** A ação foi de um gestor pela página do RH (e não do administrador). */
