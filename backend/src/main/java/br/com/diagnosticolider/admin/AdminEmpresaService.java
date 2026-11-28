@@ -117,7 +117,7 @@ public class AdminEmpresaService {
 		return new EmpresaDetalhe(empresa.getId(), empresa.getNome(), empresa.getCriadoEm(),
 				link(linksPrincipais(List.of(id)).get(id)), indicadores, RelatorioEmpresaService.MINIMO_LIDERES,
 				cores(empresa), empresa.tema(), logomarcas.logo(empresa), cargos.itens(id), encerramento(empresa),
-				empresa.getGestores(), fundos.fundo(empresa));
+				empresa.getGestores(), fundos.fundo(empresa), fundos.capa(empresa));
 	}
 
 	private Encerramento encerramento(Empresa empresa) {

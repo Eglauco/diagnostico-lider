@@ -4,43 +4,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/** A foto de fundo da empresa: versões (para o endereço mudar a cada troca) e o ponto de foco. */
+/** As fotos da página do RH (entrada e topo): versões (o endereço muda a cada troca) e o ponto de foco. */
 class FotoDeFundoTest {
 
 	@Test
 	void cadaFotoNovaGanhaUmaVersaoEDevolveAAnterior() {
-		Empresa empresa = new Empresa();
+		FotoDaEmpresa foto = new FotoDaEmpresa();
 
-		assertThat(empresa.trocarFundo(2000, 1250, 38, 47)).isNull();
-		assertThat(empresa.getFundoVersao()).isEqualTo(1);
-		assertThat(empresa.trocarFundo(1600, 900, 50, 50)).isEqualTo(1);
-		assertThat(empresa.getFundoVersao()).isEqualTo(2);
-		assertThat(empresa.getFundoLargura()).isEqualTo(1600);
+		assertThat(foto.trocar(2000, 1250, 38, 47)).isNull();
+		assertThat(foto.getVersao()).isEqualTo(1);
+		assertThat(foto.trocar(1600, 900, 50, 50)).isEqualTo(1);
+		assertThat(foto.getVersao()).isEqualTo(2);
+		assertThat(foto.getLargura()).isEqualTo(1600);
 	}
 
 	@Test
-	void ofocoFicaEntreZeroECem() {
-		Empresa empresa = new Empresa();
-		empresa.trocarFundo(2000, 1250, -10, 140);
+	void oFocoFicaEntreZeroECem() {
+		FotoDaEmpresa foto = new FotoDaEmpresa();
+		foto.trocar(2000, 1250, -10, 140);
 
-		assertThat(empresa.getFundoFocoX()).isZero();
-		assertThat(empresa.getFundoFocoY()).isEqualTo(100);
+		assertThat(foto.getFocoX()).isZero();
+		assertThat(foto.getFocoY()).isEqualTo(100);
 	}
 
 	@Test
 	void removerApagaAFotoEVoltaOFocoAoCentro() {
-		Empresa empresa = new Empresa();
-		empresa.trocarFundo(2000, 1250, 20, 80);
+		FotoDaEmpresa foto = new FotoDaEmpresa();
+		foto.trocar(2000, 1250, 20, 80);
 
-		assertThat(empresa.removerFundo()).isEqualTo(1);
-		assertThat(empresa.getFundoVersao()).isNull();
-		assertThat(empresa.getFundoFocoX()).isEqualTo(50);
-		assertThat(empresa.getFundoFocoY()).isEqualTo(50);
+		assertThat(foto.remover()).isEqualTo(1);
+		assertThat(foto.existe()).isFalse();
+		assertThat(foto.getFocoX()).isEqualTo(50);
+		assertThat(foto.getFocoY()).isEqualTo(50);
 	}
 
 	@Test
-	void oCaminhoNoBucketTemAVersao() {
-		assertThat(FotoDeFundoService.caminho(5L, 3)).isEqualTo("empresas/5/fundo-v3.jpg");
+	void aEntradaEOTopoSaoFotosSeparadas() {
+		Empresa empresa = new Empresa("Construtora");
+		empresa.getCapa().trocar(2400, 800, 50, 30);
+
+		assertThat(empresa.getCapa().existe()).isTrue();
+		assertThat(empresa.getFundo().existe()).isFalse();
+	}
+
+	@Test
+	void oCaminhoNoBucketTemOTipoEAVersao() {
+		assertThat(FotoDeFundoService.caminho(FotoDeFundoService.Tipo.FUNDO, 5L, 3)).isEqualTo("empresas/5/fundo-v3.jpg");
+		assertThat(FotoDeFundoService.caminho(FotoDeFundoService.Tipo.CAPA, 5L, 1)).isEqualTo("empresas/5/capa-v1.jpg");
 	}
 
 }

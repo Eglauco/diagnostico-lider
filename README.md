@@ -264,31 +264,37 @@ empresa, no PDF individual, no e-mail do líder, no relatório consolidado e no 
 | DELETE | `/api/admin/empresas/{id}/logo`                   | Remove a logo                               |
 | GET    | `/api/public/empresas/{id}/logo-v{versao}.png`    | Endereço permanente da versão atual (e-mail e dev sem bucket; versão antiga: 404) |
 
-### Foto de fundo da página do RH
+### Fotos da página do RH (entrada e topo)
 
-Enviada pelo administrador em Marca e cargos (só ele troca). Aparece na página do RH da empresa
-(`/acompanhar/{codigo}`): na metade esquerda da entrada no computador, numa faixa no alto da entrada
-no celular e como capa no topo da página depois de entrar. Sem foto, tudo fica nas cores da marca.
+Enviadas pelo administrador em Marca e cargos (só ele troca), cada uma com o seu campo, o tamanho
+ideal (com "Copiar o pedido para o cliente") e as prévias do corte real:
+
+| Foto | Onde aparece | Tamanho ideal | Mínimo (aviso) | Mínimo (recusa) |
+|------|--------------|---------------|----------------|-----------------|
+| **Da entrada** (`fundo`) | Metade esquerda da entrada no computador (de 0,85 a 1,25 de proporção) | 2000 × 2000 px, quadrada (ou 1600 × 2000 em pé) | 1200 × 1200 | 640 × 400 |
+| **Do topo** (`capa`) | Topo da página depois de entrar (6 por 1 no computador, 2,4 por 1 no celular) e faixa da entrada no celular | 2400 × 800 px, deitada (3 por 1) | 1600 × 530 | 1000 × 250 |
+
+Sem uma das duas, as telas usam a outra (`fotoDaEntrada` / `fotoDoTopo` em `tema-marca.ts`); sem
+nenhuma, tudo fica nas cores da marca.
 
 - **Preparada no navegador** (`admin/fundo/preparar-fundo.ts`): JPG, PNG ou WebP (até 25 MB), com a
   orientação da câmera aplicada, reduzida para até 2400 px de largura e comprimida em JPEG. O backend
-  (`FotoDeFundoService`) só aceita JPEG de 640 × 400 a 3200 px e até 2,5 MB. Abaixo de 1400 px de
-  largura o painel avisa que pode ficar borrada em tela grande.
-- **Ponto de foco:** o administrador toca na foto no que precisa ficar sempre à vista (ou usa as
-  setas); vira o `object-position` do corte (`empresa.fundo_foco_x/y`, de 0 a 100). As três prévias do
-  campo mostram o corte real de cada lugar, com o véu na cor da marca.
+  (`FotoDeFundoService`, com `Tipo.FUNDO` e `Tipo.CAPA`) só aceita JPEG até 3200 px e 2,5 MB.
+- **Ponto de foco:** o administrador clica ou arrasta na foto no que precisa ficar sempre à vista (ou
+  usa as setas); vira o `object-position` do corte (`empresa.fundo_foco_x/y` e `capa_foco_x/y`, de 0 a
+  100; as duas fotos são o `@Embeddable` `FotoDaEmpresa`).
 - **Véu na cor da marca** (`compartilhado/foto-fundo.ts`): um gradiente da tinta do tema por cima da
   foto, mais forte onde há texto, para o branco continuar legível com qualquer foto.
-- **Arquivos versionados**, como a logo: `{prefixo}/empresas/{id}/fundo-v{versao}.jpg`, endereço
-  assinado direto do bucket nas telas (vem em `MarcaEmpresa.fundo`). Trocar só o foco não regrava o
-  arquivo.
+- **Arquivos versionados**, como a logo: `{prefixo}/empresas/{id}/fundo-v{versao}.jpg` e
+  `capa-v{versao}.jpg`, endereço assinado direto do bucket nas telas (vêm em `MarcaEmpresa.fundo` e
+  `.capa`). Trocar só o foco não regrava o arquivo.
 
 | Método | Rota                                              | O que faz                                   |
 |--------|---------------------------------------------------|---------------------------------------------|
-| PUT    | `/api/admin/empresas/{id}/fundo`                  | Envia a foto (multipart `arquivo`, JPEG, mais `focoX` e `focoY`) |
-| PUT    | `/api/admin/empresas/{id}/fundo/foco`             | Só o ponto de foco (`{ x, y }`)             |
-| DELETE | `/api/admin/empresas/{id}/fundo`                  | Remove a foto                               |
-| GET    | `/api/public/empresas/{id}/fundo-v{versao}.jpg`   | A versão atual (dev sem bucket; versão antiga: 404) |
+| PUT    | `/api/admin/empresas/{id}/{fundo\|capa}`          | Envia a foto (multipart `arquivo`, JPEG, mais `focoX` e `focoY`) |
+| PUT    | `/api/admin/empresas/{id}/{fundo\|capa}/foco`     | Só o ponto de foco (`{ x, y }`)             |
+| DELETE | `/api/admin/empresas/{id}/{fundo\|capa}`          | Remove a foto                               |
+| GET    | `/api/public/empresas/{id}/{fundo\|capa}-v{versao}.jpg` | A versão atual (dev sem bucket; versão antiga: 404) |
 
 ### Cargos dos líderes
 

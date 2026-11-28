@@ -7,7 +7,7 @@ import { FAIXAS } from '../compartilhado/faixas';
 import { posicaoDaFoto, veuDaFoto } from '../compartilhado/foto-fundo';
 import { Marca } from '../compartilhado/marca';
 import { MarcaEmpresaCabecalho } from '../compartilhado/marca-empresa';
-import { MarcaEmpresa } from '../compartilhado/tema-marca';
+import { fotoDoTopo, MarcaEmpresa } from '../compartilhado/tema-marca';
 import { armazenamento, vibrar } from '../compartilhado/util';
 import { GestorRh, SessaoRh } from './rh-api';
 import { VitrineRh } from './vitrine-rh';
@@ -79,7 +79,7 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
     <div class="lg:sticky lg:top-0 lg:flex lg:h-dvh lg:items-center lg:justify-center lg:self-start lg:overflow-y-auto lg:px-10 lg:py-8">
     <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-5 sm:px-8 sm:pt-8 lg:min-h-0 lg:max-w-[27rem] lg:px-0 lg:pt-0">
       <!-- No celular, a foto da empresa numa faixa no alto, com a marca por cima. -->
-      @if (etapa() === 'email' && marca()?.fundo; as f) {
+      @if (etapa() === 'email' && faixa(); as f) {
         <div class="capa-celular relative -mx-5 -mt-5 h-[clamp(184px,30dvh,250px)] overflow-hidden rounded-b-[28px] text-white sm:-mx-8 sm:-mt-8 lg:hidden">
           <img class="foto absolute inset-0 size-full object-cover" [src]="f.url" alt="" [style.object-position]="posicao(f)" decoding="async" fetchpriority="high" />
           <i class="absolute inset-0" [style.background]="veuCelular" aria-hidden="true"></i>
@@ -95,7 +95,7 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
           </div>
         </div>
       }
-      <header class="flex min-h-12 items-center" [class]="etapa() === 'email' ? (marca()?.fundo ? 'hidden' : 'lg:hidden') : 'lg:mb-6'">
+      <header class="flex min-h-12 items-center" [class]="etapa() === 'email' ? (faixa() ? 'hidden' : 'lg:hidden') : 'lg:mb-6'">
         @if (etapa() === 'codigo') {
           <button type="button" class="-ml-3 inline-flex min-h-12 items-center gap-1.5 rounded-full px-3 text-[15px] font-semibold text-abeto-2 hover:text-abeto" (click)="voltar()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -110,9 +110,9 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
       </header>
 
       @if (etapa() === 'email') {
-        <section class="flex-1 lg:flex-none lg:pt-0" [class]="marca()?.fundo ? 'pt-2' : 'pt-8'" aria-labelledby="titulo-rh">
+        <section class="flex-1 lg:flex-none lg:pt-0" [class]="faixa() ? 'pt-2' : 'pt-8'" aria-labelledby="titulo-rh">
           <!-- Sem foto, a curva ilustra a página no celular (com foto, a faixa no alto já faz isso). -->
-          @if (!marca()?.fundo) {
+          @if (!faixa()) {
             <figure class="surgir -mx-2 rounded-[28px] bg-white/70 px-2 pt-6 ring-1 ring-linha/70 lg:hidden" style="--i: 0" aria-hidden="true">
               <app-curva modo="grupo" [pontos]="ilustracao" />
             </figure>
@@ -275,6 +275,8 @@ export class EntrarRh {
   protected readonly ilustracao = GRUPO_ILUSTRATIVO;
   protected readonly veuCelular = veuDaFoto('var(--color-abeto)', 'celular');
   protected readonly posicao = posicaoDaFoto;
+  /** A faixa do celular: a imagem do topo (ou, sem ela, a foto da entrada). */
+  protected readonly faixa = computed(() => fotoDoTopo(this.marca()));
   protected readonly casas = [0, 1, 2, 3, 4, 5];
 
   protected readonly etapa = signal<'email' | 'codigo'>('email');

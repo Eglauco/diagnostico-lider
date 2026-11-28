@@ -96,25 +96,32 @@ class AdminEmpresaController {
 		return service.detalhe(id);
 	}
 
-	/** Foto de fundo da página do RH: o painel envia um JPEG já reduzido, com o ponto de foco. */
-	@PutMapping(value = "/{id}/fundo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	EmpresaDetalhe enviarFundo(@PathVariable Long id, @RequestPart("arquivo") MultipartFile arquivo,
+	/**
+	 * As fotos da página do RH: {tipo} é "fundo" (a da entrada) ou "capa" (a do topo). O painel
+	 * envia um JPEG já reduzido, com o ponto de foco.
+	 */
+	@PutMapping(value = "/{id}/{tipo:fundo|capa}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	EmpresaDetalhe enviarFoto(@PathVariable Long id, @PathVariable String tipo, @RequestPart("arquivo") MultipartFile arquivo,
 			@RequestParam(defaultValue = "50") int focoX, @RequestParam(defaultValue = "50") int focoY) throws IOException {
-		fundos.gravar(id, arquivo.getBytes(), focoX, focoY);
+		fundos.gravar(tipoDe(tipo), id, arquivo.getBytes(), focoX, focoY);
 		return service.detalhe(id);
 	}
 
 	/** Só o ponto de foco (a mesma foto, cortada em outro lugar). */
-	@PutMapping("/{id}/fundo/foco")
-	EmpresaDetalhe focarFundo(@PathVariable Long id, @RequestBody @Validated FocoFundo foco) {
-		fundos.focar(id, foco.x(), foco.y());
+	@PutMapping("/{id}/{tipo:fundo|capa}/foco")
+	EmpresaDetalhe focarFoto(@PathVariable Long id, @PathVariable String tipo, @RequestBody @Validated FocoFundo foco) {
+		fundos.focar(tipoDe(tipo), id, foco.x(), foco.y());
 		return service.detalhe(id);
 	}
 
-	@DeleteMapping("/{id}/fundo")
-	EmpresaDetalhe removerFundo(@PathVariable Long id) {
-		fundos.remover(id);
+	@DeleteMapping("/{id}/{tipo:fundo|capa}")
+	EmpresaDetalhe removerFoto(@PathVariable Long id, @PathVariable String tipo) {
+		fundos.remover(tipoDe(tipo), id);
 		return service.detalhe(id);
+	}
+
+	private static FotoDeFundoService.Tipo tipoDe(String tipo) {
+		return "capa".equals(tipo) ? FotoDeFundoService.Tipo.CAPA : FotoDeFundoService.Tipo.FUNDO;
 	}
 
 	/** Confere o endereço do link enquanto o administrador digita. */

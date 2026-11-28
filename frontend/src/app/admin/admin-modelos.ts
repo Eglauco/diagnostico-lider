@@ -101,8 +101,9 @@ export interface EmpresaDetalhe {
   encerramento: Encerramento;
   /** E-mails dos gestores que recebem os relatórios automáticos (pode ser vazio). */
   gestores: string[];
-  /** A foto de fundo da página do RH (null sem foto). */
+  /** As fotos da página do RH: a da entrada e a do topo (null sem foto). */
   fundo: FundoEmpresa | null;
+  capa: FundoEmpresa | null;
 }
 
 export interface Disponibilidade {

@@ -4,7 +4,7 @@ import { Curva, PontoGrupo } from '../compartilhado/curva';
 import { FAIXAS } from '../compartilhado/faixas';
 import { posicaoDaFoto, veuDaFoto } from '../compartilhado/foto-fundo';
 import { semMovimento } from '../compartilhado/util';
-import { MarcaEmpresa } from '../compartilhado/tema-marca';
+import { fotoDaEntrada, MarcaEmpresa } from '../compartilhado/tema-marca';
 
 type Aba = 'participacao' | 'resultado';
 type Situacao = 'RESPONDEU' | 'COMECOU' | 'ABRIU' | 'NAO_ABRIU';
@@ -234,7 +234,7 @@ const CHEGADA_EM = 7600;
     }
   `,
   template: `
-    @if (marca()?.fundo; as f) {
+    @if (fotoEntrada(); as f) {
       <img class="foto-fundo" [src]="f.url" alt="" [style.object-position]="posicao(f)" decoding="async" fetchpriority="high" />
       <i class="veu-fundo" [style.background]="veu" aria-hidden="true"></i>
     }
@@ -424,6 +424,8 @@ export class VitrineRh {
   /** O véu da foto na cor da marca (a tinta do tema, já aplicada na página). */
   protected readonly veu = veuDaFoto('var(--color-abeto)', 'entrada');
   protected readonly posicao = posicaoDaFoto;
+  /** A foto da entrada (ou, sem ela, a do topo). */
+  protected readonly fotoEntrada = computed(() => fotoDaEntrada(this.marca()));
   protected readonly total = TOTAL;
   protected readonly trocaMs = TROCA_A_CADA;
   protected readonly pontos = PONTOS;

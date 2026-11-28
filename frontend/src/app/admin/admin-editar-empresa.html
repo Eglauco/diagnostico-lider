@@ -48,8 +48,23 @@
           <app-campo-fundo
             id="fundo-secao"
             class="scroll-mt-36"
+            tipo="fundo"
             [(mudanca)]="fundo"
             [atual]="fundoAtual()"
+            [outraExiste]="temCapa()"
+            [tema]="previa.tema()"
+            [nome]="modelo().nome.trim()"
+            [sigla]="sigla()"
+            [logo]="logoPrevia()"
+          />
+
+          <app-campo-fundo
+            id="capa-secao"
+            class="scroll-mt-36"
+            tipo="capa"
+            [(mudanca)]="capa"
+            [atual]="capaAtual()"
+            [outraExiste]="temFundo()"
             [tema]="previa.tema()"
             [nome]="modelo().nome.trim()"
             [sigla]="sigla()"

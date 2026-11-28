@@ -25,10 +25,20 @@ class LogomarcaController {
 		this.fundos = fundos;
 	}
 
-	/** A foto de fundo da página do RH (quando os arquivos estão no disco; com bucket, vai direto dele). */
+	/** A foto da entrada da página do RH (quando os arquivos estão no disco; com bucket, vai direto dele). */
 	@GetMapping("/api/public/empresas/{id}/fundo-v{versao}.jpg")
 	ResponseEntity<byte[]> fundo(@PathVariable Long id, @PathVariable int versao) {
-		return fundos.ler(id, versao)
+		return jpeg(fundos.ler(FotoDeFundoService.Tipo.FUNDO, id, versao));
+	}
+
+	/** A imagem do topo da página do RH (idem). */
+	@GetMapping("/api/public/empresas/{id}/capa-v{versao}.jpg")
+	ResponseEntity<byte[]> capa(@PathVariable Long id, @PathVariable int versao) {
+		return jpeg(fundos.ler(FotoDeFundoService.Tipo.CAPA, id, versao));
+	}
+
+	private static ResponseEntity<byte[]> jpeg(java.util.Optional<byte[]> arquivo) {
+		return arquivo
 			.map(jpeg -> ResponseEntity.ok()
 				.contentType(MediaType.IMAGE_JPEG)
 				.cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())

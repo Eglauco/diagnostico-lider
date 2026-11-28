@@ -60,9 +60,14 @@ export class AdminEditarEmpresa {
   protected readonly logoAtual = computed(() => (this.empresa.hasValue() ? this.empresa.value().logo : null));
   protected readonly logoPrevia = computed(() => logoEmPrevia(this.logo(), this.logoAtual()));
 
-  /** A foto de fundo da página do RH (troca, foco ou remoção, enviados ao salvar). */
+  /** As fotos da página do RH: a da entrada e a do topo (troca, foco ou remoção, enviados ao salvar). */
   protected readonly fundo = signal<MudancaFundo>(null);
   protected readonly fundoAtual = computed(() => (this.empresa.hasValue() ? this.empresa.value().fundo : null));
+  protected readonly capa = signal<MudancaFundo>(null);
+  protected readonly capaAtual = computed(() => (this.empresa.hasValue() ? this.empresa.value().capa : null));
+  /** Vai existir depois de salvar (a salva sem remoção, ou uma nova): sem ela, a outra a substitui. */
+  protected readonly temFundo = computed(() => this.fundo()?.tipo === 'nova' || (!!this.fundoAtual() && this.fundo()?.tipo !== 'remover'));
+  protected readonly temCapa = computed(() => this.capa()?.tipo === 'nova' || (!!this.capaAtual() && this.capa()?.tipo !== 'remover'));
 
   protected usarCoresDoLogo(cores: string[]) {
     this.corPrimaria.set(cores[0] ?? '');
@@ -135,7 +140,8 @@ export class AdminEditarEmpresa {
         }),
       );
       await salvarLogo(this.http, this.id(), this.logo());
-      await salvarFundo(this.http, this.id(), this.fundo());
+      await salvarFundo(this.http, this.id(), 'fundo', this.fundo());
+      await salvarFundo(this.http, this.id(), 'capa', this.capa());
       await this.router.navigate(['/administrador/empresas', this.id()], { replaceUrl: true, state: { salva: true } });
     } catch (e) {
       const problema = problemaDe(e);

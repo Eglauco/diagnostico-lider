@@ -6,13 +6,14 @@ package br.com.diagnosticolider.empresa;
  * cores próprias ou usa a identidade do Diagnóstico.
  */
 public record MarcaEmpresa(String nome, String sigla, boolean personalizada, PaletaMarca.Tema tema, Logo logo,
-		Fundo fundo) {
+		Foto fundo, Foto capa) {
 
 	/**
-	 * A foto de fundo da página do RH (null sem foto): o endereço (assinado, do bucket, ou o do
+	 * Uma foto da página do RH (null sem foto): fundo é a da entrada (em pé ou quadrada), capa é a
+	 * do topo da página e da faixa do celular (deitada). O endereço (assinado, do bucket, ou o do
 	 * backend), o tamanho e o ponto de foco (0 a 100), que vira o object-position do corte.
 	 */
-	public record Fundo(String url, int largura, int altura, int focoX, int focoY) {
+	public record Foto(String url, int largura, int altura, int focoX, int focoY) {
 	}
 
 	/**
@@ -47,9 +48,9 @@ public record MarcaEmpresa(String nome, String sigla, boolean personalizada, Pal
 	}
 
 	/** Use LogomarcaService.marca, que já resolve o endereço da logo. */
-	static MarcaEmpresa de(Empresa empresa, Logo logo, Fundo fundo) {
+	static MarcaEmpresa de(Empresa empresa, Logo logo, Foto fundo, Foto capa) {
 		return new MarcaEmpresa(empresa.getNome(), siglaDe(empresa.getNome()), empresa.getCorPrimaria() != null,
-				empresa.tema(), logo, fundo);
+				empresa.tema(), logo, fundo, capa);
 	}
 
 	/** Tema para quem não tem empresa (link geral): a identidade do Diagnóstico. */

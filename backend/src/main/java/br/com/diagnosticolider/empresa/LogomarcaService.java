@@ -87,7 +87,7 @@ public class LogomarcaService {
 
 	/** Nome, paleta, logo e foto de fundo da empresa, para as telas (null no link geral). */
 	public MarcaEmpresa marca(Empresa empresa) {
-		return empresa == null ? null : MarcaEmpresa.de(empresa, logo(empresa), fundos.fundo(empresa));
+		return empresa == null ? null : MarcaEmpresa.de(empresa, logo(empresa), fundos.fundo(empresa), fundos.capa(empresa));
 	}
 
 	@Transactional

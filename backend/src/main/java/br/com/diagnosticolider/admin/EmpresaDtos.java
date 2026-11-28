@@ -69,7 +69,7 @@ public final class EmpresaDtos {
 	public record EmpresaDetalhe(Long id, String nome, Instant criadaEm, Link link, Indicadores indicadores,
 			int minimoRelatorio, Cores cores, PaletaMarca.Tema tema, MarcaEmpresa.Logo logo,
 			List<CargoService.Item> cargos, Encerramento encerramento, List<String> gestores,
-			MarcaEmpresa.Fundo fundo) {
+			MarcaEmpresa.Foto fundo, MarcaEmpresa.Foto capa) {
 	}
 
 	/** O ponto da foto de fundo que fica sempre à vista (0 a 100, da esquerda e do topo). */

@@ -52,8 +52,17 @@ export interface MarcaEmpresa {
   personalizada: boolean;
   tema: TemaMarca;
   logo: LogoEmpresa | null;
+  /** A foto da entrada da página do RH (em pé ou quadrada). */
   fundo?: FundoEmpresa | null;
+  /** A imagem do topo da página do RH e da faixa da entrada no celular (deitada). */
+  capa?: FundoEmpresa | null;
 }
+
+/** A foto para a metade da entrada no computador: a da entrada, ou a do topo se não houver. */
+export const fotoDaEntrada = (m: MarcaEmpresa | null | undefined) => m?.fundo ?? m?.capa ?? null;
+
+/** A foto para o topo da página e a faixa do celular: a do topo, ou a da entrada se não houver. */
+export const fotoDoTopo = (m: MarcaEmpresa | null | undefined) => m?.capa ?? m?.fundo ?? null;
 
 /** Token do tema → variável de CSS (os nomes antigos continuam: abeto = tinta, brasa = destaque). */
 const VARIAVEIS: Partial<Record<keyof TemaMarca, string>> = {

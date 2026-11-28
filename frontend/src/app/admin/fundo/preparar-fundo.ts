@@ -10,22 +10,21 @@ export interface FotoPreparada {
   altura: number;
   /** Endereço local para pré-visualizar (URL.createObjectURL). */
   url: string;
-  /** Menor que o ideal para a metade de uma tela grande: pode ficar um pouco borrada. */
-  pequena: boolean;
 }
 
 const TIPOS_ACEITOS = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 const TAMANHO_MAXIMO = 25 * 1024 * 1024;
 const LARGURA_FINAL = 2400;
 const LADO_MAXIMO = 3200;
-const LARGURA_MINIMA = 640;
-const ALTURA_MINIMA = 400;
-/** Abaixo disso, avisa (mas aceita): na metade de um monitor grande, a foto é esticada. */
-const LARGURA_BOA = 1400;
+/** Abaixo disso, recusa (o servidor confere o mesmo): a imagem ficaria borrada em qualquer tela. */
+const MINIMO: Record<'fundo' | 'capa', { largura: number; altura: number }> = {
+  fundo: { largura: 640, altura: 400 },
+  capa: { largura: 1000, altura: 250 },
+};
 /** O servidor aceita até 2,5 MB: comprime mais se passar. */
 const BYTES_MAXIMO = 2_300_000;
 
-export async function prepararFundo(arquivo: File): Promise<FotoPreparada> {
+export async function prepararFundo(arquivo: File, tipo: 'fundo' | 'capa' = 'fundo'): Promise<FotoPreparada> {
   if (!TIPOS_ACEITOS.includes(arquivo.type)) {
     throw new Error('Use uma foto em JPG, PNG ou WebP.');
   }
@@ -39,9 +38,10 @@ export async function prepararFundo(arquivo: File): Promise<FotoPreparada> {
   } catch {
     throw new Error('Não conseguimos abrir essa foto. Tente outro arquivo.');
   }
-  if (bitmap.width < LARGURA_MINIMA || bitmap.height < ALTURA_MINIMA) {
+  const minimo = MINIMO[tipo];
+  if (bitmap.width < minimo.largura || bitmap.height < minimo.altura) {
     bitmap.close();
-    throw new Error('A foto é pequena demais e ficaria borrada: use uma com pelo menos 640 × 400 pixels.');
+    throw new Error(`A imagem é pequena demais e ficaria borrada: use uma com pelo menos ${minimo.largura} × ${minimo.altura} pixels.`);
   }
 
   const fator = Math.min(1, LARGURA_FINAL / bitmap.width, LADO_MAXIMO / bitmap.height);
@@ -69,7 +69,7 @@ export async function prepararFundo(arquivo: File): Promise<FotoPreparada> {
   }
   if (jpeg.size > BYTES_MAXIMO) throw new Error('A foto ficou pesada demais. Tente outra.');
 
-  return { jpeg, largura, altura, url: URL.createObjectURL(jpeg), pequena: largura < LARGURA_BOA };
+  return { jpeg, largura, altura, url: URL.createObjectURL(jpeg) };
 }
 
 function comprimir(tela: HTMLCanvasElement, qualidade: number): Promise<Blob> {

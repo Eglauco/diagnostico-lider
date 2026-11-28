@@ -1,7 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 
 import { posicaoDaFoto, veuDaFoto } from '../compartilhado/foto-fundo';
-import { MarcaEmpresa } from '../compartilhado/tema-marca';
+import { fotoDoTopo, MarcaEmpresa } from '../compartilhado/tema-marca';
 
 /**
  * A capa da página do RH: a foto da empresa no topo, com a marca e o nome por cima, para o gestor
@@ -83,7 +83,8 @@ import { MarcaEmpresa } from '../compartilhado/tema-marca';
 export class CapaEmpresaRh {
   readonly empresa = input.required<MarcaEmpresa>();
 
-  protected readonly fundo = computed(() => this.empresa().fundo ?? null);
+  /** A imagem do topo (ou, sem ela, a foto da entrada). */
+  protected readonly fundo = computed(() => fotoDoTopo(this.empresa()));
   protected readonly posicao = computed(() => {
     const f = this.fundo();
     return f ? posicaoDaFoto(f) : '50% 50%';

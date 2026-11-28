@@ -9,32 +9,97 @@ export interface Foco {
   y: number;
 }
 
-/** O que mudou na foto de fundo (vai para o servidor quando o formulário for salvo). */
+/** O que mudou na foto (vai para o servidor quando o formulário for salvo). */
 export type MudancaFundo =
   | { tipo: 'nova'; foto: FotoPreparada; foco: Foco }
   | { tipo: 'foco'; foco: Foco }
   | { tipo: 'remover' }
   | null;
 
+/** Qual foto da página do RH: a da entrada (em pé ou quadrada) ou a do topo (deitada). */
+export type TipoFoto = 'fundo' | 'capa';
+
 const PASSO_TECLADO = 4;
 
 /**
- * Foto de fundo da página do RH: enviar a foto, tocar nela para escolher o ponto que fica sempre
- * à vista (o foco) e ver na hora como fica cortada nos três lugares onde aparece, já com o véu na
- * cor da marca.
+ * O que cada foto pede: o tamanho ideal (para pedir ao cliente), o mínimo que não fica borrado e
+ * o texto pronto do pedido. Os tamanhos saem dos cortes reais: a metade da entrada no computador
+ * vai de 0,85 a 1,25 (quase quadrada); o topo vai de 6 por 1 (computador) a 2,4 por 1 (celular).
+ */
+const ESPEC: Record<
+  TipoFoto,
+  {
+    titulo: string;
+    descricao: string;
+    ideal: string;
+    formato: string;
+    minimo: { largura: number; altura: number };
+    rotuloMinimo: string;
+    pedido: string;
+    enviar: string;
+    semOutra: string;
+  }
+> = {
+  fundo: {
+    titulo: 'Foto da entrada da página do RH',
+    descricao:
+      'Ocupa a metade esquerda da tela de entrada no computador: uma foto da empresa (fachada, equipe, uma obra) faz o gestor se sentir em casa.',
+    ideal: '2000 × 2000 px',
+    formato: 'quadrada (ou em pé, 1600 × 2000 px)',
+    minimo: { largura: 1200, altura: 1200 },
+    rotuloMinimo: '1200 × 1200 px',
+    pedido:
+      'Foto para a entrada da página de acompanhamento da avaliação: quadrada, 2000 × 2000 pixels (no mínimo 1200 × 1200), em JPG ou PNG. Pode ser a fachada, a equipe ou uma obra, com o principal no centro e sem textos por cima.',
+    enviar: 'Enviar a foto da entrada',
+    semOutra: 'Enquanto não houver imagem do topo, esta foto também aparece no topo da página e na entrada pelo celular.',
+  },
+  capa: {
+    titulo: 'Imagem do topo da página do RH',
+    descricao:
+      'Aparece no topo da página depois que o gestor entra e na faixa da entrada pelo celular. Deitada, como um banner.',
+    ideal: '2400 × 800 px',
+    formato: 'deitada (3 por 1)',
+    minimo: { largura: 1600, altura: 530 },
+    rotuloMinimo: '1600 × 530 px',
+    pedido:
+      'Imagem para o topo da página de acompanhamento da avaliação: deitada, 2400 × 800 pixels (no mínimo 1600 × 530), em JPG ou PNG. O principal no centro, porque as laterais são cortadas no celular, e sem textos por cima.',
+    enviar: 'Enviar a imagem do topo',
+    semOutra: 'Enquanto não houver foto da entrada, esta imagem também aparece na entrada pelo computador.',
+  },
+};
+
+/**
+ * Uma foto da página do RH (a da entrada ou a do topo): o tamanho ideal para pedir ao cliente,
+ * enviar a foto, tocar ou arrastar nela para escolher o ponto que fica sempre à vista (o foco) e
+ * ver na hora como fica cortada em cada lugar onde aparece, já com o véu na cor da marca.
  */
 @Component({
   selector: 'app-campo-fundo',
   host: { class: 'block' },
   template: `
-    <p class="text-[15px] font-semibold" id="fundo-rotulo">Foto de fundo da página do RH</p>
-    <p class="mt-1 text-[14px] text-abeto-2">
-      Aparece na entrada e no topo da página onde o RH acompanha a avaliação: uma foto da empresa (fachada, equipe,
-      uma obra) faz o gestor se sentir em casa. Foto deitada, com 1600 pixels de largura ou mais, fica melhor.
-    </p>
+    <p class="text-[15px] font-semibold" [id]="tipo() + '-rotulo'">{{ espec().titulo }}</p>
+    <p class="mt-1 text-[14px] text-abeto-2">{{ espec().descricao }}</p>
+
+    <!-- O tamanho ideal, para pedir ao cliente do jeito certo. -->
+    <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-nevoa-2 px-3.5 py-2.5 ring-1 ring-linha/70">
+      <svg class="shrink-0 text-abeto-2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        @if (tipo() === 'capa') {
+          <rect x="2.5" y="7" width="19" height="10" rx="2" />
+        } @else {
+          <rect x="5" y="4" width="14" height="16" rx="2" />
+        }
+      </svg>
+      <p class="min-w-0 flex-1 text-[14px] leading-snug">
+        Tamanho ideal: <strong class="font-semibold tabular-nums">{{ espec().ideal }}</strong>, {{ espec().formato }}.
+        <span class="text-abeto-2">Mínimo {{ espec().rotuloMinimo }}. JPG ou PNG.</span>
+      </p>
+      <button type="button" class="min-h-10 rounded-full px-3 text-[14px] font-semibold text-abeto underline decoration-linha underline-offset-4 hover:decoration-abeto" (click)="copiarPedido()">
+        {{ pedidoCopiado() ? 'Pedido copiado' : 'Copiar o pedido para o cliente' }}
+      </button>
+    </div>
 
     @if (exibida(); as foto) {
-      <div class="mt-4 rounded-[20px] bg-white p-3 ring-1 ring-linha sm:p-4">
+      <div class="mt-3 rounded-[20px] bg-white p-3 ring-1 ring-linha sm:p-4">
         <!-- A foto inteira: tocar ou arrastar escolhe o ponto de foco. -->
         <div
           #area
@@ -53,85 +118,107 @@ const PASSO_TECLADO = 4;
             [style.left.%]="foto.foco.x"
             [style.top.%]="foto.foco.y"
             [attr.aria-label]="'Ponto de foco: ' + foto.foco.x + '% da esquerda e ' + foto.foco.y + '% do topo. Use as setas para mover.'"
-            aria-describedby="fundo-dica"
+            [attr.aria-describedby]="tipo() + '-dica'"
             (keydown)="tecla($event)"
             (pointerdown)="$event.stopPropagation(); apontar($event)"
           ></button>
         </div>
-        <p id="fundo-dica" class="mt-2.5 flex items-center gap-2 text-[13px] leading-snug text-abeto-2">
+        <p [id]="tipo() + '-dica'" class="mt-2.5 flex items-center gap-2 text-[13px] leading-snug text-abeto-2">
           <svg class="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="1.5" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round" /></svg>
-          {{ computador ? 'Clique' : 'Toque' }} na foto no que precisa ficar sempre à vista (um rosto, a fachada, a logo da obra).
+          {{ computador ? 'Clique ou arraste' : 'Toque' }} na foto no que precisa ficar sempre à vista (um rosto, a fachada, a logo da obra).
         </p>
 
         <!-- Como fica cortada em cada lugar, com o véu na cor da marca. -->
-        <div class="mx-auto mt-4 grid max-w-[30rem] grid-cols-2 gap-x-2.5 gap-y-3">
-          <figure>
-            <div class="miniatura" style="aspect-ratio: 4 / 5">
-              <img class="foto" [src]="foto.url" alt="" [style.object-position]="posicao()" />
-              <i class="veu" [style.background]="veu('entrada')"></i>
-              <span class="absolute inset-x-[12%] top-[12%] block">
-                <span class="block h-1 w-[45%] rounded-full bg-white/60"></span>
-                <span class="mt-1.5 block h-1.5 w-[85%] rounded-full bg-white"></span>
-                <span class="mt-1 block h-1.5 w-[60%] rounded-full bg-white"></span>
-              </span>
-              <span class="absolute inset-x-[12%] top-[40%] bottom-[16%] block rounded-md bg-white/95 shadow-lg"></span>
-            </div>
-            <figcaption class="mt-1.5 text-[12px] text-abeto-2">Entrada no computador</figcaption>
-          </figure>
-          <!-- O celular: a faixa com a foto no alto da tela e a entrada embaixo. -->
-          <figure>
-            <div class="miniatura flex flex-col" style="aspect-ratio: 4 / 5" [style.background]="tema().fundo">
-              <div class="relative h-[44%] shrink-0 overflow-hidden rounded-b-lg">
+        @if (tipo() === 'fundo') {
+          <div class="mx-auto mt-4 grid max-w-[30rem] grid-cols-2 items-end gap-x-2.5 gap-y-3">
+            @for (corte of cortesDaEntrada; track corte.rotulo) {
+              <figure>
+                <div class="miniatura" [style.aspect-ratio]="corte.proporcao">
+                  <img class="foto" [src]="foto.url" alt="" [style.object-position]="posicao()" />
+                  <i class="veu" [style.background]="veu('entrada')"></i>
+                  <span class="absolute inset-x-[12%] top-[12%] block">
+                    <span class="block h-1 w-[45%] rounded-full bg-white/60"></span>
+                    <span class="mt-1.5 block h-1.5 w-[85%] rounded-full bg-white"></span>
+                    <span class="mt-1 block h-1.5 w-[60%] rounded-full bg-white"></span>
+                  </span>
+                  <span class="absolute inset-x-[12%] top-[40%] bottom-[16%] block rounded-md bg-white/95 shadow-lg"></span>
+                </div>
+                <figcaption class="mt-1.5 text-[12px] text-abeto-2">{{ corte.rotulo }}</figcaption>
+              </figure>
+            }
+          </div>
+        } @else {
+          <div class="mx-auto mt-4 grid max-w-[30rem] gap-3">
+            <figure>
+              <div class="miniatura" style="aspect-ratio: 6 / 1">
                 <img class="foto" [src]="foto.url" alt="" [style.object-position]="posicao()" />
-                <i class="veu" [style.background]="veu('celular')"></i>
-                <span class="absolute bottom-[10%] left-[8%] flex max-w-[84%] items-center gap-1">
-                  <span class="grid size-4 shrink-0 place-items-center overflow-hidden rounded bg-white p-px text-[6px] font-bold" [style.color]="tema().acao">@if (logo(); as lg) {<img class="block size-full object-contain" [src]="lg.url" alt="" />} @else {{{ sigla() }}}</span>
-                  <span class="display line-clamp-1 text-[9px] font-bold text-white">{{ nome() || 'Nome da empresa' }}</span>
+                <i class="veu" [style.background]="veu('capa')"></i>
+                <span class="absolute inset-y-0 left-[4%] flex max-w-[78%] items-center gap-1.5">
+                  <span class="grid size-5 shrink-0 place-items-center overflow-hidden rounded-md bg-white p-0.5 text-[7px] font-bold" [style.color]="tema().acao">@if (logo(); as lg) {<img class="block size-full object-contain" [src]="lg.url" alt="" />} @else {{{ sigla() }}}</span>
+                  <span class="display line-clamp-1 text-[11px] font-bold text-white">{{ nome() || 'Nome da empresa' }}</span>
                 </span>
               </div>
-              <span class="mx-[8%] mt-[10%] block h-1 w-[40%] rounded-full" [style.background]="tema().destaque"></span>
-              <span class="mx-[8%] mt-1.5 block h-1.5 w-[78%] rounded-full" [style.background]="tema().tinta"></span>
-              <span class="mx-[8%] mt-1 block h-1.5 w-[55%] rounded-full" [style.background]="tema().tinta"></span>
-              <span class="mx-[8%] mt-auto mb-[10%] block h-3 rounded-full" [style.background]="tema().acao"></span>
+              <figcaption class="mt-1.5 text-[12px] text-abeto-2">Topo da página no computador</figcaption>
+            </figure>
+            <div class="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-end gap-2.5">
+              <figure>
+                <div class="miniatura" style="aspect-ratio: 12 / 5">
+                  <img class="foto" [src]="foto.url" alt="" [style.object-position]="posicao()" />
+                  <i class="veu" [style.background]="veu('capa')"></i>
+                  <span class="absolute bottom-[12%] left-[6%] flex max-w-[84%] items-center gap-1">
+                    <span class="grid size-4 shrink-0 place-items-center overflow-hidden rounded bg-white p-px text-[6px] font-bold" [style.color]="tema().acao">@if (logo(); as lg) {<img class="block size-full object-contain" [src]="lg.url" alt="" />} @else {{{ sigla() }}}</span>
+                    <span class="display line-clamp-1 text-[9px] font-bold text-white">{{ nome() || 'Nome da empresa' }}</span>
+                  </span>
+                </div>
+                <figcaption class="mt-1.5 text-[12px] text-abeto-2">Topo da página no celular</figcaption>
+              </figure>
+              <!-- O celular: a faixa com a imagem no alto da tela de entrada. -->
+              <figure>
+                <div class="miniatura flex flex-col" style="aspect-ratio: 4 / 5" [style.background]="tema().fundo">
+                  <div class="relative h-[44%] shrink-0 overflow-hidden rounded-b-lg">
+                    <img class="foto" [src]="foto.url" alt="" [style.object-position]="posicao()" />
+                    <i class="veu" [style.background]="veu('celular')"></i>
+                    <span class="absolute bottom-[10%] left-[8%] flex max-w-[84%] items-center gap-1">
+                      <span class="grid size-4 shrink-0 place-items-center overflow-hidden rounded bg-white p-px text-[6px] font-bold" [style.color]="tema().acao">@if (logo(); as lg) {<img class="block size-full object-contain" [src]="lg.url" alt="" />} @else {{{ sigla() }}}</span>
+                      <span class="display line-clamp-1 text-[9px] font-bold text-white">{{ nome() || 'Nome da empresa' }}</span>
+                    </span>
+                  </div>
+                  <span class="mx-[8%] mt-[10%] block h-1 w-[40%] rounded-full" [style.background]="tema().destaque"></span>
+                  <span class="mx-[8%] mt-1.5 block h-1.5 w-[78%] rounded-full" [style.background]="tema().tinta"></span>
+                  <span class="mx-[8%] mt-1 block h-1.5 w-[55%] rounded-full" [style.background]="tema().tinta"></span>
+                  <span class="mx-[8%] mt-auto mb-[10%] block h-3 rounded-full" [style.background]="tema().acao"></span>
+                </div>
+                <figcaption class="mt-1.5 text-[12px] text-abeto-2">Entrada no celular</figcaption>
+              </figure>
             </div>
-            <figcaption class="mt-1.5 text-[12px] text-abeto-2">Entrada no celular</figcaption>
-          </figure>
-          <figure class="col-span-2">
-            <div class="miniatura" style="aspect-ratio: 4 / 1">
-              <img class="foto" [src]="foto.url" alt="" [style.object-position]="posicao()" />
-              <i class="veu" [style.background]="veu('capa')"></i>
-              <span class="absolute inset-y-0 left-[5%] flex max-w-[78%] items-center gap-1.5">
-                <span class="grid size-5 shrink-0 place-items-center overflow-hidden rounded-md bg-white p-0.5 text-[7px] font-bold" [style.color]="tema().acao">@if (logo(); as lg) {<img class="block size-full object-contain" [src]="lg.url" alt="" />} @else {{{ sigla() }}}</span>
-                <span class="display line-clamp-1 text-[11px] font-bold text-white">{{ nome() || 'Nome da empresa' }}</span>
-              </span>
-            </div>
-            <figcaption class="mt-1.5 text-[12px] text-abeto-2">Topo da página do RH</figcaption>
-          </figure>
-        </div>
+          </div>
+        }
+
+        @if (!outraExiste()) {
+          <p class="mt-3 text-[13px] leading-snug text-abeto-2">{{ espec().semOutra }}</p>
+        }
       </div>
 
-      @if (preparada()?.pequena) {
-        <p class="mt-2 text-[13.5px] text-[#855300]">
-          A foto tem {{ preparada()!.largura }} pixels de largura: em telas grandes pode ficar um pouco borrada.
-        </p>
+      @if (abaixoDoIdeal(); as aviso) {
+        <p class="mt-2 text-[13.5px] text-[#855300]">{{ aviso }}</p>
       }
 
       <div class="mt-3 flex flex-wrap gap-2">
-        <button type="button" class="botao-pequeno" [disabled]="processando()" (click)="escolher()">Trocar foto</button>
+        <button type="button" class="botao-pequeno" [disabled]="processando()" (click)="escolher()">Trocar</button>
         <button type="button" class="botao-pequeno" [disabled]="processando()" (click)="remover()">Remover</button>
       </div>
       @if (processando()) {
         <p class="mt-2 flex items-center gap-2 text-[14px] text-abeto-2" role="status">
           <span class="size-4 animate-spin rounded-full border-2 border-linha border-t-abeto" aria-hidden="true"></span>
-          Preparando a foto…
+          Preparando a imagem…
         </p>
       }
     } @else {
       <button
         type="button"
-        class="zona-fundo mt-4"
+        class="zona-fundo mt-3"
         [class.zona-fundo-ativa]="arrastando()"
-        aria-describedby="fundo-rotulo"
+        [attr.aria-describedby]="tipo() + '-rotulo'"
         (click)="escolher()"
         (dragover)="arrastou($event)"
         (dragleave)="arrastando.set(false)"
@@ -139,16 +226,16 @@ const PASSO_TECLADO = 4;
       >
         @if (processando()) {
           <span class="size-6 animate-spin rounded-full border-[3px] border-linha border-t-abeto" aria-hidden="true"></span>
-          <span class="text-[15px] font-semibold">Preparando a foto…</span>
+          <span class="text-[15px] font-semibold">Preparando a imagem…</span>
         } @else {
           <svg class="text-abeto-2" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M3.5 8.5A2 2 0 0 1 5.5 6.5h2l1.5-2h6l1.5 2h2a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" stroke-linejoin="round" /><circle cx="12" cy="13" r="3.5" />
           </svg>
-          <span class="text-[15px] font-semibold">Enviar uma foto</span>
+          <span class="text-[15px] font-semibold">{{ espec().enviar }}</span>
           <span class="text-[13px] text-abeto-2">
             <span class="hidden sm:inline">Arraste o arquivo para cá ou clique para escolher · </span>JPG, PNG ou WebP
           </span>
-          <span class="text-[13px] text-abeto-2">Sem foto, o fundo fica nas cores da marca.</span>
+          <span class="text-[13px] text-abeto-2">{{ outraExiste() ? 'Sem ela, usamos a outra foto da empresa.' : 'Sem foto, fica nas cores da marca.' }}</span>
         }
       </button>
     }
@@ -248,8 +335,12 @@ const PASSO_TECLADO = 4;
   `,
 })
 export class CampoFundo {
+  /** Qual foto: a da entrada ("fundo") ou a do topo ("capa"). */
+  readonly tipo = input<TipoFoto>('fundo');
   /** A foto que já está salva (edição). */
   readonly atual = input<FundoEmpresa | null>(null);
+  /** A empresa tem (ou vai ter) a outra foto: sem ela, esta aparece também no lugar da outra. */
+  readonly outraExiste = input(false);
   /** A paleta escolhida: o véu da prévia é a cor da marca de verdade. */
   readonly tema = input.required<TemaMarca>();
   readonly nome = input('');
@@ -258,6 +349,12 @@ export class CampoFundo {
   readonly mudanca = model<MudancaFundo>(null);
 
   protected readonly computador = matchMedia('(pointer: fine)').matches;
+  protected readonly espec = computed(() => ESPEC[this.tipo()]);
+  /** A metade da entrada no computador: num notebook, quase quadrada; num monitor largo, mais deitada. */
+  protected readonly cortesDaEntrada = [
+    { rotulo: 'Entrada no notebook', proporcao: '9 / 10' },
+    { rotulo: 'Entrada em monitor largo', proporcao: '5 / 4' },
+  ];
   private readonly seletor = viewChild.required<ElementRef<HTMLInputElement>>('seletor');
   private readonly area = viewChild<ElementRef<HTMLElement>>('area');
   private arrastandoFoco = false;
@@ -281,9 +378,18 @@ export class CampoFundo {
     return posicaoDaFoto({ focoX: f.x, focoY: f.y });
   });
 
+  /** Uma foto nova abaixo do tamanho ideal: aceita, mas avisa. */
+  protected readonly abaixoDoIdeal = computed(() => {
+    const p = this.preparada();
+    const min = this.espec().minimo;
+    if (!p || (p.largura >= min.largura && p.altura >= min.altura)) return null;
+    return `A imagem tem ${p.largura} × ${p.altura} px, abaixo de ${this.espec().rotuloMinimo}: em telas grandes pode ficar um pouco borrada.`;
+  });
+
   protected readonly processando = signal(false);
   protected readonly arrastando = signal(false);
   protected readonly erro = signal<string | null>(null);
+  protected readonly pedidoCopiado = signal(false);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.liberar());
@@ -296,6 +402,17 @@ export class CampoFundo {
   /** A foto inteira cabe em até 320 px de altura (uma foto em pé não toma a tela). */
   protected larguraMaxima(foto: { largura: number; altura: number }): number {
     return Math.round((320 * foto.largura) / foto.altura);
+  }
+
+  /** O pedido pronto para mandar ao cliente (tamanho, formato e o que evitar). */
+  protected async copiarPedido() {
+    try {
+      await navigator.clipboard.writeText(this.espec().pedido);
+      this.pedidoCopiado.set(true);
+      setTimeout(() => this.pedidoCopiado.set(false), 2200);
+    } catch {
+      this.erro.set('Não deu para copiar agora. O tamanho ideal está escrito acima.');
+    }
   }
 
   protected escolher() {
@@ -387,11 +504,11 @@ export class CampoFundo {
     this.processando.set(true);
     this.erro.set(null);
     try {
-      const foto = await prepararFundo(arquivo);
+      const foto = await prepararFundo(arquivo, this.tipo());
       this.liberar();
       this.mudanca.set({ tipo: 'nova', foto, foco: { x: 50, y: 50 } });
     } catch (e) {
-      this.erro.set(e instanceof Error ? e.message : 'Não foi possível usar essa foto.');
+      this.erro.set(e instanceof Error ? e.message : 'Não foi possível usar essa imagem.');
     } finally {
       this.processando.set(false);
     }
