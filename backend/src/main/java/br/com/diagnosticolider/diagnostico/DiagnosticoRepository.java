@@ -91,7 +91,8 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 	@Query("""
 			select new br.com.diagnosticolider.diagnostico.ContagemPorEmpresa(e.id, count(d),
 				sum(case when d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO then 1 else 0 end),
-				max(d.iniciadoEm))
+				max(d.iniciadoEm),
+				avg(case when d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO then d.pontuacao end))
 			from Diagnostico d join d.empresa e
 			where d.inativadoEm is null
 			group by e.id
@@ -115,6 +116,28 @@ public interface DiagnosticoRepository extends JpaRepository<Diagnostico, UUID>,
 			  and d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO
 			""")
 	List<UUID> concluidosAtivos(Long empresa);
+
+	/**
+	 * De onde veio o líder de cada diagnóstico (planilha, cadastro manual ou link), pelo cadastro de
+	 * líderes. Quem não está no cadastro (tentativa substituída, por exemplo) fica de fora.
+	 */
+	@Query("select c.diagnostico.id, c.origem from Convite c where c.diagnostico.id in :ids")
+	List<Object[]> origensDosDiagnosticos(java.util.Collection<UUID> ids);
+
+	/**
+	 * Quantos diagnósticos ativos de cada empresa batem com a busca (nome, e-mail ou empresa
+	 * informada): o "também encontrado em" do Diagnóstico Geral. Mais resultados primeiro.
+	 */
+	@Query("""
+			select e.id, e.nome, count(d) from Diagnostico d join d.campanha c join c.empresa e
+			where d.inativadoEm is null
+			  and (lower(d.respondente.nome) like :termo escape '\\'
+			    or lower(d.respondente.email) like :termo escape '\\'
+			    or lower(d.respondente.empresaInformada) like :termo escape '\\')
+			group by e.id, e.nome
+			order by count(d) desc, e.nome
+			""")
+	List<Object[]> encontradosNasEmpresas(String termo);
 
 	/** Os diagnósticos de uma foto do resultado; respostas e dimensões vêm em lote, pelo batch fetch. */
 	@EntityGraph(attributePaths = { "faixa", "versao", "cargo" })

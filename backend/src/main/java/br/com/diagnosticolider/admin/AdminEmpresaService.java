@@ -37,6 +37,7 @@ import br.com.diagnosticolider.convite.ConviteService;
 import br.com.diagnosticolider.empresa.CargoService;
 import br.com.diagnosticolider.empresa.Empresa;
 import br.com.diagnosticolider.empresa.EmpresaRepository;
+import br.com.diagnosticolider.empresa.FotoDeFundoService;
 import br.com.diagnosticolider.empresa.LogomarcaService;
 import br.com.diagnosticolider.empresa.PaletaMarca;
 import br.com.diagnosticolider.questionario.Questionario;
@@ -72,9 +73,12 @@ public class AdminEmpresaService {
 
 	private final ConviteService convites;
 
+	private final FotoDeFundoService fundos;
+
 	AdminEmpresaService(EmpresaRepository empresas, CampanhaRepository campanhas, QuestionarioRepository questionarios,
 			DiagnosticoRepository diagnosticos, AppProperties propriedades, LogomarcaService logomarcas,
-			CargoService cargos, Clock clock, ConviteService convites) {
+			CargoService cargos, Clock clock, ConviteService convites, FotoDeFundoService fundos) {
+		this.fundos = fundos;
 		this.clock = clock;
 		this.convites = convites;
 		this.empresas = empresas;
@@ -92,11 +96,14 @@ public class AdminEmpresaService {
 		Map<Long, ContagemPorEmpresa> contagens = diagnosticos.contagemPorEmpresa()
 			.stream()
 			.collect(Collectors.toMap(ContagemPorEmpresa::empresa, Function.identity()));
+		Map<Long, int[]> lideres = convites.lideresPorEmpresa();
 		return todas.stream().map(e -> {
 			var contagem = contagens.get(e.getId());
+			int[] cadastro = lideres.getOrDefault(e.getId(), new int[] { 0, 0 });
 			return new EmpresaResumo(e.getId(), e.getNome(), e.getCriadoEm(), link(links.get(e.getId())),
 					contagem == null ? 0 : contagem.total(), contagem == null ? 0 : contagem.concluidos(),
-					contagem == null ? null : contagem.ultimo(), cores(e), logomarcas.logo(e), encerramento(e));
+					contagem == null ? null : contagem.ultimo(), cores(e), logomarcas.logo(e), encerramento(e),
+					cadastro[0], cadastro[1], contagem == null ? null : contagem.media());
 		}).toList();
 	}
 
@@ -105,11 +112,12 @@ public class AdminEmpresaService {
 		var resumo = Resumo.de(diagnosticos.resumoDaEmpresa(id));
 		var lideres = convites.lideresPorOrigem(id);
 		var indicadores = new Indicadores(resumo.total(), resumo.concluidos(), resumo.emAndamento(),
-				resumo.indiceMedio(), resumo.porFaixa(), lideres.total(), lideres.convidados(), lideres.peloLink());
+				resumo.indiceMedio(), resumo.porFaixa(), lideres.total(), lideres.convidados(), lideres.peloLink(),
+				lideres.concluiram());
 		return new EmpresaDetalhe(empresa.getId(), empresa.getNome(), empresa.getCriadoEm(),
 				link(linksPrincipais(List.of(id)).get(id)), indicadores, RelatorioEmpresaService.MINIMO_LIDERES,
 				cores(empresa), empresa.tema(), logomarcas.logo(empresa), cargos.itens(id), encerramento(empresa),
-				empresa.getGestores());
+				empresa.getGestores(), fundos.fundo(empresa));
 	}
 
 	private Encerramento encerramento(Empresa empresa) {
@@ -264,7 +272,9 @@ public class AdminEmpresaService {
 	}
 
 	private Link link(Campanha campanha) {
-		return campanha == null ? null : new Link(campanha.getCodigo(), url(campanha.getCodigo()), campanha.isAtiva());
+		return campanha == null ? null
+				: new Link(campanha.getCodigo(), url(campanha.getCodigo()), campanha.isAtiva(),
+						urlPublica + "/acompanhar/" + campanha.getCodigo());
 	}
 
 	private String url(String codigo) {

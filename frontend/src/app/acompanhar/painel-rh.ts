@@ -6,7 +6,10 @@ import { HttpClient } from '@angular/common/http';
 
 import { problemaDe } from '../api/diagnostico-api';
 import { CreditoDiagnostico, MarcaEmpresaCabecalho } from '../compartilhado/marca-empresa';
-import { aplicarTema } from '../compartilhado/tema-marca';
+import { MANTER_ROLAGEM } from '../compartilhado/rolagem';
+import { aplicarTema, MarcaEmpresa } from '../compartilhado/tema-marca';
+import { CapaEmpresaRh } from './capa-empresa-rh';
+import { EntrarRh } from './entrar-rh';
 import { ParticipacaoRhComponente } from './participacao-rh';
 import { ResultadoRhComponente } from './resultado-rh';
 import { API_RH, PainelRh, ResultadoRh, SessaoRh } from './rh-api';
@@ -17,12 +20,14 @@ const ATUALIZAR_A_CADA = 60_000;
 type Aba = 'participacao' | 'resultado';
 
 /**
- * /acompanhar/:empresa — a página do RH de uma empresa: participação ao vivo e o resultado do
- * grupo (anônimo, em lotes). Com a marca da empresa, como o link dos líderes.
+ * /acompanhar/:empresa — a página do RH de uma empresa (pelo código do link dela, /acompanhar/demo;
+ * o número antigo, /acompanhar/1, leva ao código): participação ao vivo e o resultado do grupo
+ * (anônimo, em lotes). Quem chega sem ter entrado pede o código aqui mesmo, com a marca da empresa,
+ * e fica no mesmo endereço.
  */
 @Component({
   selector: 'app-painel-rh',
-  imports: [MarcaEmpresaCabecalho, CreditoDiagnostico, ParticipacaoRhComponente, ResultadoRhComponente, RouterLink],
+  imports: [CapaEmpresaRh, MarcaEmpresaCabecalho, CreditoDiagnostico, EntrarRh, ParticipacaoRhComponente, ResultadoRhComponente, RouterLink],
   host: {
     class: 'block',
     '(document:keydown.escape)': 'menuAberto.set(false)',
@@ -38,14 +43,59 @@ export class PainelRhPagina {
   private readonly titulo = inject(Title);
   protected readonly sessao = inject(SessaoRh);
 
+  /** O que veio no endereço: o código do link (demo) ou, nos links antigos, o número (1). */
   readonly empresa = input.required<string>();
   readonly aba = input<string>();
+  /** ?lider=: a linha do tempo aberta de um líder (o "voltar" do navegador fecha). */
+  readonly lider = input<string>();
+
+  protected readonly liderId = computed(() => {
+    const id = Number(this.lider());
+    return Number.isInteger(id) && id > 0 ? id : null;
+  });
+  /** Abriu o painel por aqui (e não por um endereço colado): fechar volta no histórico. */
+  private abriuAqui = false;
 
   protected readonly abaAtual = computed<Aba>(() => (this.aba() === 'resultado' ? 'resultado' : 'participacao'));
-  protected readonly empresaId = computed(() => Number(this.empresa()));
 
-  protected readonly painel = httpResource<PainelRh>(() => `${API_RH}/empresas/${this.empresa()}`);
-  protected readonly resultado = httpResource<ResultadoRh>(() => `${API_RH}/empresas/${this.empresa()}/resultado`);
+  /** A empresa do endereço entre as que esta pessoa acompanha (undefined: não acompanha ou não entrou). */
+  protected readonly alvo = computed(() => {
+    const pedida = this.empresa();
+    return this.sessao.gestor()?.empresas.find((e) => e.codigo === pedida || String(e.id) === pedida);
+  });
+  protected readonly empresaId = computed(() => this.alvo()?.id ?? 0);
+  /** O código pedido no endereço (null no número antigo): vai no pedido do código, para o e-mail. */
+  protected readonly codigoPedido = computed(() => (/^\d+$/.test(this.empresa()) ? null : this.empresa()));
+
+  /** Não deu para saber quem está neste aparelho (rede): oferece tentar de novo. */
+  protected readonly falhaSessao = signal(false);
+
+  protected readonly painel = httpResource<PainelRh>(() => {
+    const id = this.alvo()?.id;
+    return id ? `${API_RH}/empresas/${id}` : undefined;
+  });
+  protected readonly resultado = httpResource<ResultadoRh>(() => {
+    const id = this.alvo()?.id;
+    return id ? `${API_RH}/empresas/${id}/resultado` : undefined;
+  });
+  /** A marca para a tela de entrada (pública, a mesma do link dos líderes). */
+  protected readonly marcaPublica = httpResource<MarcaEmpresa>(() => {
+    const pedida = this.empresa();
+    return this.sessao.gestor() === null && this.codigoPedido() ? `${API_RH}/marca/${encodeURIComponent(pedida)}` : undefined;
+  });
+
+  /**
+   * entrar: ninguém neste aparelho. fora: entrou com um e-mail que não acompanha esta empresa (ou
+   * ela saiu da lista dele). carregando: conferindo a sessão. ok: a página da empresa.
+   */
+  protected readonly estado = computed<'carregando' | 'entrar' | 'fora' | 'ok'>(() => {
+    const gestor = this.sessao.gestor();
+    if (gestor === undefined) return 'carregando';
+    if (gestor === null) return 'entrar';
+    const erro = this.painel.error();
+    if (!this.alvo() || (erro instanceof HttpErrorResponse && erro.status === 404)) return 'fora';
+    return 'ok';
+  });
 
   /** Relógio da tela ("há 2 min", "faltam 3 dias"): anda sozinho a cada 30 segundos. */
   protected readonly agora = signal(Date.now());
@@ -70,7 +120,7 @@ export class PainelRhPagina {
     return minutos < 60 ? `há ${minutos} min` : `há ${Math.round(minutos / 60)} h`;
   });
 
-  private visitaRegistrada: string | null = null;
+  private visitaRegistrada: number | null = null;
   private relogio: ReturnType<typeof setInterval>;
   private atualizacao: ReturnType<typeof setInterval> | undefined;
 
@@ -83,21 +133,39 @@ export class PainelRhPagina {
       clearInterval(this.atualizacao);
     });
 
-    // A marca da empresa na tela inteira (e na barra do navegador do celular).
+    void this.conferirSessao();
+
+    // A marca da empresa na tela inteira (e na barra do navegador do celular), também na entrada.
     effect((onCleanup) => {
-      const tema = this.painel.value()?.empresa.tema ?? null;
+      const tema =
+        this.painel.value()?.empresa.tema ?? (this.estado() === 'entrar' ? (this.marcaPublica.value()?.tema ?? null) : null);
       const desfazer = aplicarTema(tema);
       onCleanup(desfazer);
     });
 
-    // Quem entrou direto por aqui (aparelho lembrado): o e-mail para o menu da conta.
-    void this.sessao.conferir().catch(() => undefined);
+    // Link antigo pelo número (/acompanhar/1): troca pelo código, sem perder a aba aberta.
+    effect(() => {
+      const alvo = this.alvo();
+      if (alvo?.codigo && this.empresa() !== alvo.codigo) {
+        untracked(() =>
+          this.router.navigate(['/acompanhar', alvo.codigo], { queryParamsHandling: 'preserve', replaceUrl: true }),
+        );
+      }
+    });
 
     // O título da aba do navegador acompanha a seção (o roteador repõe o da rota a cada navegação).
     effect(() => {
-      const nome = this.painel.value()?.empresa.nome;
+      const estado = this.estado();
+      const nome = this.painel.value()?.empresa.nome ?? this.marcaPublica.value()?.nome;
+      if (estado === 'entrar') {
+        this.titulo.setTitle(nome ? `Entrar · Acompanhamento · ${nome}` : 'Entrar · Acompanhamento da avaliação');
+        return;
+      }
       const secao = this.abaAtual() === 'resultado' ? 'Resultado do grupo' : 'Participação';
-      if (nome) this.titulo.setTitle(`${secao} · ${nome}`);
+      // Com a linha do tempo de um líder aberta, o nome dele vem na frente.
+      const id = this.liderId();
+      const lider = id ? this.painel.value()?.participacao.grupos.flatMap((g) => g.lideres).find((l) => l.id === id) : undefined;
+      if (nome && estado === 'ok') this.titulo.setTitle(lider ? `${lider.nome} · ${secao} · ${nome}` : `${secao} · ${nome}`);
     });
 
     effect(() => {
@@ -106,23 +174,59 @@ export class PainelRhPagina {
       untracked(() => {
         this.atualizadoEm.set(Date.now());
         this.atualizando.set(false);
-        if (this.visitaRegistrada !== this.empresa()) {
-          this.visitaRegistrada = this.empresa();
-          this.http.post(`${API_RH}/empresas/${this.empresa()}/visita`, null).subscribe({ error: () => undefined });
+        const id = this.empresaId();
+        if (id && this.visitaRegistrada !== id) {
+          this.visitaRegistrada = id;
+          this.http.post(`${API_RH}/empresas/${id}/visita`, null).subscribe({ error: () => undefined });
         }
       });
     });
 
-    // Acesso vencido ou retirado: volta para a entrada, lembrando onde estava.
+    // Acesso vencido ou retirado: a entrada aparece aqui mesmo, no endereço da empresa.
     effect(() => {
       const erros = [this.painel.error(), this.resultado.error()];
       if (erros.some((e) => e instanceof HttpErrorResponse && e.status === 401)) {
-        untracked(() => {
-          this.sessao.encerrada();
-          void this.router.navigate(['/acompanhar'], { queryParams: { voltar: this.router.url }, replaceUrl: true });
-        });
+        untracked(() => this.sessao.encerrada());
       }
     });
+  }
+
+  protected async conferirSessao() {
+    this.falhaSessao.set(false);
+    try {
+      await this.sessao.conferir();
+    } catch {
+      this.falhaSessao.set(true);
+    }
+  }
+
+  /** Entrou pelo código: a página da empresa carrega no mesmo endereço. */
+  protected entrou() {
+    this.menuAberto.set(false);
+  }
+
+  /** "Entrar com outro e-mail": sai deste aparelho e mostra a entrada, sem sair da empresa. */
+  protected async trocarEmail() {
+    this.menuAberto.set(false);
+    await this.sessao.sair();
+  }
+
+  protected abrirLider(id: number) {
+    this.abriuAqui = true;
+    void this.router.navigate([], { queryParams: { lider: id }, queryParamsHandling: 'merge', state: MANTER_ROLAGEM });
+  }
+
+  protected trocarLider(id: number) {
+    void this.router.navigate([], { queryParams: { lider: id }, queryParamsHandling: 'merge', replaceUrl: true, state: MANTER_ROLAGEM });
+  }
+
+  protected fecharLider() {
+    if (this.abriuAqui) {
+      this.abriuAqui = false;
+      history.back();
+      return;
+    }
+    void this.router.navigate([], { queryParams: { lider: null }, queryParamsHandling: 'merge', replaceUrl: true, state: MANTER_ROLAGEM });
   }
 
   protected trocarAba(aba: Aba) {
@@ -152,8 +256,10 @@ export class PainelRhPagina {
   protected visibilidade() {
     if (document.visibilityState === 'visible') {
       this.agora.set(Date.now());
-      this.painel.reload();
-      this.resultado.reload();
+      if (this.alvo()) {
+        this.painel.reload();
+        this.resultado.reload();
+      }
       this.agendar();
     } else {
       clearInterval(this.atualizacao);
@@ -163,7 +269,7 @@ export class PainelRhPagina {
   private agendar() {
     clearInterval(this.atualizacao);
     this.atualizacao = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible' || !this.alvo()) return;
       this.painel.reload();
       this.resultado.reload();
     }, ATUALIZAR_A_CADA);

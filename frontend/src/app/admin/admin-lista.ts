@@ -7,12 +7,19 @@ import { baixarArquivo, buscarArquivo, compartilharArquivo, podeCompartilharArqu
 import { estiloFaixa, FAIXAS, ORDEM_FAIXAS } from '../compartilhado/faixas';
 import { quando } from '../compartilhado/formatos';
 import { MANTER_ROLAGEM } from '../compartilhado/rolagem';
-import { API_ADMIN, ItemLista, Pagina, Painel } from './admin-modelos';
+import { API_ADMIN, EncontradoEmEmpresa, ItemLista, OrigemLider, Pagina, Painel } from './admin-modelos';
+import { EmpresaAtual } from './empresa/empresa-atual';
 import { SeloFaixa, SeloStatus } from './selos';
 
 const TAMANHO_PAGINA = 20;
 
 type Filtros = Partial<Record<'busca' | 'status' | 'faixa' | 'campanha' | 'cargo' | 'pagina', string | number | null>>;
+
+const ROTULO_ORIGEM: Record<OrigemLider, string> = {
+  PLANILHA: 'Planilha',
+  MANUAL: 'Cadastro manual',
+  LINK: 'Link da empresa',
+};
 
 /** Mantém o último valor carregado enquanto um novo filtro carrega (sem piscar a tela). */
 function ultimoValor<T>(recurso: HttpResourceRef<T | undefined>) {
@@ -30,7 +37,10 @@ function semVazios(valores: Record<string, string | number | null | undefined>):
 }
 
 /**
- * Painel: indicadores, curva com todos os líderes e a lista de diagnósticos.
+ * Indicadores, curva com os líderes e a lista de diagnósticos, em dois lugares:
+ * - Diagnóstico Geral (/administrador/geral): só quem respondeu pelo link geral, sem empresa;
+ * - aba Diagnóstico da empresa (/administrador/empresas/:id/diagnostico): o link dela, com cargos,
+ *   a origem de cada líder e o relatório consolidado.
  * Todos os filtros vivem na URL, então dá para compartilhar ou voltar para a mesma visão.
  */
 @Component({
@@ -43,40 +53,65 @@ function semVazios(valores: Record<string, string | number | null | undefined>):
 export class AdminLista {
   private readonly router = inject(Router);
   private readonly rota = inject(ActivatedRoute);
+  private readonly empresaAtual = inject(EmpresaAtual, { optional: true });
 
-  // Filtros vindos da URL (?busca=&status=&faixa=&campanha=&cargo=&pagina=)
+  /** Vem do "data" da rota: o Diagnóstico Geral ou a aba de uma empresa. */
+  readonly modo = input<'geral' | 'empresa'>('geral');
+
+  // Filtros vindos da URL (?busca=&status=&faixa=&cargo=&pagina=)
   readonly busca = input<string>();
   readonly status = input<string>();
   readonly faixa = input<string>();
+  /** Só em links antigos (?campanha=): o de uma empresa leva à aba Diagnóstico dela. */
   readonly campanha = input<string>();
-  /** Id do cargo ou "outro"; só vale junto com um link de empresa. */
+  /** Id do cargo ou "outro"; só na aba da empresa. */
   readonly cargo = input<string>();
   readonly pagina = input<string>();
 
+  protected readonly geral = computed(() => this.modo() !== 'empresa');
+  protected readonly empresa = computed(() =>
+    !this.geral() && this.empresaAtual?.empresa.hasValue() ? this.empresaAtual.empresa.value() : undefined,
+  );
+  /** O link cujos diagnósticos aparecem: o geral ou o da empresa (undefined enquanto ela carrega). */
+  private readonly codigo = computed(() => (this.geral() ? 'geral' : this.empresa()?.link?.codigo));
+  private readonly cargoAtivo = computed(() => (this.geral() ? null : this.cargo()));
+
   protected readonly paginaAtual = computed(() => Math.max(1, Number.parseInt(this.pagina() ?? '1', 10) || 1));
 
-  protected readonly painel = httpResource<Painel>(() => ({
-    url: `${API_ADMIN}/painel`,
-    params: semVazios({ campanha: this.campanha(), cargo: this.campanha() ? this.cargo() : null }),
-  }));
+  protected readonly painel = httpResource<Painel>(() => {
+    const codigo = this.codigo();
+    return codigo ? { url: `${API_ADMIN}/painel`, params: semVazios({ campanha: codigo, cargo: this.cargoAtivo() }) } : undefined;
+  });
   /** Os filtros da tela como a API entende; a exportação usa os mesmos, sem paginar. */
-  private readonly filtrosApi = computed(() =>
-    semVazios({
+  private readonly filtrosApi = computed(() => {
+    const codigo = this.codigo();
+    if (!codigo) return null;
+    return semVazios({
       busca: this.busca(),
       // "Inativos" não é uma situação do diagnóstico: são os tirados dos cálculos.
       status: this.status() === 'INATIVO' ? null : this.status(),
       inativos: this.status() === 'INATIVO' ? 'true' : null,
       faixa: this.faixa(),
-      campanha: this.campanha(),
-      cargo: this.campanha() ? this.cargo() : null,
-    }),
-  );
-  protected readonly lista = httpResource<Pagina<ItemLista>>(() => ({
-    url: `${API_ADMIN}/diagnosticos`,
-    params: { ...this.filtrosApi(), pagina: this.paginaAtual() - 1, tamanho: TAMANHO_PAGINA },
-  }));
+      campanha: codigo,
+      cargo: this.cargoAtivo(),
+    });
+  });
+  protected readonly lista = httpResource<Pagina<ItemLista>>(() => {
+    const filtros = this.filtrosApi();
+    return filtros
+      ? { url: `${API_ADMIN}/diagnosticos`, params: { ...filtros, pagina: this.paginaAtual() - 1, tamanho: TAMANHO_PAGINA } }
+      : undefined;
+  });
+  /** Busca no Diagnóstico Geral: em quais empresas a pessoa também aparece. */
+  protected readonly nasEmpresas = httpResource<EncontradoEmEmpresa[]>(() => {
+    const busca = this.busca()?.trim();
+    return this.geral() && busca ? { url: `${API_ADMIN}/diagnosticos/nas-empresas`, params: { busca } } : undefined;
+  });
   protected readonly dadosPainel = ultimoValor(this.painel);
   protected readonly dadosLista = ultimoValor(this.lista);
+  protected readonly encontrados = computed(() =>
+    this.busca() && this.nasEmpresas.hasValue() ? (this.nasEmpresas.value() ?? []) : [],
+  );
 
   protected readonly termo = linkedSignal(() => this.busca() ?? '');
   private readonly campoBusca = viewChild<ElementRef<HTMLInputElement>>('campoBusca');
@@ -87,7 +122,7 @@ export class AdminLista {
   /** PDF já gerado, guardado quando o navegador pediu um novo toque para abrir a folha. */
   private pdfPronto: { url: string; arquivo: File } | null = null;
   protected readonly erro = signal<string | null>(null);
-  protected readonly copiado = signal<string | null>(null);
+  protected readonly copiado = signal(false);
 
   protected readonly faixas = ORDEM_FAIXAS.map((codigo) => ({ codigo, ...FAIXAS[codigo] }));
   protected readonly quando = quando;
@@ -96,23 +131,26 @@ export class AdminLista {
   protected readonly descricaoFiltros = computed(() => {
     const partes: string[] = [];
     if (this.busca()) partes.push(`“${this.busca()}”`);
-    if (this.status()) partes.push(this.status() === 'CONCLUIDO' ? 'concluídos' : 'em andamento');
+    if (this.status()) partes.push(this.status() === 'CONCLUIDO' ? 'concluídos' : this.status() === 'INATIVO' ? 'inativos' : 'em andamento');
     const faixa = estiloFaixa(this.faixa());
     if (faixa) partes.push(`faixa ${faixa.rotulo}`);
     return partes.join(' · ');
   });
-  protected readonly totalTodosOsLinks = computed(() =>
-    (this.dadosPainel()?.campanhas ?? []).reduce((soma, c) => soma + c.total, 0),
-  );
-  protected readonly campanhaSelecionada = computed(() =>
-    this.dadosPainel()?.campanhas.find((c) => c.codigo === this.campanha()),
-  );
   protected readonly cargoSelecionado = computed(() =>
-    this.campanha() ? this.dadosPainel()?.cargos.find((c) => c.valor === this.cargo()) : undefined,
+    this.geral() ? undefined : this.dadosPainel()?.cargos.find((c) => c.valor === this.cargo()),
   );
   protected readonly taxaConclusao = computed(() => {
     const p = this.dadosPainel();
     return p?.total ? Math.round((p.concluidos / p.total) * 100) : 0;
+  });
+  /** "2 pontos acima da média geral (52)", só na empresa. */
+  protected readonly comparacao = computed(() => {
+    const p = this.dadosPainel();
+    if (this.geral() || !p?.referencia || p.indiceMedio === null) return null;
+    const diferenca = p.indiceMedio - p.referencia.media;
+    if (diferenca === 0) return `na média geral (${p.referencia.media})`;
+    const pontos = Math.abs(diferenca);
+    return `${pontos} ${pontos === 1 ? 'ponto' : 'pontos'} ${diferenca > 0 ? 'acima' : 'abaixo'} da média geral (${p.referencia.media})`;
   });
   protected readonly pontos = computed(() =>
     (this.dadosPainel()?.pontos ?? []).map((p) => ({ indice: p.indice, cor: estiloFaixa(p.faixa)?.cor ?? '#0F2B26' })),
@@ -139,6 +177,14 @@ export class AdminLista {
     return { inicio, fim: inicio + l.itens.length - 1, total: l.total };
   });
 
+  // Relatório consolidado da empresa: só com respostas suficientes para ninguém ser identificado.
+  protected readonly faltamParaRelatorio = computed(() => {
+    const e = this.empresa();
+    return e ? Math.max(0, e.minimoRelatorio - e.indicadores.concluidos) : 0;
+  });
+  protected readonly urlRelatorio = computed(() => `${API_ADMIN}/empresas/${this.empresa()?.id}/relatorio.pdf`);
+  protected readonly gerandoRelatorio = signal(false);
+
   constructor() {
     // Busca enquanto digita, com uma pequena espera para não consultar a cada tecla.
     effect((onCleanup) => {
@@ -146,6 +192,24 @@ export class AdminLista {
       if (termo === (untracked(this.busca) ?? '')) return;
       const espera = setTimeout(() => this.filtrar({ busca: termo || null, pagina: null }), 280);
       onCleanup(() => clearTimeout(espera));
+    });
+
+    // Link antigo (/administrador?campanha=demo&cargo=3): a lista de uma empresa mora na tela dela.
+    effect(() => {
+      const codigo = this.campanha();
+      const campanhas = this.dadosPainel()?.campanhas;
+      if (!this.geral() || !codigo || !campanhas) return;
+      untracked(() => {
+        const destino = campanhas.find((c) => c.codigo === codigo)?.empresaId;
+        if (destino) {
+          void this.router.navigate(['/administrador/empresas', destino, 'diagnostico'], {
+            queryParams: semVazios({ busca: this.busca(), status: this.status(), faixa: this.faixa(), cargo: this.cargo() }),
+            replaceUrl: true,
+          });
+        } else {
+          this.filtrar({ campanha: null, cargo: null });
+        }
+      });
     });
   }
 
@@ -173,8 +237,13 @@ export class AdminLista {
     this.filtrar({ busca: null, status: null, faixa: null, pagina: null });
   }
 
-  protected rotuloCampanha(item: ItemLista): string {
-    return item.campanhaDeEmpresa ? item.campanhaNome : 'Link geral';
+  /**
+   * Fora do cadastro de líderes e em andamento, só pode ser quem já tinha respondido e começou de
+   * novo: vira a resposta dele quando terminar.
+   */
+  protected origem(item: ItemLista): string {
+    if (item.origem) return ROTULO_ORIGEM[item.origem];
+    return item.status === 'EM_ANDAMENTO' ? 'Nova tentativa' : '—';
   }
 
   protected async baixar(item: ItemLista) {
@@ -192,9 +261,10 @@ export class AdminLista {
 
   /** Exporta a lista inteira com os filtros da tela (não só a página aberta). */
   protected async exportar(tipo: 'pdf' | 'xlsx') {
-    if (this.exportando() || !this.dadosLista()?.total) return;
+    const filtros = this.filtrosApi();
+    if (this.exportando() || !filtros || !this.dadosLista()?.total) return;
     const url = `${API_ADMIN}/diagnosticos/exportacao.${tipo}?${new URLSearchParams(
-      Object.entries(this.filtrosApi()).map(([chave, valor]) => [chave, String(valor)]),
+      Object.entries(filtros).map(([chave, valor]) => [chave, String(valor)]),
     )}`;
     const nome = `diagnosticos.${tipo}`;
     this.exportando.set(tipo);
@@ -205,7 +275,7 @@ export class AdminLista {
         return;
       }
       const arquivo = this.pdfPronto?.url === url ? this.pdfPronto.arquivo : await buscarArquivo(url, nome);
-      const resultado = await compartilharArquivo(arquivo, 'Diagnósticos');
+      const resultado = await compartilharArquivo(arquivo, this.geral() ? 'Diagnóstico Geral' : `Diagnóstico · ${this.empresa()?.nome ?? ''}`);
       this.pdfPronto = resultado === 'precisa-de-toque' ? { url, arquivo } : null;
       if (resultado === 'precisa-de-toque') this.erro.set('O PDF está pronto. Toque em "PDF" de novo para enviar.');
     } catch (e) {
@@ -216,12 +286,27 @@ export class AdminLista {
     }
   }
 
-  protected async copiarLink(codigo: string) {
-    const link = `${location.origin}${codigo === 'geral' ? '/' : `/c/${codigo}`}`;
+  protected async baixarRelatorio() {
+    if (this.gerandoRelatorio() || !this.empresa()) return;
+    this.gerandoRelatorio.set(true);
+    this.erro.set(null);
+    try {
+      await baixarArquivo(this.urlRelatorio(), 'relatorio-consolidado.pdf');
+    } catch (e) {
+      this.erro.set(e instanceof Error && !e.message.startsWith('Falha') ? e.message : 'Não foi possível gerar o relatório agora. Tente de novo.');
+    } finally {
+      this.gerandoRelatorio.set(false);
+    }
+  }
+
+  /** O link geral (no Diagnóstico Geral) ou o da empresa. */
+  protected async copiarLink() {
+    const link = this.geral() ? `${location.origin}/` : this.empresa()?.link?.url;
+    if (!link) return;
     try {
       await navigator.clipboard.writeText(link);
-      this.copiado.set(codigo);
-      setTimeout(() => this.copiado.set(null), 2000);
+      this.copiado.set(true);
+      setTimeout(() => this.copiado.set(false), 2000);
     } catch {
       this.erro.set(`Copie o link manualmente: ${link}`);
     }

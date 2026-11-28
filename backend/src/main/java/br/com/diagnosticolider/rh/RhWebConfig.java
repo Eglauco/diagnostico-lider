@@ -14,6 +14,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import br.com.diagnosticolider.acesso.QuemEsta;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -58,6 +59,8 @@ class RhWebConfig implements WebMvcConfigurer {
 					// Usou de novo: mais 30 dias neste aparelho.
 					CookieRh.gravar(request, response, token, AcessoRhService.LEMBRAR);
 				}
+				// O que o gestor fizer nesta requisição (cadastrar, editar, enviar) fica com o e-mail dele.
+				request.setAttribute(QuemEsta.AUTOR_RH, QuemEsta.PREFIXO_RH + gestor.email());
 				return gestor;
 			}
 

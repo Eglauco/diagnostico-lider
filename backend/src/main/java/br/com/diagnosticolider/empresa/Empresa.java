@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -46,6 +49,24 @@ public class Empresa {
 
 	@Column(name = "logo_altura")
 	private Integer logoAltura;
+
+	/** Foto de fundo da página do RH: versão no bucket (null = sem foto), tamanho e ponto de foco (0 a 100). */
+	@Column(name = "fundo_versao")
+	private Integer fundoVersao;
+
+	@Column(name = "fundo_largura")
+	private Integer fundoLargura;
+
+	@Column(name = "fundo_altura")
+	private Integer fundoAltura;
+
+	@Column(name = "fundo_foco_x", nullable = false)
+	@JdbcTypeCode(SqlTypes.SMALLINT)
+	private int fundoFocoX = 50;
+
+	@Column(name = "fundo_foco_y", nullable = false)
+	@JdbcTypeCode(SqlTypes.SMALLINT)
+	private int fundoFocoY = 50;
 
 	/**
 	 * Quando a avaliação da empresa encerra (null: sem data). Depois dela os links fecham, os
@@ -96,6 +117,52 @@ public class Empresa {
 		this.logoLargura = null;
 		this.logoAltura = null;
 		return anterior;
+	}
+
+	/** Nova foto de fundo; devolve a versão anterior (para apagar o arquivo antigo), se havia. */
+	public Integer trocarFundo(int largura, int altura, int focoX, int focoY) {
+		Integer anterior = fundoVersao;
+		this.fundoVersao = (anterior == null ? 0 : anterior) + 1;
+		this.fundoLargura = largura;
+		this.fundoAltura = altura;
+		focarFundo(focoX, focoY);
+		return anterior;
+	}
+
+	public Integer removerFundo() {
+		Integer anterior = fundoVersao;
+		this.fundoVersao = null;
+		this.fundoLargura = null;
+		this.fundoAltura = null;
+		this.fundoFocoX = 50;
+		this.fundoFocoY = 50;
+		return anterior;
+	}
+
+	/** O ponto da foto que fica sempre à vista no corte (0 a 100, da esquerda e do topo). */
+	public void focarFundo(int x, int y) {
+		this.fundoFocoX = Math.clamp(x, 0, 100);
+		this.fundoFocoY = Math.clamp(y, 0, 100);
+	}
+
+	public Integer getFundoVersao() {
+		return fundoVersao;
+	}
+
+	public Integer getFundoLargura() {
+		return fundoLargura;
+	}
+
+	public Integer getFundoAltura() {
+		return fundoAltura;
+	}
+
+	public int getFundoFocoX() {
+		return fundoFocoX;
+	}
+
+	public int getFundoFocoY() {
+		return fundoFocoY;
 	}
 
 	public Integer getLogoVersao() {

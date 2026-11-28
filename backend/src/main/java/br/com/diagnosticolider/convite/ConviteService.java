@@ -157,14 +157,17 @@ public class ConviteService {
 	}
 
 	/** Quantos líderes ativos a empresa tem: convidados (planilha e cadastro manual) e pelo link aberto. */
-	public record LideresPorOrigem(int total, int convidados, int peloLink) {
+	/** concluiram: líderes do cadastro cujo diagnóstico vigente está concluído. */
+	public record LideresPorOrigem(int total, int convidados, int peloLink, int concluiram) {
 	}
 
 	public LideresPorOrigem lideresPorOrigem(Long empresaId) {
 		int convidados = 0;
 		int peloLink = 0;
+		int concluiram = 0;
 		for (Object[] linha : convites.origensDaEmpresa(empresaId)) {
-			int n = ((Long) linha[1]).intValue();
+			int n = ((Number) linha[1]).intValue();
+			concluiram += linha[2] == null ? 0 : ((Number) linha[2]).intValue();
 			if (linha[0] == OrigemLider.LINK) {
 				peloLink += n;
 			}
@@ -172,7 +175,17 @@ public class ConviteService {
 				convidados += n;
 			}
 		}
-		return new LideresPorOrigem(convidados + peloLink, convidados, peloLink);
+		return new LideresPorOrigem(convidados + peloLink, convidados, peloLink, concluiram);
+	}
+
+	/** Líderes no cadastro e quantos concluíram, de cada empresa (id → [líderes, concluíram]). */
+	public Map<Long, int[]> lideresPorEmpresa() {
+		Map<Long, int[]> porEmpresa = new HashMap<>();
+		for (Object[] linha : convites.lideresPorEmpresa()) {
+			porEmpresa.put((Long) linha[0], new int[] { ((Number) linha[1]).intValue(),
+					linha[2] == null ? 0 : ((Number) linha[2]).intValue() });
+		}
+		return porEmpresa;
 	}
 
 	/** A planilha modelo, com os cargos da empresa na lista suspensa. */
@@ -213,6 +226,8 @@ public class ConviteService {
 		Map<String, String> erros = new LinkedHashMap<>();
 		Set<String> nestaLista = new HashSet<>();
 		List<Convite.Dados> validos = new ArrayList<>();
+		String autor = quemEsta.nome();
+		boolean peloRh = QuemEsta.doRh(autor);
 		for (int i = 0; i < pedido.convites().size(); i++) {
 			try {
 				Convite.Dados dados = validar(pedido.convites().get(i), lista);
@@ -221,7 +236,8 @@ public class ConviteService {
 				}
 				if (existentes.contains(dados.email())) {
 					throw new RegraNegocioException(inativos.contains(dados.email())
-							? "Esse líder já está na lista, inativo: reative em vez de convidar de novo."
+							? (peloRh ? "Esse líder foi retirado da avaliação: devolva à lista em vez de cadastrar de novo."
+									: "Esse líder já está na lista, inativo: reative em vez de convidar de novo.")
 							: peloLink.contains(dados.email())
 									? "Esse líder já está na lista: começou pelo link aberto da empresa."
 									: "Esse e-mail já tem convite.");
@@ -239,8 +255,9 @@ public class ConviteService {
 			throw erro;
 		}
 		Instant agora = agora();
-		String autor = quemEsta.nome();
-		String origem = pedido.daPlanilha() ? "Importado da planilha." : "Adicionado no painel.";
+		String origem = peloRh
+				? (pedido.daPlanilha() ? "Importado da planilha pela página do RH." : "Cadastrado pela página do RH.")
+				: (pedido.daPlanilha() ? "Importado da planilha." : "Adicionado no painel.");
 		OrigemLider de = pedido.daPlanilha() ? OrigemLider.PLANILHA : OrigemLider.MANUAL;
 		for (Convite.Dados dados : validos) {
 			Convite convite = convites.save(new Convite(link, novoToken(), dados, de, agora));
@@ -347,6 +364,289 @@ public class ConviteService {
 			.toList();
 	}
 
+	// ------------------------------------------------------------------ gestão pela página do RH
+
+	/**
+	 * O que a página do RH precisa para gerenciar os líderes: os cargos (cadastrados pelo
+	 * administrador), se dá para mandar e-mail, quantos ainda não receberam o convite e quem foi
+	 * retirado (podeVoltar: não tinha respondido; quem respondeu só o administrador devolve).
+	 */
+	public record GestaoRh(List<CargoOpcao> cargos, boolean emailAtivo, boolean encerrada, int naoEnviados,
+			List<RetiradoRh> retirados) {
+	}
+
+	public record RetiradoRh(Long id, String nome, String cargo, boolean podeVoltar) {
+	}
+
+	/** Os dados de um líder para o formulário de edição do RH. */
+	public record LiderEditavel(Long id, String nome, String email, String whatsapp, Long cargoId, boolean cargoOutro,
+			boolean respondeu) {
+	}
+
+	@Transactional(readOnly = true)
+	public GestaoRh gestaoRh(Long empresaId) {
+		Convites lista = listar(empresaId);
+		int naoEnviados = (int) lista.convites().stream().filter(c -> c.status() == StatusConvite.AGUARDANDO_ENVIO).count();
+		List<RetiradoRh> retirados = lista.convites()
+			.stream()
+			.filter(c -> c.status() == StatusConvite.INATIVO)
+			.map(c -> new RetiradoRh(c.id(), c.nome(), c.cargo(), c.concluidoEm() == null))
+			.toList();
+		return new GestaoRh(lista.cargos(), lista.emailAtivo(), lista.encerrada(), naoEnviados, retirados);
+	}
+
+	@Transactional(readOnly = true)
+	public LiderEditavel liderParaRh(Long empresaId, Long id) {
+		Convite c = daEmpresa(empresaId, id);
+		return new LiderEditavel(c.getId(), c.getNome(), c.getEmail(), c.getWhatsapp(),
+				c.getCargo() == null ? null : c.getCargo().getId(), c.isCargoOutro(), respondeu(c));
+	}
+
+	@Transactional
+	public ConviteItem editarPeloRh(Long empresaId, Long id, NovoConvite pedido) {
+		travarQuemRespondeu(daEmpresa(empresaId, id));
+		return editar(id, pedido);
+	}
+
+	@Transactional
+	public void retirarPeloRh(Long empresaId, Long id) {
+		travarQuemRespondeu(daEmpresa(empresaId, id));
+		inativar(id);
+	}
+
+	@Transactional
+	public void devolverPeloRh(Long empresaId, Long id) {
+		travarQuemRespondeu(daEmpresa(empresaId, id));
+		reativar(id);
+	}
+
+	/** A chamada do lembrete que o RH manda na hora para quem começou e parou (título e assunto do e-mail). */
+	static final String CHAMADA_RH = "Falta pouco para terminar";
+
+	/** tipo: CONVITE (quem não começou) ou LEMBRETE (quem começou e parou). */
+	public record CobrancaFeita(String para, String tipo) {
+	}
+
+	/** O que saiu no "Lembrar todos que faltam": convites, lembretes e quem ficou de fora (e-mail que voltou). */
+	public record LembreteTodos(int convites, int lembretes, int deFora) {
+	}
+
+	/**
+	 * O e-mail da plataforma para um líder, com a mensagem da situação dele: quem começou e parou
+	 * recebe o lembrete "continue de onde parou"; os outros, o convite (de novo). Na hora: a página
+	 * espera e mostra se saiu ou o motivo. Fora de transação, como o envio de um convite.
+	 */
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	public CobrancaFeita cobrarPeloRh(Long empresaId, Long id) {
+		Convite convite = daEmpresa(empresaId, id);
+		if (convite.status() != StatusConvite.COMECOU) {
+			return new CobrancaFeita(enviarUm(id).para(), "CONVITE");
+		}
+		conferirEnvio(convite);
+		try {
+			envio.lembrarAgora(id, CHAMADA_RH, quemEsta.nome());
+		}
+		catch (EmailSender.FalhaEnvio e) {
+			throw RegraNegocioException.conflito("O lembrete não saiu. " + e.getMessage());
+		}
+		return new CobrancaFeita(convite.getEmail(), "LEMBRETE");
+	}
+
+	/**
+	 * "Lembrar todos que faltam" pela plataforma: cada um que não respondeu recebe a mensagem da
+	 * sua situação, em segundo plano. Ficam de fora os e-mails que voltaram ou foram para o spam.
+	 */
+	public LembreteTodos lembrarTodosPeloRh(Long empresaId) {
+		Empresa empresa = empresa(empresaId);
+		if (!email.ativo()) {
+			throw RegraNegocioException
+				.conflito("Este servidor está com o envio de e-mail desligado: nada sai até ele ser ligado.");
+		}
+		if (empresa.encerrada(agora())) {
+			throw RegraNegocioException.conflito("A avaliação desta empresa já foi encerrada: os e-mails não saem mais.");
+		}
+		List<Convite> faltam = convites.daEmpresa(empresaId)
+			.stream()
+			.filter(c -> !c.inativo() && c.status() != StatusConvite.CONCLUIDO)
+			.toList();
+		Map<Long, BloqueioDeEnvio.Bloqueio> bloqueados = bloqueios.de(faltam);
+		List<Convite> livres = faltam.stream().filter(c -> !bloqueados.containsKey(c.getId())).toList();
+		List<Long> paraLembrete = livres.stream().filter(c -> c.status() == StatusConvite.COMECOU).map(Convite::getId).toList();
+		List<Long> paraConvite = livres.stream().filter(c -> c.status() != StatusConvite.COMECOU).map(Convite::getId).toList();
+		if (livres.isEmpty()) {
+			throw RegraNegocioException.conflito(faltam.isEmpty() ? "Todos já responderam: não há quem lembrar."
+					: "Os e-mails de quem falta voltaram ou foram para o spam: mande o link pessoal pelo WhatsApp.");
+		}
+		envio.cobrar(paraConvite, paraLembrete, CHAMADA_RH, quemEsta.nome());
+		return new LembreteTodos(paraConvite.size(), paraLembrete.size(), bloqueados.size());
+	}
+
+	/** O e-mail que o líder receberia pela plataforma agora (o convite ou o lembrete). */
+	@Transactional(readOnly = true)
+	public String previaParaRh(Long empresaId, Long id) {
+		Convite c = daEmpresa(empresaId, id);
+		return c.status() == StatusConvite.COMECOU ? envio.htmlLembrete(c, CHAMADA_RH) : envio.html(c);
+	}
+
+	/**
+	 * O RH abriu a mensagem no próprio e-mail ou no WhatsApp: fica na linha do tempo de cada líder,
+	 * com quem foi (não dá para confirmar que saiu). Repetir em menos de 10 minutos não duplica.
+	 */
+	@Transactional
+	public void registrarContatoPeloRh(Long empresaId, List<Long> ids, String canal, String via) {
+		boolean whatsapp = "WHATSAPP".equals(canal);
+		TipoEvento tipo = whatsapp ? TipoEvento.CONTATO_WHATSAPP : TipoEvento.CONTATO_EMAIL;
+		List<Long> unicos = ids.stream().distinct().limit(1000).toList();
+		String detalhe = (unicos.size() > 1 ? "Num e-mail para todos que faltavam, em cópia oculta. " : "")
+				+ (whatsapp ? "Aberto no WhatsApp com a mensagem e o link pessoal."
+						: switch (via == null ? "" : via) {
+							case "OUTLOOK" -> "Aberto no Outlook com a mensagem pronta.";
+							case "GMAIL" -> "Aberto no Gmail com a mensagem pronta.";
+							case "COPIA" -> "Mensagem copiada para mandar pelo e-mail do RH.";
+							default -> "Aberto no programa de e-mail com a mensagem pronta.";
+						})
+				+ " Sai fora da plataforma: sem confirmação de entrega.";
+		String autor = quemEsta.nome();
+		Instant agora = agora();
+		for (Long id : unicos) {
+			Convite c = daEmpresa(empresaId, id);
+			if (c.inativo()) {
+				continue;
+			}
+			boolean repetido = eventos.findFirstByConviteIdAndTipoOrderByIdDesc(c.getId(), tipo)
+				.filter(e -> Objects.equals(e.getAutor(), autor) && e.getQuando().isAfter(agora.minusSeconds(600)))
+				.isPresent();
+			if (!repetido) {
+				registrar(c, tipo, agora, detalhe, autor);
+			}
+		}
+	}
+
+	/** O líder é desta empresa (senão, para quem pergunta, ele não existe). */
+	private Convite daEmpresa(Long empresaId, Long id) {
+		return convites.findWithCampanhaById(id)
+			.filter(c -> c.getCampanha().vinculadaAEmpresa() && c.getCampanha().getEmpresa().getId().equals(empresaId))
+			.orElseThrow(() -> new NaoEncontradoException("Líder não encontrado."));
+	}
+
+	private static boolean respondeu(Convite c) {
+		return c.getDiagnostico() != null && c.getDiagnostico().concluido();
+	}
+
+	/**
+	 * Quem já respondeu não muda pela página do RH: retirar tiraria as respostas do resultado (dava
+	 * para "melhorar" a nota da empresa), e os dados dele já estão no relatório.
+	 */
+	private static void travarQuemRespondeu(Convite c) {
+		if (respondeu(c)) {
+			throw RegraNegocioException.conflito("Quem já respondeu não muda pela página do RH: as respostas estão no "
+					+ "resultado do grupo. Para corrigir, fale com quem administra o Diagnóstico do Líder.");
+		}
+	}
+
+	/**
+	 * Um passo da linha do tempo que o RH vê. tom: neutro, envio, alerta ou concluido (a cor do ponto).
+	 * entrega: a situação do e-mail daquele passo (ENTREGUE, DEVOLVIDO...), sem o detalhe técnico.
+	 */
+	public record PassoRh(String tipo, String titulo, String detalhe, Instant quando, String tom, EntregaRh entrega,
+			String por) {
+
+		PassoRh(String tipo, String titulo, String detalhe, Instant quando, String tom, EntregaRh entrega) {
+			this(tipo, titulo, detalhe, quando, tom, entrega, null);
+		}
+
+		/** Feito por um gestor pela página do RH: o e-mail de quem fez. */
+		PassoRh feitoPor(String email) {
+			return new PassoRh(tipo, titulo, detalhe, quando, tom, entrega, email);
+		}
+
+	}
+
+	public record EntregaRh(String situacao, Instant entregueEm, Instant atualizadoEm) {
+	}
+
+	/**
+	 * A linha do tempo de um líder para a página do RH: só a participação (entrou na lista, convite,
+	 * entrega, lembretes, abriu, começou, respondeu). Ficam de fora o que é do líder (ver, baixar e
+	 * compartilhar o próprio resultado), o que é do painel (edições, PDF baixado pelo administrador,
+	 * quem fez) e os dados que ele corrigiu. Líder de outra empresa ou fora da lista: 404.
+	 */
+	@Transactional(readOnly = true)
+	public List<PassoRh> linhaDoTempoRh(Long empresaId, Long conviteId) {
+		Convite c = convites.findWithCampanhaById(conviteId)
+			.filter(x -> x.getInativadoEm() == null && x.getCampanha().vinculadaAEmpresa()
+					&& x.getCampanha().getEmpresa().getId().equals(empresaId))
+			.orElseThrow(() -> new NaoEncontradoException("Líder não encontrado."));
+		List<EventoConvite> lista = eventos.findByConviteIdOrderByQuandoAscIdAsc(c.getId());
+		Map<Long, EmailEnviado> emails = new HashMap<>();
+		emailsEnviados.findAllById(lista.stream().map(EventoConvite::getEmailId).filter(Objects::nonNull).toList())
+			.forEach(e -> emails.put(e.getId(), e));
+		List<PassoRh> passos = new ArrayList<>();
+		for (EventoConvite e : lista) {
+			EmailEnviado email = e.getEmailId() == null ? null : emails.get(e.getEmailId());
+			EntregaRh entrega = email == null ? null
+					: new EntregaRh(email.getSituacao().name(), email.getEntregueEm(), email.getAtualizadoEm());
+			PassoRh passo = switch (e.getTipo()) {
+				case CRIADO -> new PassoRh("CRIADO", "Entrou na lista",
+						QuemEsta.doRh(e.getAutor()) ? e.getDetalhe()
+								: c.getOrigem() == OrigemLider.MANUAL ? "Cadastrado no painel." : "Veio da planilha de líderes.",
+						e.getQuando(), "neutro", null);
+				case COMECOU_PELO_LINK -> new PassoRh("COMECOU_PELO_LINK", "Começou pelo link aberto da empresa",
+						"Entrou na lista por conta própria, sem convite.", e.getQuando(), "neutro", null);
+				case ENVIADO -> new PassoRh("ENVIADO", "Convite enviado por e-mail", "Para " + c.getEmail() + ".",
+						e.getQuando(), "envio", entrega);
+				case LEMBRETE -> new PassoRh("LEMBRETE", "Lembrete enviado", primeiraFrase(e.getDetalhe()), e.getQuando(),
+						"envio", entrega);
+				case FALHA_ENVIO -> new PassoRh("FALHA_ENVIO", "O e-mail não saiu",
+						"Mande o link pessoal pelo WhatsApp ou copie e envie por outro canal.", e.getQuando(), "alerta", null);
+				case EMAIL_DEVOLVIDO -> new PassoRh("EMAIL_DEVOLVIDO", "O e-mail voltou",
+						"O endereço pode estar errado ou a caixa, cheia. Mande o link pelo WhatsApp.", e.getQuando(), "alerta",
+						null);
+				case EMAIL_SPAM -> new PassoRh("EMAIL_SPAM", "O e-mail foi marcado como spam",
+						"Os próximos e-mails podem não chegar. Mande o link pelo WhatsApp.", e.getQuando(), "alerta", null);
+				case ABERTO -> new PassoRh("ABERTO", "Abriu o link", e.getDetalhe(), e.getQuando(), "neutro", null);
+				case DADOS_CONFIRMADOS -> new PassoRh("DADOS_CONFIRMADOS", "Confirmou os dados", null, e.getQuando(),
+						"neutro", null);
+				case DADOS_CORRIGIDOS -> new PassoRh("DADOS_CORRIGIDOS", "Atualizou os próprios dados", null,
+						e.getQuando(), "neutro", null);
+				case COMECOU_RESPONDER -> new PassoRh("COMECOU_RESPONDER", "Começou a responder", e.getDetalhe(),
+						e.getQuando(), "neutro", null);
+				case CONCLUIDO -> new PassoRh("CONCLUIDO", "Respondeu o diagnóstico",
+						"As respostas e o resultado ficam só com o líder.", e.getQuando(), "concluido", null);
+				case RESULTADO_ENVIADO -> new PassoRh("RESULTADO_ENVIADO", "Recebeu o próprio resultado por e-mail",
+						"Só o líder vê.", e.getQuando(), "concluido", entrega);
+				case RESPONDEU_DE_NOVO -> new PassoRh("RESPONDEU_DE_NOVO", "Respondeu de novo",
+						"Vale a resposta mais recente.", e.getQuando(), "concluido", null);
+				// O RH abriu a mensagem no próprio e-mail ou no WhatsApp: fica registrado, sem confirmação de entrega.
+				case CONTATO_EMAIL -> new PassoRh("CONTATO_EMAIL", "Mensagem pelo e-mail do RH", e.getDetalhe(),
+						e.getQuando(), "neutro", null);
+				case CONTATO_WHATSAPP -> new PassoRh("CONTATO_WHATSAPP", "Mensagem pelo WhatsApp do RH", e.getDetalhe(),
+						e.getQuando(), "neutro", null);
+				// Do painel do administrador, nada; do próprio RH, sim (com quem fez).
+				case EDITADO -> QuemEsta.doRh(e.getAutor())
+						? new PassoRh("EDITADO", "Dados editados", e.getDetalhe(), e.getQuando(), "neutro", null) : null;
+				case INATIVADO -> QuemEsta.doRh(e.getAutor()) ? new PassoRh("INATIVADO", "Retirado da avaliação",
+						"O link pessoal parou de funcionar.", e.getQuando(), "alerta", null) : null;
+				case REATIVADO -> QuemEsta.doRh(e.getAutor()) ? new PassoRh("REATIVADO", "Voltou para a lista",
+						"O link pessoal voltou a funcionar.", e.getQuando(), "neutro", null) : null;
+				case VIU_RESULTADO, BAIXOU_PDF, COMPARTILHOU_PDF, PDF_BAIXADO_PAINEL -> null;
+			};
+			if (passo != null) {
+				passos.add(QuemEsta.doRh(e.getAutor()) ? passo.feitoPor(QuemEsta.emailDoRh(e.getAutor())) : passo);
+			}
+		}
+		return passos;
+	}
+
+	/** "Faltam 3 dias para responder. Para ana@x.com." → "Faltam 3 dias para responder." */
+	private static String primeiraFrase(String texto) {
+		if (texto == null) {
+			return null;
+		}
+		int fim = texto.indexOf(". ");
+		return fim < 0 ? texto : texto.substring(0, fim + 1);
+	}
+
 	private static Entrega entrega(EmailEnviado e) {
 		return e == null ? null
 				: new Entrega(e.getSituacao().name(), e.getPara(), e.getEntregueEm(), e.getAtualizadoEm(), e.getDetalhe());
@@ -397,6 +697,18 @@ public class ConviteService {
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public EnvioFeito enviarUm(Long id) {
 		Convite convite = carregar(id);
+		conferirEnvio(convite);
+		try {
+			envio.enviarAgora(id, quemEsta.nome());
+		}
+		catch (EmailSender.FalhaEnvio e) {
+			throw RegraNegocioException.conflito("O convite não saiu. " + e.getMessage());
+		}
+		return new EnvioFeito(convite.getEmail());
+	}
+
+	/** Um e-mail para este líder pode sair agora? (servidor com e-mail, ativo, sem responder, no prazo, sem devolução) */
+	private void conferirEnvio(Convite convite) {
 		if (!email.ativo()) {
 			throw RegraNegocioException
 				.conflito("Este servidor está com o envio de e-mail desligado: nada sai até ele ser ligado.");
@@ -414,13 +726,6 @@ public class ConviteService {
 		if (bloqueio.isPresent()) {
 			throw RegraNegocioException.conflito(bloqueio.get().texto());
 		}
-		try {
-			envio.enviarAgora(id, quemEsta.nome());
-		}
-		catch (EmailSender.FalhaEnvio e) {
-			throw RegraNegocioException.conflito("O convite não saiu. " + e.getMessage());
-		}
-		return new EnvioFeito(convite.getEmail());
 	}
 
 	/** O e-mail de convite como o líder vai receber (com o primeiro convite da lista ou um exemplo). */

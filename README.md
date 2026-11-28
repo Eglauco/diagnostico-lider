@@ -117,14 +117,26 @@ Erros seguem `application/problem+json` (RFC 9457); validação traz o mapa `cam
 
 ## Painel administrativo
 
-Tela em `/administrador`: indicadores, a curva com todos os líderes, distribuição por faixa,
-busca (atalho `/`), filtros por link, situação e faixa (todos na URL) e o detalhe de cada
-diagnóstico com respostas, pontos, linha do tempo e download do PDF.
+O login abre a **carteira de empresas** (`/administrador` → `/administrador/empresas`): os
+totais de todas as empresas (avaliações abertas, líderes, quantos responderam, índice médio
+ponderado pelos concluídos) e um cartão por empresa com o prazo, o progresso ("24 de 29
+responderam") e o índice médio. As que encerram antes vêm primeiro; as encerradas ficam à parte.
 
-Em `/administrador/empresas`: cadastro de empresas (cada uma recebe o seu link), mensagem de
-convite pronta e o QR Code do link, em dois formatos: só o código (PNG ou SVG para gráfica) e
-um cartão de divulgação 1080 × 1350. O QR Code é gerado no navegador (`lean-qr`, correção H,
-com o símbolo da marca no centro): copiar, baixar ou compartilhar a imagem não passa pelo servidor.
+Tudo de uma empresa fica na tela dela (`/administrador/empresas/:id`, `EmpresaLayout`): o
+cabeçalho (marca, prazo, progresso, copiar o link) fica parado e as abas trocam embaixo:
+
+| Aba | Endereço | O que tem |
+|---|---|---|
+| Visão geral | `/empresas/:id` | Link, mensagem de convite, QR Code (só o código, PNG/SVG, e o cartão 1080 × 1350, gerados no navegador com `lean-qr`) e resumos que levam às outras abas |
+| Diagnóstico | `/empresas/:id/diagnostico` | Indicadores (o índice comparado à média geral), a curva, faixas, filtro por cargo, o relatório consolidado e a lista de respostas com a origem de cada líder (planilha, cadastro manual, link) |
+| Líderes | `/empresas/:id/lideres` | O cadastro de líderes, convites, participação e o acompanhamento do gestor (`/convites` redireciona para cá) |
+| Marca e cargos | `/empresas/:id/editar` | Nome, logo, cores, cargos, encerramento e gestores |
+
+O **Diagnóstico Geral** (`/administrador/geral`) mostra só quem respondeu pelo link geral, sem
+empresa. A busca de lá avisa quando a pessoa aparece numa empresa ("também aparece em: Empresa X")
+e leva à aba Diagnóstico dela já filtrada. Um link antigo da lista com `?campanha=` de empresa
+vai para essa aba. Nas duas listas: busca (atalho `/`), situação e faixa na URL, exportação em
+PDF e Excel e o detalhe de cada diagnóstico (o "voltar" leva à lista de onde ele é).
 
 ### Login e usuários do painel
 
@@ -159,14 +171,15 @@ todo usuário acessa tudo, inclusive a gestão de usuários em `/administrador/u
 
 | Método | Caminho                                         | O que faz                                                   |
 |--------|-------------------------------------------------|-------------------------------------------------------------|
-| GET    | `/api/admin/painel?campanha=&cargo=`            | Indicadores, pontos da curva, totais por link e os cargos do link |
+| GET    | `/api/admin/painel?campanha=&cargo=`            | Indicadores, pontos da curva, totais por link, os cargos do link e a média geral (`referencia`, no link de empresa) |
 | GET    | `/api/admin/diagnosticos?busca=&status=&faixa=&campanha=&cargo=&inativos=&pagina=&tamanho=` | Lista paginada (mais recentes primeiro); `inativos=true` mostra só os inativados |
+| GET    | `/api/admin/diagnosticos/nas-empresas?busca=`    | Em quais empresas a busca encontra alguém, com quantos (o "também aparece em" do Diagnóstico Geral) |
 | GET    | `/api/admin/diagnosticos/exportacao.xlsx?busca=&status=&faixa=&campanha=&cargo=&inativos=` | A lista inteira com os filtros da tela, em Excel (resumo com fórmulas, uma coluna por dimensão) |
 | GET    | `/api/admin/diagnosticos/exportacao.pdf?…`      | A mesma lista em PDF (indicadores, curva e uma linha por líder; até 1.000) |
 | GET    | `/api/admin/diagnosticos/exportacao.html?…`     | O PDF em HTML, para ajustar o layout                        |
 | GET    | `/api/admin/diagnosticos/{id}`                  | Detalhe completo: líder, origem, resultado, todas as respostas |
 | GET    | `/api/admin/diagnosticos/{id}/relatorio.pdf`    | PDF do diagnóstico                                          |
-| GET    | `/api/admin/empresas`                           | Empresas com o link e quantos diagnósticos cada uma recebeu |
+| GET    | `/api/admin/empresas`                           | A carteira: cada empresa com o link, diagnósticos, líderes do cadastro, quantos concluíram e o índice médio |
 | POST   | `/api/admin/empresas`                           | Cadastra a empresa e cria o link (`{ nome, codigo?, cores, cargos }`) |
 | GET    | `/api/admin/empresas/{id}`                      | Empresa, link e indicadores                                 |
 | GET    | `/api/admin/empresas/disponibilidade?codigo=`   | Confere se o endereço do link está livre (e sugere outro)   |
@@ -250,6 +263,32 @@ empresa, no PDF individual, no e-mail do líder, no relatório consolidado e no 
 | PUT    | `/api/admin/empresas/{id}/logo`                   | Envia a logo (multipart, campo `arquivo`, PNG) |
 | DELETE | `/api/admin/empresas/{id}/logo`                   | Remove a logo                               |
 | GET    | `/api/public/empresas/{id}/logo-v{versao}.png`    | Endereço permanente da versão atual (e-mail e dev sem bucket; versão antiga: 404) |
+
+### Foto de fundo da página do RH
+
+Enviada pelo administrador em Marca e cargos (só ele troca). Aparece na página do RH da empresa
+(`/acompanhar/{codigo}`): na metade esquerda da entrada no computador, numa faixa no alto da entrada
+no celular e como capa no topo da página depois de entrar. Sem foto, tudo fica nas cores da marca.
+
+- **Preparada no navegador** (`admin/fundo/preparar-fundo.ts`): JPG, PNG ou WebP (até 25 MB), com a
+  orientação da câmera aplicada, reduzida para até 2400 px de largura e comprimida em JPEG. O backend
+  (`FotoDeFundoService`) só aceita JPEG de 640 × 400 a 3200 px e até 2,5 MB. Abaixo de 1400 px de
+  largura o painel avisa que pode ficar borrada em tela grande.
+- **Ponto de foco:** o administrador toca na foto no que precisa ficar sempre à vista (ou usa as
+  setas); vira o `object-position` do corte (`empresa.fundo_foco_x/y`, de 0 a 100). As três prévias do
+  campo mostram o corte real de cada lugar, com o véu na cor da marca.
+- **Véu na cor da marca** (`compartilhado/foto-fundo.ts`): um gradiente da tinta do tema por cima da
+  foto, mais forte onde há texto, para o branco continuar legível com qualquer foto.
+- **Arquivos versionados**, como a logo: `{prefixo}/empresas/{id}/fundo-v{versao}.jpg`, endereço
+  assinado direto do bucket nas telas (vem em `MarcaEmpresa.fundo`). Trocar só o foco não regrava o
+  arquivo.
+
+| Método | Rota                                              | O que faz                                   |
+|--------|---------------------------------------------------|---------------------------------------------|
+| PUT    | `/api/admin/empresas/{id}/fundo`                  | Envia a foto (multipart `arquivo`, JPEG, mais `focoX` e `focoY`) |
+| PUT    | `/api/admin/empresas/{id}/fundo/foco`             | Só o ponto de foco (`{ x, y }`)             |
+| DELETE | `/api/admin/empresas/{id}/fundo`                  | Remove a foto                               |
+| GET    | `/api/public/empresas/{id}/fundo-v{versao}.jpg`   | A versão atual (dev sem bucket; versão antiga: 404) |
 
 ### Cargos dos líderes
 
@@ -394,8 +433,21 @@ A empresa tem uma lista de gestores (nenhum, um ou vários; cadastro e edição)
 
 ### Acesso do RH (página de acompanhamento)
 
-Os gestores da empresa (a mesma lista que recebe os relatórios) acompanham a avaliação em
-`/acompanhar`, no celular ou no computador, com a marca da empresa. Só leitura.
+Os gestores da empresa (a mesma lista que recebe os relatórios) acompanham a avaliação na página
+dela, `/acompanhar/{codigo}` (o mesmo código do link dos líderes, `/c/{codigo}`), no celular ou
+no computador, com a marca da empresa, e cuidam da lista de líderes (veja "Gestão dos líderes").
+O resultado continua só leitura.
+
+- **A entrada** segue a do painel do administrador: no computador, a metade esquerda é da empresa
+  de ponta a ponta (a foto de fundo, quando há, ou as cores da marca, com a prévia da página) e a
+  entrada fica à direita; em monitor largo o conteúdo fica centrado em cada metade.
+- **Uma página por empresa:** o endereço abre direto nela, mesmo para quem acompanha mais de uma. O
+  endereço sozinho não dá acesso: é preciso entrar com o e-mail, e só os gestores daquela empresa veem.
+  Quem chega sem ter entrado pede o código ali mesmo, com a logo e as cores da empresa
+  (`GET /api/acompanhar/marca/{codigo}`, a mesma marca pública do link dos líderes). Quem entrou
+  com um e-mail que não acompanha a empresa vê o aviso e "Entrar com outro e-mail". O endereço antigo
+  pelo número (`/acompanhar/1`) leva ao código. `/acompanhar` sozinho continua: entra e, com mais
+  de uma empresa, pergunta qual.
 
 - **Entrada sem senha:** a pessoa digita o e-mail e recebe um código de 6 números (vale 10 minutos,
   5 tentativas, uma vez) com um botão "Entrar" no mesmo e-mail. A tela responde igual para quem não é
@@ -405,11 +457,43 @@ Os gestores da empresa (a mesma lista que recebe os relatórios) acompanham a av
   acesso na hora. Pedir código tem limite (3 por e-mail e 10 por IP a cada 15 min), porque gasta e-mail.
 - **No painel**, o cartão "Relatórios para o gestor" mostra cada gestor com o último acesso e o
   "Mandar acesso" (botão que entra direto, vale 7 dias, uma vez). O token do botão vai depois do `#`
-  (`/acompanhar/entrar#…`): não passa pelo servidor nem por quem pré-visualiza links. O e-mail diário
-  e o final ao gestor trazem o botão "Acompanhar ao vivo".
+  (`/acompanhar/entrar?empresa={codigo}#…`): não passa pelo servidor nem por quem pré-visualiza links,
+  e `?empresa=` abre a empresa do e-mail depois de entrar. O e-mail do código pedido na página de uma
+  empresa também leva a ela. O e-mail diário e o final ao gestor trazem o botão "Acompanhar ao vivo",
+  para a página da empresa. A Visão geral da empresa no painel mostra o endereço, para copiar.
 - **Participação ao vivo** (atualiza a cada minuto com a tela aberta): o placar, quem falta em grupos
   (começou, abriu, não abriu) com o WhatsApp do líder já com a mensagem e o link pessoal, copiar o link,
   quem já respondeu (só o nome) e o relatório de participação em PDF e Excel.
+- **Linha do tempo de cada líder:** clicar no nome abre um painel (pela direita no computador, do rodapé
+  no celular; `?lider=` no endereço, então o "voltar" fecha) com a situação, o próximo passo, os botões
+  de contato e o que aconteceu: entrou na lista, convite e lembretes com a entrega (Resend), devolução,
+  abriu, começou, respondeu. Só a participação: ficam de fora ver, baixar e compartilhar o próprio
+  resultado, o que é do painel (edições, PDF baixado pelo administrador, quem fez) e os dados que o líder
+  corrigiu (`ConviteService.linhaDoTempoRh`). As setas ← → passam de líder. O que o próprio RH fez
+  (cadastro, edição, retirada, devolução, envio) aparece com "por {e-mail do gestor}".
+- **Gestão dos líderes:** todo gestor da empresa cadastra um líder, importa a planilha (o mesmo modelo e
+  a mesma revisão linha a linha do painel), envia os convites de quem ainda não recebeu (confirmação
+  com a prévia do e-mail; quem já recebeu não recebe de novo) e, no painel do líder, edita os dados
+  e retira da avaliação (com "Desfazer"; quem foi retirado
+  e não tinha respondido volta pela lista "líderes retirados"). **Quem já respondeu fica travado**
+  (`ConviteService.travarQuemRespondeu`, 409): retirar tiraria as respostas do resultado e deixaria a
+  empresa "melhorar" a própria nota; correções assim são com o administrador. Cargos e prazo também
+  ficam com o administrador. As mesmas proteções de envio do painel valem aqui (e-mail que voltou ou
+  foi para o spam não sai de novo, nada sai depois do prazo). Cada ação fica na auditoria com o autor
+  `RH · {e-mail}` (`QuemEsta`, pelo atributo que o `RhWebConfig` grava ao reconhecer o cookie).
+- **"Por e-mail" sempre pergunta por onde sai** (`acompanhar/email-rh.ts`), na lista e no painel do
+  líder, e o mesmo modal serve ao **"Lembrar os N que faltam"**:
+  - *Pela plataforma*: a mensagem da situação de cada um (quem começou e parou recebe o lembrete
+    "Falta pouco para terminar", com o botão para continuar; os outros, o convite), com a marca da
+    empresa e a entrega rastreada (`ConviteService.cobrarPeloRh` e `lembrarTodosPeloRh`, em segundo
+    plano no lote). Prévia do e-mail no modal. As travas de sempre: e-mail que voltou ou foi para o
+    spam fica de fora (com "Corrigir o e-mail"), nada sai depois do prazo ou com o envio desligado.
+  - *Pelo e-mail do RH*: Outlook na web, Gmail na web ou o programa do computador (no celular, o app de
+    e-mail primeiro), com destinatário, assunto e mensagem prontos (`mensagens-rh.ts`), mais "Copiar a
+    mensagem". No lote, o e-mail vai para o próprio gestor com os líderes em cópia oculta.
+  - **Registro na linha do tempo:** abrir o e-mail do RH ou o WhatsApp vira "Mensagem pelo e-mail do
+    RH" / "Mensagem pelo WhatsApp do RH", com quem e quando (`CONTATO_EMAIL`, `CONTATO_WHATSAPP`; sem
+    confirmação de envio, e o texto diz isso). Repetir em menos de 10 minutos não duplica.
 - **Resultado do grupo, anônimo:** o RH vê quem acabou de responder, então se a média mudasse a cada
   resposta uma conta mostraria o índice dessa pessoa (antes 10 com média 50, depois 11 com 52: quem
   entrou tem 72). Por isso o resultado é uma foto (`resultado_foto`, regra em `RegraDaFoto`, com testes):
@@ -423,11 +507,27 @@ Os gestores da empresa (a mesma lista que recebe os relatórios) acompanham a av
 | Método | Caminho                                          | O que faz                                               |
 |--------|--------------------------------------------------|---------------------------------------------------------|
 | GET    | `/api/acompanhar/sessao`                         | Quem está neste aparelho (`{ gestor }`) e o cookie CSRF  |
-| POST   | `/api/acompanhar/codigo`                         | Manda o código (`{ email }`); 204 sempre                 |
+| POST   | `/api/acompanhar/codigo`                         | Manda o código (`{ email, empresa? }`); 204 sempre       |
+| GET    | `/api/acompanhar/marca/{codigo}`                 | Marca da empresa para a tela de entrada (pública)       |
 | POST   | `/api/acompanhar/entrar`                         | `{ email, codigo }` ou `{ link }` (o botão do e-mail)    |
 | POST   | `/api/acompanhar/sair`                           | Esquece este aparelho                                   |
 | GET    | `/api/acompanhar/empresas/{id}`                  | Marca, prazo e participação ao vivo                     |
 | POST   | `/api/acompanhar/empresas/{id}/visita`           | A página abriu (último acesso no painel)                |
+| GET    | `/api/acompanhar/empresas/{id}/lideres/{lider}/linha-do-tempo` | A linha do tempo de um líder (só a participação) |
+| GET    | `/api/acompanhar/empresas/{id}/gestao`           | Cargos, e-mail ligado, quantos sem convite e os retirados |
+| POST   | `/api/acompanhar/empresas/{id}/lideres`          | Cadastra (`{ convites, origem }`, como no painel)       |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/importar` | Lê a planilha para a revisão (multipart `arquivo`)      |
+| GET    | `/api/acompanhar/empresas/{id}/lideres/modelo.xlsx` | A planilha modelo, com os cargos da empresa          |
+| GET    | `/api/acompanhar/empresas/{id}/lideres/email-previa` | O e-mail de convite como o líder recebe (HTML)       |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/enviar`   | Convite para todos que ainda não receberam              |
+| GET    | `/api/acompanhar/empresas/{id}/lideres/{lider}`  | Os dados do líder para editar (`respondeu`)             |
+| PUT    | `/api/acompanhar/empresas/{id}/lideres/{lider}`  | Edita (409 se já respondeu)                             |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/{lider}/enviar` | E-mail da plataforma agora: convite ou lembrete, pela situação (`{ para, tipo }`) |
+| GET    | `/api/acompanhar/empresas/{id}/lideres/{lider}/email-previa` | O e-mail que esse líder receberia (HTML) |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/lembrar`  | Lembrar todos que faltam (`{ convites, lembretes, deFora }`) |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/contato`  | O RH abriu e-mail ou WhatsApp (`{ ids, canal, via }`; 204) |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/{lider}/retirar` | Retira da avaliação (409 se já respondeu)        |
+| POST   | `/api/acompanhar/empresas/{id}/lideres/{lider}/devolver` | Devolve à lista (409 se já respondeu)           |
 | GET    | `/api/acompanhar/empresas/{id}/resultado`        | A foto do resultado (AGUARDANDO, PARCIAL ou FINAL)      |
 | GET    | `/api/acompanhar/empresas/{id}/resultado.pdf`    | O consolidado da foto em PDF                            |
 | GET    | `/api/acompanhar/empresas/{id}/participacao.pdf` | Participação em PDF (também `.xlsx`)                    |

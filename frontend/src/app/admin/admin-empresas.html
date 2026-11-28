@@ -1,10 +1,10 @@
 <main class="mx-auto max-w-6xl px-4 pt-8 pb-20 sm:px-6 sm:pt-10">
   <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      <p class="rotulo text-brasa-escura">Links por empresa</p>
+      <p class="rotulo text-brasa-escura">Carteira</p>
       <h1 class="display mt-2 text-[40px] leading-none font-bold sm:text-[52px]">Empresas</h1>
       <p class="mt-3 max-w-xl text-[16px] text-abeto-2">
-        Cada empresa tem um link próprio. Quem responde por ele entra no relatório consolidado da empresa.
+        Cada empresa tem o seu link, os seus líderes e o seu diagnóstico. Abra uma para ver tudo dela num lugar só.
       </p>
     </div>
     <a routerLink="nova" class="botao-primario w-full shrink-0 sm:w-auto">
@@ -20,74 +20,64 @@
       <button type="button" class="botao-secundario mt-4" (click)="empresas.reload()">Tentar de novo</button>
     </div>
   } @else if (empresas.hasValue()) {
-    @if (empresas.value(); as lista) {
-      @if (lista.length) {
-        <ul class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          @for (e of lista; track e.id) {
-            <li class="cartao cartao-empresa relative flex flex-col p-5">
-              <div class="flex items-start gap-4">
-                <div class="min-w-0 flex-1">
-                  @if (e.logo; as logo) {
-                    <img [src]="logo.url" class="mb-2.5 block h-8 w-auto max-w-[160px] object-contain" alt="" />
-                  }
-                  <h2 class="text-[18px] leading-snug font-semibold break-words">
-                    <a [routerLink]="[e.id]" class="linha-link">{{ e.nome }}</a>
-                  </h2>
-                  @if (e.link) {
-                    <p class="mt-1 flex items-center gap-2 text-[14px] text-abeto-2">
-                      @if (e.cores.primaria) {
-                        <span class="flex shrink-0" aria-hidden="true">
-                          <i class="block size-3.5 rounded-full ring-2 ring-white" [style.background]="e.cores.primaria"></i>
-                          @if (e.cores.secundaria) {
-                            <i class="-ml-1 block size-3.5 rounded-full ring-2 ring-white" [style.background]="e.cores.secundaria"></i>
-                          }
-                        </span>
-                      }
-                      <span class="truncate">/c/{{ e.link.codigo }}</span>
-                    </p>
-                  }
-                </div>
-                @if (e.link) {
-                  <app-qr-svg class="size-16 shrink-0 overflow-hidden rounded-xl ring-1 ring-linha" [texto]="e.link.url" [tema]="null" />
-                }
-              </div>
-
-              <p class="mt-5 text-[15px]">
-                <strong class="font-semibold tabular-nums">{{ e.diagnosticos }}</strong>
-                {{ e.diagnosticos === 1 ? 'diagnóstico' : 'diagnósticos' }}
-                <span class="text-abeto-2">· {{ e.concluidos }} {{ e.concluidos === 1 ? 'concluído' : 'concluídos' }}</span>
-              </p>
-              <p class="mt-0.5 text-[13px] text-abeto-2">
-                {{ e.ultimoDiagnostico ? 'Último: ' + quando(e.ultimoDiagnostico) : 'Nenhuma resposta ainda' }}
-              </p>
-
-              <div class="mt-auto flex items-center justify-between gap-2 pt-5">
-                @if (e.link) {
-                  <button type="button" class="chip relative z-10" (click)="copiarLink(e)">
-                    {{ copiado() === e.id ? 'Link copiado' : 'Copiar link' }}
-                  </button>
-                }
-                <span class="flex items-center gap-1 text-[14px] font-semibold text-abeto" aria-hidden="true">
-                  QR Code e relatório
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                </span>
-              </div>
-            </li>
-          }
-        </ul>
-      } @else {
-        <div class="cartao mt-8 flex flex-col items-center px-6 py-14 text-center">
-          <div class="grid size-16 place-items-center rounded-2xl bg-nevoa" aria-hidden="true">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0F2B26" stroke-width="1.8">
-              <rect x="3.5" y="3.5" width="6" height="6" rx="1.5" /><rect x="14.5" y="3.5" width="6" height="6" rx="1.5" /><rect x="3.5" y="14.5" width="6" height="6" rx="1.5" />
-              <path d="M14.5 14.5h2.5v2.5M20.5 14.5v.01M14.5 20.5h.01M17.5 20.5h3v-3" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </div>
-          <p class="mt-5 text-[18px] font-semibold">Nenhuma empresa cadastrada ainda</p>
-          <p class="mt-1 max-w-sm text-[15px] text-abeto-2">Cadastre a primeira e receba na hora o link e o QR Code para enviar aos líderes.</p>
-          <a routerLink="nova" class="botao-primario mt-6">Cadastrar empresa</a>
+    @if (totais().empresas) {
+      @let t = totais();
+      <!-- Todas as empresas juntas. -->
+      <dl class="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="cartao kpi">
+          <dt>Avaliações abertas</dt>
+          <dd>{{ t.abertas }}</dd>
+          <p>de {{ t.empresas }} {{ t.empresas === 1 ? 'empresa' : 'empresas' }}</p>
         </div>
+        <div class="cartao kpi">
+          <dt>Líderes</dt>
+          <dd>{{ t.lideres }}</dd>
+          <p>em todas as empresas</p>
+        </div>
+        <div class="cartao kpi">
+          <dt>Responderam</dt>
+          <dd>{{ t.responderam }}</dd>
+          <p>{{ t.percentual }}% dos líderes</p>
+        </div>
+        <div class="cartao kpi">
+          <dt>Índice médio</dt>
+          <dd>{{ t.indice ?? '—' }}@if (t.indice !== null) {<small class="ml-0.5 text-[16px] font-medium text-abeto-3">/100</small>}</dd>
+          <p>{{ t.concluidos ? 'de ' + t.concluidos + ' concluídos' : 'ninguém concluiu ainda' }}</p>
+        </div>
+      </dl>
+
+      @if (abertas().length) {
+        <section class="mt-10" aria-labelledby="titulo-abertas">
+          <h2 id="titulo-abertas" class="secao-carteira">Avaliações abertas <span class="contagem">{{ abertas().length }}</span></h2>
+          <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            @for (e of abertas(); track e.id) {
+              <li class="cartao cartao-empresa relative flex flex-col p-5"><ng-container [ngTemplateOutlet]="cartaoEmpresa" [ngTemplateOutletContext]="{ $implicit: e }" /></li>
+            }
+          </ul>
+        </section>
       }
+      @if (encerradas().length) {
+        <section class="mt-10" aria-labelledby="titulo-encerradas">
+          <h2 id="titulo-encerradas" class="secao-carteira">Encerradas <span class="contagem">{{ encerradas().length }}</span></h2>
+          <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            @for (e of encerradas(); track e.id) {
+              <li class="cartao cartao-empresa relative flex flex-col p-5"><ng-container [ngTemplateOutlet]="cartaoEmpresa" [ngTemplateOutletContext]="{ $implicit: e }" /></li>
+            }
+          </ul>
+        </section>
+      }
+    } @else {
+      <div class="cartao mt-8 flex flex-col items-center px-6 py-14 text-center">
+        <div class="grid size-16 place-items-center rounded-2xl bg-nevoa" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0F2B26" stroke-width="1.8">
+            <rect x="3.5" y="3.5" width="6" height="6" rx="1.5" /><rect x="14.5" y="3.5" width="6" height="6" rx="1.5" /><rect x="3.5" y="14.5" width="6" height="6" rx="1.5" />
+            <path d="M14.5 14.5h2.5v2.5M20.5 14.5v.01M14.5 20.5h.01M17.5 20.5h3v-3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <p class="mt-5 text-[18px] font-semibold">Nenhuma empresa cadastrada ainda</p>
+        <p class="mt-1 max-w-sm text-[15px] text-abeto-2">Cadastre a primeira e receba na hora o link e o QR Code para enviar aos líderes.</p>
+        <a routerLink="nova" class="botao-primario mt-6">Cadastrar empresa</a>
+      </div>
     }
   } @else {
     <div class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
@@ -108,3 +98,74 @@
     </div>
   }
 </div>
+
+<!-- Um cartão da carteira: marca, prazo, progresso e índice. O cartão inteiro abre a empresa. -->
+<ng-template #cartaoEmpresa let-e>
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      @if (e.logo; as logo) {
+        <img [src]="logo.url" class="mb-3 block h-8 w-auto max-w-[160px] object-contain" alt="" />
+      }
+      <h3 class="text-[18px] leading-snug font-semibold break-words">
+        <a [routerLink]="[e.id]" class="linha-link">{{ e.nome }}</a>
+      </h3>
+    </div>
+    @if (e.cores.primaria) {
+      <span class="mt-1 flex shrink-0" aria-hidden="true">
+        <i class="block size-4 rounded-full ring-2 ring-white" [style.background]="e.cores.primaria"></i>
+        @if (e.cores.secundaria) {
+          <i class="-ml-1.5 block size-4 rounded-full ring-2 ring-white" [style.background]="e.cores.secundaria"></i>
+        }
+      </span>
+    }
+  </div>
+
+  @if (prazo(e); as pz) {
+    <p class="mt-1.5 flex items-center gap-2 text-[14px]" [class]="pz.urgente ? 'font-semibold text-travada' : 'text-abeto-2'">
+      <i class="block size-2 shrink-0 rounded-full" [class]="pz.aberta ? (pz.urgente ? 'bg-travada' : 'bg-ascensao') : 'bg-abeto-3'" aria-hidden="true"></i>
+      {{ pz.texto }}
+    </p>
+  } @else {
+    <p class="mt-1.5 flex items-center gap-2 text-[14px] text-abeto-2">
+      <i class="block size-2 shrink-0 rounded-full bg-ascensao" aria-hidden="true"></i>
+      Aberta, sem data para encerrar
+    </p>
+  }
+
+  @if (e.lideres) {
+    <div class="mt-5">
+      <div class="flex items-baseline justify-between gap-3 text-[14px]">
+        <span><strong class="font-semibold tabular-nums">{{ e.lideresConcluiram }} de {{ e.lideres }}</strong><span class="text-abeto-2"> {{ e.lideres === 1 ? 'respondeu' : 'responderam' }}</span></span>
+        <span class="font-semibold text-abeto-2 tabular-nums">{{ progresso(e) }}%</span>
+      </div>
+      <div class="mt-2 h-2 overflow-hidden rounded-full bg-nevoa" aria-hidden="true">
+        <span class="block h-full rounded-full bg-ascensao transition-[width] duration-700" [style.width.%]="progresso(e)"></span>
+      </div>
+    </div>
+  } @else {
+    <p class="mt-5 rounded-xl bg-nevoa-2 px-3 py-2.5 text-[14px] text-abeto-2">Nenhum líder ainda: convide pela aba Líderes ou mande o link.</p>
+  }
+
+  <dl class="mt-4 grid grid-cols-2 gap-3">
+    <div>
+      <dt class="text-[13px] text-abeto-2">Índice médio</dt>
+      <dd class="display mt-0.5 text-[26px] leading-none font-bold tabular-nums">{{ indice(e) ?? '—' }}</dd>
+    </div>
+    <div>
+      <dt class="text-[13px] text-abeto-2">Última resposta</dt>
+      <dd class="mt-1.5 text-[14px] font-semibold">{{ e.ultimoDiagnostico ? quando(e.ultimoDiagnostico) : 'Nenhuma ainda' }}</dd>
+    </div>
+  </dl>
+
+  <div class="mt-auto flex items-center justify-between gap-2 pt-5">
+    @if (e.link) {
+      <button type="button" class="chip relative z-10" (click)="copiarLink(e)">
+        {{ copiado() === e.id ? 'Link copiado' : 'Copiar link' }}
+      </button>
+    }
+    <span class="ml-auto flex items-center gap-1 text-[14px] font-semibold text-abeto" aria-hidden="true">
+      Abrir
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </span>
+  </div>
+</ng-template>

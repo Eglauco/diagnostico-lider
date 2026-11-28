@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { exigeLogin, soVisitante } from './acesso/sessao';
 import { AdminLayout } from './admin-layout';
+import { EmpresaLayout } from './empresa/empresa-layout';
 
 export const ROTAS_ADMIN: Routes = [
   {
@@ -16,8 +17,16 @@ export const ROTAS_ADMIN: Routes = [
     canActivate: [exigeLogin],
     children: [
       {
+        // A casa do painel é a carteira de empresas. Um link antigo da lista com ?campanha= vai para
+        // o Diagnóstico Geral, que manda o link de empresa para a aba Diagnóstico dela.
         path: '',
-        title: 'Diagnósticos · Administrador',
+        pathMatch: 'full',
+        redirectTo: ({ queryParams }) => (queryParams['campanha'] ? 'geral' : 'empresas'),
+      },
+      {
+        path: 'geral',
+        title: 'Diagnóstico Geral · Administrador',
+        data: { modo: 'geral' },
         loadComponent: () => import('./admin-lista').then((m) => m.AdminLista),
       },
       {
@@ -36,19 +45,34 @@ export const ROTAS_ADMIN: Routes = [
         loadComponent: () => import('./admin-nova-empresa').then((m) => m.AdminNovaEmpresa),
       },
       {
-        path: 'empresas/:id/editar',
-        title: 'Editar empresa · Administrador',
-        loadComponent: () => import('./admin-editar-empresa').then((m) => m.AdminEditarEmpresa),
-      },
-      {
-        path: 'empresas/:id/convites',
-        title: 'Líderes · Administrador',
-        loadComponent: () => import('./convites/admin-convites').then((m) => m.AdminConvites),
-      },
-      {
+        // Tudo da empresa num lugar só: o cabeçalho fica, as abas trocam embaixo.
         path: 'empresas/:id',
-        title: 'Empresa · Administrador',
-        loadComponent: () => import('./admin-empresa').then((m) => m.AdminEmpresa),
+        component: EmpresaLayout,
+        children: [
+          {
+            path: '',
+            title: 'Empresa · Administrador',
+            loadComponent: () => import('./admin-empresa').then((m) => m.AdminEmpresa),
+          },
+          {
+            path: 'diagnostico',
+            title: 'Diagnóstico da empresa · Administrador',
+            data: { modo: 'empresa' },
+            loadComponent: () => import('./admin-lista').then((m) => m.AdminLista),
+          },
+          {
+            path: 'lideres',
+            title: 'Líderes · Administrador',
+            loadComponent: () => import('./convites/admin-convites').then((m) => m.AdminConvites),
+          },
+          // Endereço antigo da página de líderes.
+          { path: 'convites', redirectTo: 'lideres' },
+          {
+            path: 'editar',
+            title: 'Marca e cargos · Administrador',
+            loadComponent: () => import('./admin-editar-empresa').then((m) => m.AdminEditarEmpresa),
+          },
+        ],
       },
       {
         path: 'usuarios',

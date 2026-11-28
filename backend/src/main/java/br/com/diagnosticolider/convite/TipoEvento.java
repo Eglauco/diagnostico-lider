@@ -23,7 +23,11 @@ public enum TipoEvento {
 	INATIVADO("Líder inativado"),
 	REATIVADO("Líder reativado"),
 	COMECOU_PELO_LINK("Começou pelo link da empresa"),
-	RESPONDEU_DE_NOVO("Respondeu de novo");
+	RESPONDEU_DE_NOVO("Respondeu de novo"),
+	/** O RH abriu uma mensagem no próprio e-mail (Outlook, Gmail...): a plataforma não confirma que saiu. */
+	CONTATO_EMAIL("Mensagem pelo e-mail do RH"),
+	/** O RH abriu o WhatsApp com a mensagem pronta. */
+	CONTATO_WHATSAPP("Mensagem pelo WhatsApp do RH");
 
 	private final String rotulo;
 

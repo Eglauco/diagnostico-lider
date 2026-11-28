@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.diagnosticolider.config.AppProperties;
+import br.com.diagnosticolider.campanha.LinksDaEmpresa;
 import jakarta.validation.constraints.NotBlank;
 
 /** No painel: quem da empresa acompanha pela página do RH, quando entrou, e o "Mandar acesso". */
@@ -23,11 +23,11 @@ class AdminAcessoRhController {
 
 	private final AcessoRhService acessos;
 
-	private final String pagina;
+	private final LinksDaEmpresa links;
 
-	AdminAcessoRhController(AcessoRhService acessos, AppProperties propriedades) {
+	AdminAcessoRhController(AcessoRhService acessos, LinksDaEmpresa links) {
 		this.acessos = acessos;
-		this.pagina = propriedades.urlPublica().replaceAll("/+$", "") + "/acompanhar";
+		this.links = links;
 	}
 
 	record AcessosRh(String pagina, List<AcessoRhService.AcessoDoGestor> gestores) {
@@ -38,7 +38,7 @@ class AdminAcessoRhController {
 
 	@GetMapping
 	AcessosRh listar(@PathVariable Long id) {
-		return new AcessosRh(pagina, acessos.acessosDaEmpresa(id));
+		return new AcessosRh(links.paginaDoRh(id), acessos.acessosDaEmpresa(id));
 	}
 
 	@PostMapping("/convite")

@@ -1,7 +1,10 @@
 package br.com.diagnosticolider.rh;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.util.List;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -14,20 +17,33 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import br.com.diagnosticolider.acompanhamento.ResultadoDaEmpresa;
+import br.com.diagnosticolider.campanha.Campanha;
+import br.com.diagnosticolider.campanha.CampanhaRepository;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
+import br.com.diagnosticolider.convite.ConviteDtos.CriarConvites;
+import br.com.diagnosticolider.convite.ConviteDtos.Criados;
+import br.com.diagnosticolider.convite.ConviteDtos.Envio;
+import br.com.diagnosticolider.convite.ConviteDtos.EnvioIniciado;
+import br.com.diagnosticolider.convite.ConviteDtos.Importacao;
+import br.com.diagnosticolider.convite.ConviteDtos.NovoConvite;
+import br.com.diagnosticolider.convite.ConviteService;
 import br.com.diagnosticolider.convite.ParticipacaoService;
 import br.com.diagnosticolider.diagnostico.DiagnosticoRepository;
 import br.com.diagnosticolider.diagnostico.StatusDiagnostico;
 import br.com.diagnosticolider.empresa.Empresa;
 import br.com.diagnosticolider.empresa.EmpresaRepository;
 import br.com.diagnosticolider.empresa.LogomarcaService;
+import br.com.diagnosticolider.empresa.MarcaEmpresa;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados;
 import br.com.diagnosticolider.relatorio.RelatorioPdfService;
 import br.com.diagnosticolider.rh.RhDtos.Entrar;
@@ -37,6 +53,7 @@ import br.com.diagnosticolider.rh.RhDtos.PedirCodigo;
 import br.com.diagnosticolider.rh.RhDtos.ResultadoRh;
 import br.com.diagnosticolider.rh.RhDtos.Sessao;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
@@ -67,9 +84,15 @@ class RhController {
 
 	private final Clock clock;
 
+	private final CampanhaRepository campanhas;
+
+	private final ConviteService convites;
+
 	RhController(AcessoRhService acessos, ParticipacaoService participacao, ResultadoDaEmpresa resultados,
 			RelatorioPdfService pdf, EmpresaRepository empresas, DiagnosticoRepository diagnosticos,
-			LogomarcaService logomarcas, Clock clock) {
+			LogomarcaService logomarcas, Clock clock, CampanhaRepository campanhas, ConviteService convites) {
+		this.campanhas = campanhas;
+		this.convites = convites;
 		this.acessos = acessos;
 		this.participacao = participacao;
 		this.resultados = resultados;
@@ -104,7 +127,22 @@ class RhController {
 	@PostMapping("/codigo")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void pedirCodigo(@RequestBody @Validated PedirCodigo pedido, HttpServletRequest request) {
-		acessos.pedirCodigo(pedido.email(), request.getRemoteAddr());
+		acessos.pedirCodigo(pedido.email(), request.getRemoteAddr(), pedido.empresa());
+	}
+
+	/**
+	 * A marca da empresa para a tela de entrada de /acompanhar/{codigo}: o gestor reconhece que está no
+	 * lugar certo antes de pedir o código. É a mesma marca pública do link dos líderes (/c/{codigo});
+	 * nada da avaliação sai daqui.
+	 */
+	@GetMapping("/marca/{codigo}")
+	MarcaEmpresa marca(@PathVariable String codigo) {
+		Long empresaId = campanhas.findByCodigo(codigo.strip().toLowerCase(java.util.Locale.ROOT))
+			.filter(Campanha::vinculadaAEmpresa)
+			.map(c -> c.getEmpresa().getId())
+			.orElseThrow(() -> new NaoEncontradoException("Empresa não encontrada."));
+		return logomarcas.marca(empresas.findById(empresaId)
+			.orElseThrow(() -> new NaoEncontradoException("Empresa não encontrada.")));
 	}
 
 	@PostMapping("/entrar")
@@ -162,6 +200,14 @@ class RhController {
 		return arquivo(dados.nomeArquivo(), MediaType.APPLICATION_PDF, conteudo);
 	}
 
+	/** A linha do tempo de um líder: só a participação (nada das respostas nem do resultado). */
+	@GetMapping("/empresas/{id}/lideres/{lider}/linha-do-tempo")
+	List<ConviteService.PassoRh> linhaDoTempo(@PathVariable Long id, @PathVariable Long lider,
+			AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.linhaDoTempoRh(id, lider);
+	}
+
 	@GetMapping("/empresas/{id}/participacao.pdf")
 	ResponseEntity<byte[]> participacaoPdf(@PathVariable Long id, AcessoRhService.Gestor gestor,
 			HttpServletRequest request) {
@@ -180,6 +226,118 @@ class RhController {
 		acessos.registrar(gestor, id, AtividadeRh.Tipo.BAIXOU_PARTICIPACAO_XLSX,
 				request.getHeader(HttpHeaders.USER_AGENT));
 		return arquivo(arquivo.nome(), XLSX, arquivo.conteudo());
+	}
+
+	// ------------------------------------------------------------------ gerenciar os líderes
+	// Todo gestor pode. Quem já respondeu fica travado (ConviteService.travarQuemRespondeu) e cada
+	// ação fica na auditoria com o e-mail do gestor (QuemEsta, pelo cookie do RH).
+
+	/** Cargos, se dá para enviar e-mail, quantos não receberam o convite e quem foi retirado. */
+	@GetMapping("/empresas/{id}/gestao")
+	ConviteService.GestaoRh gestao(@PathVariable Long id, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.gestaoRh(id);
+	}
+
+	@GetMapping("/empresas/{id}/lideres/{lider}")
+	ConviteService.LiderEditavel lider(@PathVariable Long id, @PathVariable Long lider, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.liderParaRh(id, lider);
+	}
+
+	/** Cadastra um líder ({ origem: "painel" }) ou os revisados da planilha. */
+	@PostMapping("/empresas/{id}/lideres")
+	@ResponseStatus(HttpStatus.CREATED)
+	Criados criar(@PathVariable Long id, @Valid @RequestBody CriarConvites pedido, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.criar(id, pedido);
+	}
+
+	/** Lê a planilha para a revisão (não grava nada). */
+	@PostMapping(path = "/empresas/{id}/lideres/importar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	Importacao importar(@PathVariable Long id, @RequestParam("arquivo") MultipartFile arquivo,
+			AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		try {
+			return convites.importar(id, arquivo.getOriginalFilename(), arquivo.getBytes());
+		}
+		catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	@GetMapping("/empresas/{id}/lideres/modelo.xlsx")
+	ResponseEntity<byte[]> modelo(@PathVariable Long id, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return arquivo(convites.nomeDoModelo(id), XLSX, convites.modelo(id));
+	}
+
+	/** O e-mail de convite como o líder recebe, para conferir antes de enviar. */
+	@GetMapping(path = "/empresas/{id}/lideres/email-previa", produces = MediaType.TEXT_HTML_VALUE)
+	String previaEmail(@PathVariable Long id, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.previaEmail(id);
+	}
+
+	/** Envia o convite a todos que ainda não receberam (em segundo plano). */
+	@PostMapping("/empresas/{id}/lideres/enviar")
+	EnvioIniciado enviar(@PathVariable Long id, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.enviar(id, new Envio(List.of()));
+	}
+
+	@PutMapping("/empresas/{id}/lideres/{lider}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void editar(@PathVariable Long id, @PathVariable Long lider, @RequestBody NovoConvite pedido,
+			AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		convites.editarPeloRh(id, lider, pedido);
+	}
+
+	/**
+	 * O e-mail da plataforma para um líder, agora, com a mensagem da situação dele (convite ou
+	 * lembrete "continue de onde parou"). Responde depois que o e-mail saiu.
+	 */
+	@PostMapping("/empresas/{id}/lideres/{lider}/enviar")
+	ConviteService.CobrancaFeita enviarUm(@PathVariable Long id, @PathVariable Long lider, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.cobrarPeloRh(id, lider);
+	}
+
+	/** O e-mail que este líder receberia pela plataforma agora (convite ou lembrete), para conferir. */
+	@GetMapping(path = "/empresas/{id}/lideres/{lider}/email-previa", produces = MediaType.TEXT_HTML_VALUE)
+	String previaDoLider(@PathVariable Long id, @PathVariable Long lider, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.previaParaRh(id, lider);
+	}
+
+	/** "Lembrar todos que faltam" pela plataforma: cada um recebe a mensagem da sua situação. */
+	@PostMapping("/empresas/{id}/lideres/lembrar")
+	ConviteService.LembreteTodos lembrarTodos(@PathVariable Long id, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		return convites.lembrarTodosPeloRh(id);
+	}
+
+	/** O RH abriu a mensagem no próprio e-mail ou no WhatsApp: fica na linha do tempo dos líderes. */
+	@PostMapping("/empresas/{id}/lideres/contato")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void contato(@PathVariable Long id, @Valid @RequestBody RhDtos.Contato pedido, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		convites.registrarContatoPeloRh(id, pedido.ids(), pedido.canal(), pedido.via());
+	}
+
+	@PostMapping("/empresas/{id}/lideres/{lider}/retirar")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void retirar(@PathVariable Long id, @PathVariable Long lider, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		convites.retirarPeloRh(id, lider);
+	}
+
+	@PostMapping("/empresas/{id}/lideres/{lider}/devolver")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void devolver(@PathVariable Long id, @PathVariable Long lider, AcessoRhService.Gestor gestor) {
+		empresaDo(gestor, id);
+		convites.devolverPeloRh(id, lider);
 	}
 
 	// ------------------------------------------------------------------ apoio

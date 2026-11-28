@@ -22,10 +22,12 @@ export type MudancaLogo = { tipo: 'nova'; logo: LogoPreparada } | { tipo: 'remov
 
     @if (exibida(); as url) {
       <div class="mt-4 grid grid-cols-2 gap-2">
-        <figure class="grid h-28 place-items-center rounded-2xl p-4 ring-1 ring-linha" [style.background]="tema().fundo">
-          <img [src]="url" class="max-h-full max-w-full object-contain" alt="Logomarca sobre o fundo claro do questionário" />
+        <!-- Caixa de altura fixa e a logo ocupando-a com object-contain (numa grade, max-h-full não
+             segura a altura e uma logo grande saía da caixa). -->
+        <figure class="block h-28 overflow-hidden rounded-2xl p-4 ring-1 ring-linha" [style.background]="tema().fundo">
+          <img [src]="url" class="block size-full object-contain" alt="Logomarca sobre o fundo claro do questionário" />
         </figure>
-        <figure class="grid h-28 place-items-center rounded-2xl p-4" [style.background]="tema().tinta">
+        <figure class="grid h-28 place-items-center overflow-hidden rounded-2xl p-4" [style.background]="tema().tinta">
           <span class="grid max-h-full max-w-full place-items-center rounded-xl bg-white px-3 py-2">
             <img [src]="url" class="max-h-14 max-w-full object-contain" alt="Logomarca no cartão branco usado sobre fundos escuros" />
           </span>

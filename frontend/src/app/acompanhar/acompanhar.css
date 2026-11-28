@@ -8,6 +8,49 @@
     0 18px 36px -32px rgb(15 43 38 / 0.55);
 }
 
+/* O cargo mais travado: contorno na cor da faixa (o ring do Tailwind perderia para a sombra do cartão). */
+.cartao-rh.cartao-travado {
+  box-shadow:
+    0 0 0 2px var(--color-travada),
+    0 18px 36px -32px rgb(15 43 38 / 0.55);
+}
+
+.cartao-clicavel {
+  transition: box-shadow 200ms;
+}
+.cartao-clicavel:hover {
+  box-shadow:
+    0 0 0 1px var(--color-abeto-3),
+    0 22px 40px -30px rgb(15 43 38 / 0.6);
+}
+
+/*
+ * Computador (a partir de 1024 px, o lg: do Tailwind): o placar vira cartão e fica parado ao lado
+ * da lista (só em janelas altas o bastante para caber inteiro); os blocos do resultado viram cartões.
+ */
+@media (width >= 64rem) {
+  .placar-rh,
+  .cartao-lg {
+    border-radius: 24px;
+    background: #fff;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-linha) 80%, transparent),
+      0 18px 36px -32px rgb(15 43 38 / 0.55);
+  }
+  .placar-rh {
+    padding: 24px;
+  }
+  .cartao-lg {
+    padding: 28px;
+  }
+}
+@media (width >= 64rem) {
+  .coluna-placar.fixa {
+    position: sticky;
+    top: 96px;
+  }
+}
+
 /* Abas: no topo (computador) e no rodapé (celular, no alcance do polegar). */
 .aba-topo {
   min-height: 44px;
@@ -80,6 +123,13 @@
 }
 .acao-linha:active {
   transform: scale(0.94);
+}
+/* No computador, com o mouse, o alvo pode ser menor e a linha fica mais compacta. */
+@media (width >= 64rem) {
+  .acao-linha {
+    width: 40px;
+    height: 40px;
+  }
 }
 .acao-whatsapp {
   background: #e7f7ee;
@@ -166,4 +216,137 @@ details.dobra > summary .seta {
 }
 details.dobra[open] > summary .seta {
   transform: rotate(180deg);
+}
+
+/* A linha de um líder na lista: clicável, abre a linha do tempo. */
+.linha-lider {
+  cursor: pointer;
+  transition: background-color 160ms;
+}
+.linha-lider:hover {
+  background: var(--color-nevoa-2);
+}
+.linha-lider:hover .nome-lider {
+  text-decoration: underline;
+  text-decoration-color: var(--color-abeto-3);
+  text-underline-offset: 4px;
+}
+.linha-lider:focus-visible {
+  outline: 2px solid var(--color-acao);
+  outline-offset: 2px;
+}
+
+/* Uma ação de cadastro na linha do tempo (editar, reenviar, retirar): a linha inteira é o alvo. */
+.acao-gestao {
+  display: flex;
+  width: 100%;
+  min-height: 60px;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  text-align: left;
+  transition: background-color 160ms;
+}
+.acao-gestao:hover {
+  background: var(--color-nevoa-2);
+}
+.acao-gestao:focus-visible {
+  outline: 2px solid var(--color-acao);
+  outline-offset: -2px;
+}
+.acao-gestao + .acao-gestao,
+.acao-gestao + .confirmar-gestao,
+.confirmar-gestao + .acao-gestao {
+  border-top: 1px solid color-mix(in srgb, var(--color-linha) 70%, transparent);
+}
+.icone-gestao {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--color-nevoa);
+  color: var(--color-abeto);
+}
+.confirmar-gestao {
+  padding: 16px;
+  background: var(--color-nevoa-2);
+  animation: aparecer 220ms ease both;
+}
+
+/* Botão de ação que tira alguém da lista: a cor da faixa travada, sem sombra de destaque. */
+.botao-retirar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--color-travada);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 180ms, transform 160ms var(--ease-mola);
+}
+.botao-retirar:hover {
+  background: #a62b3e;
+}
+.botao-retirar:active {
+  transform: scale(0.98);
+}
+
+/* O aviso do que acabou de acontecer, com "Desfazer": no rodapé, acima das abas do celular. */
+.aviso-rh {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  display: flex;
+  width: min(100% - 32px, 30rem);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 18px;
+  border-radius: 18px;
+  background: var(--color-abeto);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.35;
+  box-shadow: 0 22px 48px -20px rgb(15 43 38 / 0.7);
+  transform: translateX(-50%);
+  animation: aviso-subir 320ms var(--ease-mola) both;
+}
+.aviso-rh.aviso-erro {
+  background: var(--color-travada);
+}
+.aviso-rh .aviso-acao {
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.aviso-rh .aviso-acao:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+@keyframes aviso-subir {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+}
+@media (width >= 64rem) {
+  .aviso-rh {
+    bottom: 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aviso-rh,
+  .confirmar-gestao {
+    animation: none;
+  }
 }

@@ -1,12 +1,16 @@
-import { Component, computed, DestroyRef, ElementRef, inject, output, signal, viewChild } from '@angular/core';
+import { Component, computed, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 
 import { problemaDe } from '../api/diagnostico-api';
 import { Curva, PontoGrupo } from '../compartilhado/curva';
 import { problemaEmail } from '../compartilhado/email';
 import { FAIXAS } from '../compartilhado/faixas';
+import { posicaoDaFoto, veuDaFoto } from '../compartilhado/foto-fundo';
 import { Marca } from '../compartilhado/marca';
+import { MarcaEmpresaCabecalho } from '../compartilhado/marca-empresa';
+import { MarcaEmpresa } from '../compartilhado/tema-marca';
 import { armazenamento, vibrar } from '../compartilhado/util';
 import { GestorRh, SessaoRh } from './rh-api';
+import { VitrineRh } from './vitrine-rh';
 
 const ULTIMO_EMAIL = 'rh:email';
 const ESPERA_REENVIO = 45;
@@ -23,7 +27,7 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
  */
 @Component({
   selector: 'app-entrar-rh',
-  imports: [Marca, Curva],
+  imports: [Marca, MarcaEmpresaCabecalho, Curva, VitrineRh],
   host: { class: 'block' },
   styles: `
     .casa {
@@ -64,38 +68,69 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
     @keyframes piscar {
       50% { opacity: 0; }
     }
-    @keyframes tremer {
-      20%, 60% { transform: translateX(-4px); }
-      40%, 80% { transform: translateX(4px); }
-    }
   `,
   template: `
-    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-5 sm:px-8 sm:pt-8">
-      <header class="flex min-h-12 items-center">
+    <!--
+      Celular: uma coluna. Computador: como a entrada do administrador, a vitrine da empresa ocupa a
+      metade esquerda de ponta a ponta (com a foto da empresa, quando há) e a entrada fica à direita.
+    -->
+    <div class="lg:grid lg:min-h-dvh lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+    <!-- A entrada vem primeiro no código (é o que a pessoa veio fazer) e, no computador, fica parada no meio da tela. -->
+    <div class="lg:sticky lg:top-0 lg:flex lg:h-dvh lg:items-center lg:justify-center lg:self-start lg:overflow-y-auto lg:px-10 lg:py-8">
+    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-5 sm:px-8 sm:pt-8 lg:min-h-0 lg:max-w-[27rem] lg:px-0 lg:pt-0">
+      <!-- No celular, a foto da empresa numa faixa no alto, com a marca por cima. -->
+      @if (etapa() === 'email' && marca()?.fundo; as f) {
+        <div class="capa-celular relative -mx-5 -mt-5 h-[clamp(184px,30dvh,250px)] overflow-hidden rounded-b-[28px] text-white sm:-mx-8 sm:-mt-8 lg:hidden">
+          <img class="foto absolute inset-0 size-full object-cover" [src]="f.url" alt="" [style.object-position]="posicao(f)" decoding="async" fetchpriority="high" />
+          <i class="absolute inset-0" [style.background]="veuCelular" aria-hidden="true"></i>
+          <div class="absolute inset-x-5 bottom-5 flex min-w-0 items-center gap-3 sm:inset-x-8">
+            <span class="grid h-12 min-w-12 shrink-0 place-items-center rounded-2xl bg-white px-2.5 shadow-lg">
+              @if (marca()!.logo; as logo) {
+                <img [src]="logo.url" class="block h-8 w-auto max-w-[140px] object-contain" alt="" />
+              } @else {
+                <span class="display text-[17px] font-bold text-acao">{{ marca()!.sigla }}</span>
+              }
+            </span>
+            <span class="display min-w-0 text-[20px] leading-tight font-bold [text-shadow:0_1px_12px_rgb(0_0_0/0.25)]">{{ marca()!.nome }}</span>
+          </div>
+        </div>
+      }
+      <header class="flex min-h-12 items-center" [class]="etapa() === 'email' ? (marca()?.fundo ? 'hidden' : 'lg:hidden') : 'lg:mb-6'">
         @if (etapa() === 'codigo') {
           <button type="button" class="-ml-3 inline-flex min-h-12 items-center gap-1.5 rounded-full px-3 text-[15px] font-semibold text-abeto-2 hover:text-abeto" (click)="voltar()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
             Usar outro e-mail
           </button>
+        } @else if (marca(); as m) {
+          <!-- Pelo link da empresa (/acompanhar/demo): a marca dela, como no link dos líderes. -->
+          <app-marca-empresa class="min-w-0" [empresa]="m" />
         } @else {
           <app-marca />
         }
       </header>
 
       @if (etapa() === 'email') {
-        <section class="flex-1 pt-8" aria-labelledby="titulo-rh">
-          <figure class="surgir -mx-2 rounded-[28px] bg-white/70 px-2 pt-6 ring-1 ring-linha/70" style="--i: 0" aria-hidden="true">
-            <app-curva modo="grupo" [pontos]="ilustracao" />
-          </figure>
-          <p class="rotulo surgir mt-8 text-brasa-escura" style="--i: 1">Acompanhamento da avaliação</p>
-          <h1 id="titulo-rh" class="display surgir mt-2 text-[38px] leading-[1.02] font-bold sm:text-[44px]" style="--i: 2">
-            Acompanhe a avaliação dos seus líderes
+        <section class="flex-1 lg:flex-none lg:pt-0" [class]="marca()?.fundo ? 'pt-2' : 'pt-8'" aria-labelledby="titulo-rh">
+          <!-- Sem foto, a curva ilustra a página no celular (com foto, a faixa no alto já faz isso). -->
+          @if (!marca()?.fundo) {
+            <figure class="surgir -mx-2 rounded-[28px] bg-white/70 px-2 pt-6 ring-1 ring-linha/70 lg:hidden" style="--i: 0" aria-hidden="true">
+              <app-curva modo="grupo" [pontos]="ilustracao" />
+            </figure>
+          }
+          <p class="rotulo surgir mt-8 text-brasa-escura lg:mt-0" style="--i: 1">Acompanhamento da avaliação</p>
+          <h1 id="titulo-rh" class="display surgir mt-2 text-[38px] leading-[1.02] font-bold sm:text-[44px] lg:text-[clamp(34px,2.9vw,46px)]" style="--i: 2">
+            @if (marca(); as m) {
+              Acompanhe os líderes da {{ m.nome }}
+            } @else {
+              Acompanhe a avaliação dos seus líderes
+            }
           </h1>
           <p class="surgir mt-4 text-[17px] leading-snug text-abeto-2" style="--i: 3">
-            Veja quem já respondeu, mande o link para quem falta e acompanhe o resultado do grupo.
+            <span class="lg:hidden">Veja quem já respondeu, mande o link para quem falta e acompanhe o resultado do grupo.</span>
+            <span class="hidden lg:inline">Entre com o seu e-mail de trabalho: mandamos um código de 6 números, sem senha e sem cadastro.</span>
           </p>
 
-          <form class="surgir mt-9" style="--i: 4" novalidate (submit)="$event.preventDefault(); pedir()">
+          <form class="surgir mt-9 lg:mt-10" style="--i: 4" novalidate (submit)="$event.preventDefault(); pedir()">
             <label for="email-rh" class="block text-[15px] font-semibold">Seu e-mail de trabalho</label>
             <div class="mt-1 flex items-end gap-3">
               <input
@@ -114,9 +149,10 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
                 [attr.aria-invalid]="!!erro()"
                 [attr.aria-describedby]="erro() ? 'erro-rh' : 'dica-rh'"
               />
+              <!-- No celular, o botão redondo ao lado do campo; no computador, o botão com o texto, embaixo. -->
               <button
                 type="submit"
-                class="botao-enviar"
+                class="botao-enviar lg:hidden"
                 [class.botao-enviar-pronto]="email().trim().length > 3"
                 [attr.aria-busy]="enviando()"
                 [disabled]="enviando()"
@@ -134,6 +170,15 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
             } @else {
               <p id="dica-rh" class="mt-3 text-[14px] text-abeto-2">Sem senha: mandamos um código de 6 números para este e-mail.</p>
             }
+            <button type="submit" class="botao-primario mt-7 hidden w-full lg:flex" [attr.aria-busy]="enviando()" [disabled]="enviando()">
+              @if (enviando()) {
+                <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+                <span>Mandando o código…</span>
+              } @else {
+                <span>Receber o código</span>
+                <svg class="seta" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              }
+            </button>
           </form>
         </section>
       } @else {
@@ -141,8 +186,9 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
           <p class="rotulo surgir text-brasa-escura" style="--i: 0">Confira o seu e-mail</p>
           <h1 id="titulo-codigo" class="display surgir mt-2 text-[38px] leading-[1.02] font-bold" style="--i: 1">Digite o código</h1>
           <p class="surgir mt-4 text-[17px] leading-snug text-abeto-2" style="--i: 2">
-            Se <strong class="font-semibold break-all text-abeto">{{ email().trim() }}</strong> acompanha alguma avaliação, o código de 6
-            números chega em instantes. Ele vale por 10 minutos.
+            Se <strong class="font-semibold break-all text-abeto">{{ email().trim() }}</strong> acompanha
+            {{ marca() ? 'a avaliação da ' + marca()!.nome : 'alguma avaliação' }}, o código de 6 números chega em instantes.
+            Ele vale por 10 minutos.
           </p>
 
           <div class="surgir relative mt-8" style="--i: 3" [class.erro]="erroCodigo()" (click)="campoCodigo.focus()">
@@ -205,10 +251,15 @@ const GRUPO_ILUSTRATIVO: PontoGrupo[] = [22, 31, 38, 44, 47, 52, 55, 58, 58, 63,
         </section>
       }
 
-      <footer class="mt-10 mb-[max(20px,env(safe-area-inset-bottom))] flex items-start gap-3 rounded-2xl bg-white/60 px-4 py-3.5 text-[14px] leading-snug text-abeto-2 ring-1 ring-linha/60">
+      <footer class="mt-10 mb-[max(20px,env(safe-area-inset-bottom))] lg:mb-0 flex items-start gap-3 rounded-2xl bg-white/60 px-4 py-3.5 text-[14px] leading-snug text-abeto-2 ring-1 ring-linha/60">
         <svg class="mt-0.5 shrink-0 text-abeto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke-linecap="round" /></svg>
         <span>Você vê só números do grupo. O resultado e as respostas de cada líder ficam com ele.</span>
       </footer>
+    </div>
+    </div>
+
+      <!-- No computador, a vitrine à esquerda: a marca e a página que o gestor vai ver. No celular, nada. -->
+      <app-vitrine-rh class="hidden min-h-dvh lg:order-first lg:flex" [marca]="marca()" [empresa]="empresa()" />
     </div>
   `,
 })
@@ -216,8 +267,14 @@ export class EntrarRh {
   private readonly sessao = inject(SessaoRh);
 
   readonly entrou = output<GestorRh>();
+  /** A marca da empresa quando a pessoa chega pelo link dela (/acompanhar/demo); null: tela neutra. */
+  readonly marca = input<MarcaEmpresa | null>(null);
+  /** O código dessa empresa: vai junto no pedido, para o botão do e-mail abrir nela. */
+  readonly empresa = input<string | null>(null);
 
   protected readonly ilustracao = GRUPO_ILUSTRATIVO;
+  protected readonly veuCelular = veuDaFoto('var(--color-abeto)', 'celular');
+  protected readonly posicao = posicaoDaFoto;
   protected readonly casas = [0, 1, 2, 3, 4, 5];
 
   protected readonly etapa = signal<'email' | 'codigo'>('email');
@@ -251,7 +308,7 @@ export class EntrarRh {
     }
     this.enviando.set(true);
     try {
-      await this.sessao.pedirCodigo(email);
+      await this.sessao.pedirCodigo(email, this.empresa());
       armazenamento.gravar(ULTIMO_EMAIL, email);
       this.codigo.set('');
       this.erro.set(null);
@@ -269,7 +326,7 @@ export class EntrarRh {
     this.erro.set(null);
     this.enviando.set(true);
     try {
-      await this.sessao.pedirCodigo(this.email().trim());
+      await this.sessao.pedirCodigo(this.email().trim(), this.empresa());
       this.codigo.set('');
       this.aviso.set('Mandamos um código novo. Use o do e-mail mais recente.');
       this.contarEspera();

@@ -1,59 +1,102 @@
-@if (erro(); as e) {
-  @if (e.status !== 401) {
+@switch (estado()) {
+  @case ('entrar') {
+    <!-- Ninguém neste aparelho: a entrada aqui mesmo, com a marca da empresa do endereço. -->
+    <app-entrar-rh [marca]="marcaPublica.value() ?? null" [empresa]="codigoPedido()" (entrou)="entrou()" />
+  }
+  @case ('fora') {
+    <!-- Entrou com um e-mail que não acompanha esta empresa: dá para trocar de e-mail sem perder o endereço. -->
     <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 text-center">
-      <p class="display text-[30px] leading-tight font-bold">{{ e.status === 404 ? 'Você não acompanha esta empresa' : 'Não deu para abrir agora' }}</p>
-      <p class="mt-3 text-[17px] text-abeto-2" role="alert">
-        {{ e.status === 404 ? 'O seu e-mail não está na lista de gestores dela. Fale com quem administra o Diagnóstico do Líder.' : e.detail }}
+      <p class="display text-[30px] leading-tight font-bold">Você não acompanha esta empresa</p>
+      <p class="mt-3 text-[17px] text-abeto-2">
+        <strong class="font-semibold break-all text-abeto">{{ sessao.gestor()?.email }}</strong> não está na lista de gestores dela.
+        Entre com o e-mail cadastrado ou fale com quem administra o Diagnóstico do Líder.
       </p>
       <div class="mt-8 flex flex-col gap-2">
-        @if (e.status !== 404) {
-          <button type="button" class="botao-primario" (click)="atualizarAgora()">Tentar de novo</button>
+        <button type="button" class="botao-primario" (click)="trocarEmail()">Entrar com outro e-mail</button>
+        @if (sessao.gestor()?.empresas?.length) {
+          <a routerLink="/acompanhar" class="botao-secundario">{{ sessao.gestor()!.empresas.length === 1 ? 'Ver a empresa que você acompanha' : 'Ver as empresas que você acompanha' }}</a>
         }
+      </div>
+    </div>
+  }
+  @case ('carregando') {
+    @if (falhaSessao()) {
+      <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 text-center">
+        <p class="text-[17px] text-abeto-2" role="alert">Não deu para abrir agora. Confira a internet e tente de novo.</p>
+        <button type="button" class="botao-secundario mt-6" (click)="conferirSessao()">Tentar de novo</button>
+      </div>
+    } @else {
+      <div class="grid min-h-dvh place-items-center" aria-busy="true">
+        <span class="size-8 animate-spin rounded-full border-[3px] border-linha border-t-abeto" aria-hidden="true"></span>
+        <span class="sr-only">Carregando o acompanhamento…</span>
+      </div>
+    }
+  }
+  @default {
+@if (erro(); as e) {
+  @if (e.status !== 401 && e.status !== 404) {
+    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 text-center">
+      <p class="display text-[30px] leading-tight font-bold">Não deu para abrir agora</p>
+      <p class="mt-3 text-[17px] text-abeto-2" role="alert">{{ e.detail ?? 'Confira a internet e tente de novo.' }}</p>
+      <div class="mt-8 flex flex-col gap-2">
+        <button type="button" class="botao-primario" (click)="atualizarAgora()">Tentar de novo</button>
         <a routerLink="/acompanhar" class="botao-secundario">Voltar ao início</a>
       </div>
     </div>
   }
 } @else if (painel.value(); as p) {
-  <div class="mx-auto flex min-h-dvh w-full max-w-3xl flex-col">
-    <!-- Cabeçalho: a marca da empresa e a conta. No computador, as abas ficam aqui. -->
-    <header class="sticky top-0 z-30 bg-nevoa/90 px-5 pt-[max(12px,env(safe-area-inset-top))] pb-3 backdrop-blur-md sm:px-8">
-      <div class="flex min-h-12 items-center justify-between gap-3">
-        <app-marca-empresa class="min-w-0" [empresa]="p.empresa" />
-        <div class="relative" data-menu-conta>
-          <button
-            type="button"
-            class="grid size-12 place-items-center rounded-full"
-            [attr.aria-expanded]="menuAberto()"
-            aria-haspopup="true"
-            aria-controls="menu-conta"
-            [attr.aria-label]="'Sua conta: ' + (sessao.gestor()?.email ?? '')"
-            (click)="menuAberto.set(!menuAberto())"
-          >
-            <span class="grid size-9 place-items-center rounded-full bg-white text-[15px] font-bold text-abeto ring-1 ring-linha">{{ inicial() }}</span>
-          </button>
-          @if (menuAberto()) {
-            <div id="menu-conta" class="aparecer absolute right-0 z-40 mt-1 w-[min(300px,calc(100vw-32px))] overflow-hidden rounded-[20px] bg-white shadow-[0_24px_48px_-24px_rgb(15_43_38/0.45)] ring-1 ring-linha">
-              <p class="border-b border-linha px-5 py-4 text-[14px] text-abeto-2">
-                Entrou como<br /><strong class="font-semibold break-all text-abeto">{{ sessao.gestor()?.email }}</strong>
-              </p>
-              @if (outrasEmpresas()) {
-                <a routerLink="/acompanhar" class="flex min-h-13 items-center px-5 text-[16px] font-semibold hover:bg-nevoa-2" (click)="menuAberto.set(false)">Trocar de empresa</a>
+  <div class="flex min-h-dvh w-full flex-col">
+    <!-- Cabeçalho: a marca da empresa e a conta. No computador, as abas ficam no meio, como no painel do administrador. -->
+    <header class="sticky top-0 z-30 bg-nevoa/90 backdrop-blur-md lg:border-b lg:border-linha/80">
+      <div class="mx-auto flex min-h-12 w-full max-w-3xl items-center justify-between gap-3 px-5 pt-[max(12px,env(safe-area-inset-top))] pb-3 sm:px-8 lg:h-[72px] lg:max-w-6xl lg:px-6 lg:py-0">
+        <app-marca-empresa class="min-w-0 lg:flex-1" [empresa]="p.empresa" />
+
+        <nav class="hidden shrink-0 lg:block" aria-label="Seções">
+          <div class="inline-flex rounded-full bg-white p-1 ring-1 ring-linha" role="tablist">
+            <button type="button" role="tab" class="aba-topo" [attr.aria-selected]="abaAtual() === 'participacao'" (click)="trocarAba('participacao')">Participação</button>
+            <button type="button" role="tab" class="aba-topo" [attr.aria-selected]="abaAtual() === 'resultado'" (click)="trocarAba('resultado')">
+              Resultado do grupo
+              @if (resultado.value()?.estado === 'AGUARDANDO') {
+                <span class="sr-only">(ainda fechado)</span>
               }
-              <button type="button" class="flex min-h-13 w-full items-center px-5 text-left text-[16px] font-semibold text-travada hover:bg-nevoa-2" (click)="sair()">Sair deste aparelho</button>
-            </div>
-          }
+            </button>
+          </div>
+        </nav>
+
+        <div class="flex justify-end lg:flex-1">
+          <div class="relative" data-menu-conta>
+            <button
+              type="button"
+              class="grid size-12 place-items-center rounded-full"
+              [attr.aria-expanded]="menuAberto()"
+              aria-haspopup="true"
+              aria-controls="menu-conta"
+              [attr.aria-label]="'Sua conta: ' + (sessao.gestor()?.email ?? '')"
+              (click)="menuAberto.set(!menuAberto())"
+            >
+              <span class="grid size-9 place-items-center rounded-full bg-white text-[15px] font-bold text-abeto ring-1 ring-linha">{{ inicial() }}</span>
+            </button>
+            @if (menuAberto()) {
+              <div id="menu-conta" class="aparecer absolute right-0 z-40 mt-1 w-[min(300px,calc(100vw-32px))] overflow-hidden rounded-[20px] bg-white shadow-[0_24px_48px_-24px_rgb(15_43_38/0.45)] ring-1 ring-linha">
+                <p class="border-b border-linha px-5 py-4 text-[14px] text-abeto-2">
+                  Entrou como<br /><strong class="font-semibold break-all text-abeto">{{ sessao.gestor()?.email }}</strong>
+                </p>
+                @if (outrasEmpresas()) {
+                  <a routerLink="/acompanhar" class="flex min-h-13 items-center px-5 text-[16px] font-semibold hover:bg-nevoa-2" (click)="menuAberto.set(false)">Trocar de empresa</a>
+                }
+                <button type="button" class="flex min-h-13 w-full items-center px-5 text-left text-[16px] font-semibold text-travada hover:bg-nevoa-2" (click)="sair()">Sair deste aparelho</button>
+              </div>
+            }
+          </div>
         </div>
       </div>
-
-      <nav class="mt-3 hidden lg:block" aria-label="Seções">
-        <div class="inline-flex rounded-full bg-white p-1 ring-1 ring-linha" role="tablist">
-          <button type="button" role="tab" class="aba-topo" [attr.aria-selected]="abaAtual() === 'participacao'" (click)="trocarAba('participacao')">Participação</button>
-          <button type="button" role="tab" class="aba-topo" [attr.aria-selected]="abaAtual() === 'resultado'" (click)="trocarAba('resultado')">Resultado do grupo</button>
-        </div>
-      </nav>
     </header>
 
-    <main class="flex-1 px-5 pb-10 sm:px-8" [attr.aria-busy]="atualizando()">
+    <main class="mx-auto w-full max-w-3xl flex-1 px-5 pb-10 sm:px-8 lg:max-w-6xl lg:px-6 lg:pt-4" [attr.aria-busy]="atualizando()">
+      <!-- A foto da empresa no topo (quando o administrador enviou uma). -->
+      @if (p.empresa.fundo) {
+        <app-capa-empresa-rh class="mt-2 mb-2 lg:mt-1 lg:mb-4" [empresa]="p.empresa" />
+      }
       @if (abaAtual() === 'participacao') {
         <app-participacao-rh
           [painel]="p"
@@ -63,6 +106,10 @@
           [atualizando]="atualizando()"
           (atualizar)="atualizarAgora()"
           (verResultado)="trocarAba('resultado')"
+          [liderAberto]="liderId()"
+          (abrirLider)="abrirLider($event)"
+          (trocarLider)="trocarLider($event)"
+          (fecharLider)="fecharLider()"
         />
       } @else {
         <app-resultado-rh
@@ -114,4 +161,6 @@
     <span class="size-8 animate-spin rounded-full border-[3px] border-linha border-t-abeto" aria-hidden="true"></span>
     <span class="sr-only">Carregando o acompanhamento…</span>
   </div>
+}
+  }
 }

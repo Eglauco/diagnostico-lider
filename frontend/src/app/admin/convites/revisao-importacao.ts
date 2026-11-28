@@ -219,6 +219,8 @@ export class RevisaoImportacao {
 
   readonly empresaId = input.required<number>();
   readonly importacao = input.required<Importacao>();
+  /** Para onde vão os líderes revisados (padrão: o painel do administrador; a página do RH passa a dela). */
+  readonly destino = input<string | null>(null);
   readonly criados = output<number>();
   readonly fechou = output();
 
@@ -344,7 +346,7 @@ export class RevisaoImportacao {
     this.erro.set(null);
     try {
       const r = await firstValueFrom(
-        this.http.post<{ criados: number }>(`${API_ADMIN}/empresas/${this.empresaId()}/convites`, {
+        this.http.post<{ criados: number }>(this.destino() ?? `${API_ADMIN}/empresas/${this.empresaId()}/convites`, {
           convites: prontas.map(paraEnvio),
           origem: 'planilha',
         }),

@@ -1,18 +1,19 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { httpResource } from '@angular/common/http';
 import { Location } from '@angular/common';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
-import { baixarArquivo } from '../compartilhado/download';
 import { FAIXAS, ORDEM_FAIXAS } from '../compartilhado/faixas';
 import { dataCompleta } from '../compartilhado/formatos';
-import { API_ADMIN, Convites, EmpresaDetalhe } from './admin-modelos';
+import { API_ADMIN, Convites } from './admin-modelos';
 import { linkWhatsappComTexto, mensagemConvite } from './convite';
-import { encerramentoPorExtenso } from './encerramento/secao-encerramento';
+import { EmpresaAtual } from './empresa/empresa-atual';
 import { KitQr } from './qr/kit-qr';
 
-/** Tudo o que a empresa precisa para divulgar: link, convite pronto e QR Code. */
+/**
+ * Aba "Visão geral" da empresa: o que ela precisa para divulgar (link, convite pronto e QR Code) e
+ * um resumo dos líderes, do diagnóstico e dos cargos, cada um levando à sua aba.
+ */
 @Component({
   selector: 'app-admin-empresa',
   imports: [KitQr, RouterLink],
@@ -21,15 +22,18 @@ import { KitQr } from './qr/kit-qr';
   host: { class: 'block' },
 })
 export class AdminEmpresa {
-  readonly id = input.required<string>();
+  private readonly atual = inject(EmpresaAtual);
 
-  protected readonly empresa = httpResource<EmpresaDetalhe>(() => `${API_ADMIN}/empresas/${this.id()}`);
-  /** Resumo dos convites por e-mail (o funil) para o cartão da página. */
-  protected readonly convites = httpResource<Convites>(() => `${API_ADMIN}/empresas/${this.id()}/convites`);
-  protected readonly encerramentoPorExtenso = encerramentoPorExtenso;
+  /** A mesma empresa do cabeçalho (EmpresaLayout): um pedido só. */
+  protected readonly empresa = this.atual.empresa;
+  /** Resumo do cadastro de líderes (o funil) para o cartão da página. */
+  protected readonly convites = httpResource<Convites>(() => {
+    const id = this.atual.id();
+    return id ? `${API_ADMIN}/empresas/${id}/convites` : undefined;
+  });
   private readonly dados = computed(() => (this.empresa.hasValue() ? this.empresa.value() : undefined));
 
-  /** Acabou de ser cadastrada (veio do formulário): mostra a confirmação uma vez só. */
+  /** Acabou de ser cadastrada ou editada: mostra a confirmação uma vez só. */
   protected readonly confirmacao = signal(this.lerConfirmacao());
 
   protected readonly convite = computed(() => {
@@ -46,42 +50,13 @@ export class AdminEmpresa {
     });
   });
 
-  protected readonly copiado = signal<'link' | 'convite' | null>(null);
+  protected readonly copiado = signal<'link' | 'convite' | 'rh' | null>(null);
   protected readonly erro = signal<string | null>(null);
-  protected readonly dataCompleta = dataCompleta;
 
-  // Relatório consolidado: só com respostas suficientes para ninguém ser identificado.
-  protected readonly faltamParaRelatorio = computed(() => {
-    const e = this.dados();
-    return e ? Math.max(0, e.minimoRelatorio - e.indicadores.concluidos) : 0;
-  });
   /** Cargos como escada: o nível mais alto em cima (nivel 1 = primeiro nível de liderança). */
   protected readonly cargosNaEscada = computed(() =>
     (this.dados()?.cargos ?? []).map((cargo, i) => ({ ...cargo, nivel: i + 1 })).reverse(),
   );
-  protected readonly urlRelatorio = computed(() => `${API_ADMIN}/empresas/${this.id()}/relatorio.pdf`);
-  protected readonly gerandoRelatorio = signal(false);
-
-  protected async baixarRelatorio() {
-    if (this.gerandoRelatorio()) return;
-    this.gerandoRelatorio.set(true);
-    this.erro.set(null);
-    try {
-      await baixarArquivo(this.urlRelatorio(), 'relatorio-consolidado.pdf');
-    } catch (e) {
-      this.erro.set(e instanceof Error && !e.message.startsWith('Falha') ? e.message : 'Não foi possível gerar o relatório agora. Tente de novo.');
-    } finally {
-      this.gerandoRelatorio.set(false);
-    }
-  }
-
-  constructor() {
-    const titulo = inject(Title);
-    effect(() => {
-      const e = this.dados();
-      if (e) titulo.setTitle(`${e.nome} · Empresas · Administrador`);
-    });
-  }
 
   /** O estado do histórico sobrevive ao recarregar: limpa a marca depois de ler. */
   private lerConfirmacao(): 'criada' | 'salva' | null {
@@ -95,7 +70,7 @@ export class AdminEmpresa {
     return dataCompleta(iso).replace(/ às .*$/, '');
   }
 
-  protected async copiar(texto: string, chave: 'link' | 'convite') {
+  protected async copiar(texto: string, chave: 'link' | 'convite' | 'rh') {
     this.erro.set(null);
     try {
       await navigator.clipboard.writeText(texto);

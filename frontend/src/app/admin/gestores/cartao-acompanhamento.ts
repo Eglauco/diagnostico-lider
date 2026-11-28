@@ -97,8 +97,9 @@ const TITULO_ITEM: Record<ItemAcompanhamento['tipo'], string> = {
           <div class="mt-5 border-t border-linha pt-4">
             <h3 class="text-[15px] font-semibold">Acompanhamento ao vivo</h3>
             <p class="mt-1 text-[14px] text-abeto-2">
-              Os gestores também veem a participação e o resultado do grupo, sem nenhuma resposta individual, em
-              <span class="font-semibold break-all text-abeto">{{ semProtocolo(a.pagina) }}</span>. Entram com o próprio e-mail: o código chega na hora, sem senha.
+              Os gestores também veem a participação e o resultado do grupo, sem nenhuma resposta individual, na página desta empresa:
+              <span class="font-semibold break-all text-abeto">{{ semProtocolo(a.pagina) }}</span>. O endereço abre direto nela, mesmo para quem
+              acompanha mais de uma. Entram com o próprio e-mail: o código chega na hora, sem senha.
             </p>
             <ul class="mt-3 space-y-2">
               @for (g of a.gestores; track g.email) {
@@ -136,6 +137,9 @@ const TITULO_ITEM: Record<ItemAcompanhamento['tipo'], string> = {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
                 {{ paginaCopiada() ? 'Endereço copiado' : 'Copiar o endereço' }}
               </button>
+              <a [href]="a.pagina" target="_blank" rel="noopener" class="inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-abeto hover:underline">
+                Abrir a página <span aria-hidden="true">↗</span><span class="sr-only">(abre em nova aba)</span>
+              </a>
             </div>
           </div>
         }

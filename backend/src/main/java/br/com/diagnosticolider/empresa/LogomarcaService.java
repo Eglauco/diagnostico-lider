@@ -51,9 +51,12 @@ public class LogomarcaService {
 
 	private final Armazenamento armazenamento;
 
-	LogomarcaService(EmpresaRepository empresas, Armazenamento armazenamento) {
+	private final FotoDeFundoService fundos;
+
+	LogomarcaService(EmpresaRepository empresas, Armazenamento armazenamento, FotoDeFundoService fundos) {
 		this.empresas = empresas;
 		this.armazenamento = armazenamento;
+		this.fundos = fundos;
 	}
 
 	static String caminho(Long empresaId, int versao) {
@@ -82,9 +85,9 @@ public class LogomarcaService {
 		return new MarcaEmpresa.Logo(url, empresa.getLogoLargura(), empresa.getLogoAltura());
 	}
 
-	/** Nome, paleta e logo da empresa, para as telas do líder (null no link geral). */
+	/** Nome, paleta, logo e foto de fundo da empresa, para as telas (null no link geral). */
 	public MarcaEmpresa marca(Empresa empresa) {
-		return empresa == null ? null : MarcaEmpresa.de(empresa, logo(empresa));
+		return empresa == null ? null : MarcaEmpresa.de(empresa, logo(empresa), fundos.fundo(empresa));
 	}
 
 	@Transactional

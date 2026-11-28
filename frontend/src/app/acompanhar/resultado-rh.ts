@@ -10,6 +10,7 @@ import {
 } from '../compartilhado/download';
 import { estiloFaixa, FAIXAS } from '../compartilhado/faixas';
 import { quando } from '../compartilhado/formatos';
+import { telaDeComputador } from '../compartilhado/util';
 import { API_RH, GrupoCargoRh, ParteFaixa, ResultadoRh } from './rh-api';
 
 const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
@@ -37,7 +38,7 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
 
       @if (r.estado === 'AGUARDANDO' || !r.dados) {
         <!-- Ainda fechado: menos de 3 respostas. -->
-        <section class="surgir cartao-rh mt-4 overflow-hidden" style="--i: 0" aria-labelledby="titulo-fechado">
+        <section class="surgir cartao-rh mt-4 overflow-hidden lg:mx-auto lg:mt-6 lg:max-w-2xl" style="--i: 0" aria-labelledby="titulo-fechado">
           <div class="relative px-3 pt-8 opacity-35 grayscale" aria-hidden="true">
             <app-curva modo="grupo" [pontos]="[]" />
           </div>
@@ -73,7 +74,22 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
             <span class="text-[14px] text-abeto-2">
               {{ r.respostas }} {{ r.respostas === 1 ? 'resposta' : 'respostas' }} · atualizado {{ minuscula(quando(r.atualizadoEm)) }}
             </span>
+            @if (computador()) {
+              <!-- No computador, o PDF fica à mão no topo (e de novo no fim). -->
+              <button type="button" class="botao-primario ml-auto min-h-12 px-6 text-[15px]" [attr.aria-busy]="baixando()" [disabled]="baixando()" (click)="baixar('topo')">
+                @if (baixando()) {
+                  <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+                  Gerando o PDF…
+                } @else {
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  Baixar o resultado em PDF
+                }
+              </button>
+            }
           </div>
+          @if (erroArquivo() && baixouDe() === 'topo') {
+            <p class="aparecer mt-3 text-right text-[15px] font-medium text-travada" role="alert">{{ erroArquivo() }}</p>
+          }
 
           @if (r.estado === 'PARCIAL') {
             <details class="dobra cartao-rh mt-4 px-4">
@@ -89,7 +105,7 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
                 </span>
                 <svg class="seta shrink-0 text-abeto-3" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" /></svg>
               </summary>
-              <div class="space-y-2 border-t border-linha/70 py-4 text-[15px] leading-snug text-abeto-2">
+              <div class="max-w-3xl space-y-2 border-t border-linha/70 py-4 text-[15px] leading-snug text-abeto-2">
                 <p>Você vê quem acabou de responder. Se a média mudasse a cada resposta, uma conta mostraria o índice dessa pessoa.</p>
                 <p>Por isso o resultado só muda quando chegam {{ r.minimo }} respostas novas de uma vez. Cargos e perguntas aparecem no resultado final, quando a avaliação terminar.</p>
               </div>
@@ -102,42 +118,45 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
           }
         </section>
 
-        <!-- O índice médio e a faixa do grupo. -->
-        <section class="surgir mt-8" style="--i: 1" aria-labelledby="titulo-indice">
-          <h2 id="titulo-indice" class="secao-titulo">Índice médio do grupo</h2>
-          <div class="mt-2 flex items-end justify-between gap-4">
-            <p class="display text-[84px] leading-[0.8] font-bold tabular-nums" [attr.aria-label]="d.indice.media + ' de 100'">
-              {{ d.indice.media }}<span class="ml-0.5 text-[22px] font-medium tracking-normal text-abeto-3">/100</span>
-            </p>
-            <span class="mb-1 inline-flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-bold"
-                  [style.background]="faixa(d.faixaDaMedia.codigo)?.suave" [style.color]="faixa(d.faixaDaMedia.codigo)?.texto">
-              <i class="block size-2.5 rounded-full" [style.background]="faixa(d.faixaDaMedia.codigo)?.cor" aria-hidden="true"></i>
-              {{ d.faixaDaMedia.titulo }}
-            </span>
-          </div>
-          <p class="mt-4 text-[15px] leading-snug text-abeto-2">
-            Mediana {{ d.indice.mediana }} · do menor ao maior, de {{ d.indice.menor }} a {{ d.indice.maior }}.
-            @if (d.referencia; as ref) {
-              <br /><strong class="font-semibold text-abeto">{{ comparacao(d.indice.media, ref.media) }}</strong> da média geral, que é {{ ref.media }} ({{ ref.lideres }} líderes de todas as empresas).
-            }
-          </p>
-        </section>
-
-        <!-- A curva: cada ponto é um líder, sem nome. -->
-        <figure class="surgir cartao-rh mt-6 px-2 pt-10 pb-3" style="--i: 2">
-          <app-curva modo="grupo" [pontos]="pontos()" />
-          <figcaption class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 pt-2 text-[13px] text-abeto-2">
-            <span>Cada ponto é um líder, sem identificação.</span>
-            <span class="flex gap-3">
-              @for (f of ordem; track f) {
-                <span class="inline-flex items-center gap-1.5"><i class="block size-2 rounded-full" [style.background]="faixa(f)?.cor" aria-hidden="true"></i>{{ faixa(f)?.rotulo }}</span>
+        <!-- O índice e a curva: um embaixo do outro no celular, lado a lado no computador. -->
+        <div class="lg:mt-6 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-6">
+          <!-- O índice médio e a faixa do grupo. -->
+          <section class="surgir cartao-lg mt-8 lg:mt-0 lg:flex lg:flex-col" style="--i: 1" aria-labelledby="titulo-indice">
+            <h2 id="titulo-indice" class="secao-titulo">Índice médio do grupo</h2>
+            <div class="mt-2 flex items-end justify-between gap-4 lg:mt-5 lg:flex-col lg:items-start lg:gap-5">
+              <p class="display text-[84px] leading-[0.8] font-bold tabular-nums lg:text-[104px]" [attr.aria-label]="d.indice.media + ' de 100'">
+                {{ d.indice.media }}<span class="ml-0.5 text-[22px] font-medium tracking-normal text-abeto-3 lg:text-[26px]">/100</span>
+              </p>
+              <span class="mb-1 inline-flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-bold"
+                    [style.background]="faixa(d.faixaDaMedia.codigo)?.suave" [style.color]="faixa(d.faixaDaMedia.codigo)?.texto">
+                <i class="block size-2.5 rounded-full" [style.background]="faixa(d.faixaDaMedia.codigo)?.cor" aria-hidden="true"></i>
+                {{ d.faixaDaMedia.titulo }}
+              </span>
+            </div>
+            <p class="mt-4 text-[15px] leading-snug text-abeto-2 lg:mt-auto lg:border-t lg:border-linha/70 lg:pt-5">
+              Mediana {{ d.indice.mediana }} · do menor ao maior, de {{ d.indice.menor }} a {{ d.indice.maior }}.
+              @if (d.referencia; as ref) {
+                <br /><strong class="font-semibold text-abeto">{{ comparacao(d.indice.media, ref.media) }}</strong> da média geral, que é {{ ref.media }} ({{ ref.lideres }} líderes de todas as empresas).
               }
-            </span>
-          </figcaption>
-        </figure>
+            </p>
+          </section>
+
+          <!-- A curva: cada ponto é um líder, sem nome. -->
+          <figure class="surgir cartao-rh mt-6 px-2 pt-10 pb-3 lg:mt-0 lg:flex lg:flex-col lg:justify-end lg:px-4 lg:pt-12" style="--i: 2">
+            <app-curva modo="grupo" [pontos]="pontos()" [largura]="computador() ? 500 : 360" />
+            <figcaption class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 pt-2 text-[13px] text-abeto-2">
+              <span>Cada ponto é um líder, sem identificação.</span>
+              <span class="flex gap-3">
+                @for (f of ordem; track f) {
+                  <span class="inline-flex items-center gap-1.5"><i class="block size-2 rounded-full" [style.background]="faixa(f)?.cor" aria-hidden="true"></i>{{ faixa(f)?.rotulo }}</span>
+                }
+              </span>
+            </figcaption>
+          </figure>
+        </div>
 
         <!-- Faixas. -->
-        <section class="mt-10" aria-labelledby="titulo-faixas">
+        <section class="mt-10 lg:mt-12" aria-labelledby="titulo-faixas">
           <h2 id="titulo-faixas" class="secao-titulo">Como o grupo se distribui</h2>
           <div class="mt-4 flex h-3 gap-[3px] overflow-hidden rounded-full" aria-hidden="true">
             @for (f of d.faixas; track f.codigo) {
@@ -146,7 +165,7 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
               }
             }
           </div>
-          <ul class="mt-4 space-y-3">
+          <ul class="mt-4 space-y-3 lg:grid lg:grid-cols-3 lg:gap-4 lg:space-y-0">
             @for (f of d.faixas; track f.codigo) {
               <li class="cartao-rh p-4">
                 <div class="flex items-center gap-3">
@@ -169,7 +188,8 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
         @if (d.destaques.length) {
           <section class="mt-10" aria-labelledby="titulo-destaques">
             <h2 id="titulo-destaques" class="secao-titulo">O que se destaca</h2>
-            <ul class="mt-4 space-y-3">
+            <!-- Em duas colunas; se sobrar um, ele ocupa a linha toda. -->
+            <ul class="mt-4 space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:[&>li:last-child:nth-child(odd)]:col-span-2">
               @for (x of d.destaques; track x.titulo) {
                 <li class="cartao-rh flex gap-3.5 p-4">
                   <i class="mt-1.5 block size-2.5 shrink-0 rounded-full" [style.background]="faixa(x.codigo)?.cor ?? 'var(--color-abeto-3)'" aria-hidden="true"></i>
@@ -187,7 +207,9 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
         @if (d.dimensoes.length) {
           <section class="mt-10" aria-labelledby="titulo-dimensoes">
             <h2 id="titulo-dimensoes" class="secao-titulo">Por dimensão</h2>
-            <ul class="mt-4 space-y-3">
+            <!-- Três dimensões (ou seis): três colunas. Outro número: duas, e a que sobrar ocupa a linha. -->
+            <ul class="mt-4 space-y-3 lg:grid lg:gap-4 lg:space-y-0"
+                [class]="d.dimensoes.length % 3 === 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2 lg:[&>li:last-child:nth-child(odd)]:col-span-2'">
               @for (dim of d.dimensoes; track dim.codigo) {
                 <li class="cartao-rh p-4">
                   <div class="flex items-start justify-between gap-3">
@@ -229,42 +251,47 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
             <section class="mt-10" aria-labelledby="titulo-cargos">
               <h2 id="titulo-cargos" class="secao-titulo">Em que nível a carreira trava</h2>
               <p class="mt-1.5 text-[15px] leading-snug text-abeto-2">Do cargo mais alto para o primeiro nível. Um cargo só aparece sozinho com 3 líderes ou mais.</p>
-              <ul class="mt-4 space-y-3">
-                @for (g of escada(pc.grupos); track g.nome) {
-                  <li class="cartao-rh p-4" [class.ring-2]="pc.maisTravado?.nome === g.nome" [class.ring-travada]="pc.maisTravado?.nome === g.nome">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <p class="text-[16px] font-semibold">{{ g.nome }}</p>
-                        <p class="text-[13.5px] text-abeto-2">{{ g.lideres }} {{ g.lideres === 1 ? 'líder' : 'líderes' }}{{ pc.maisTravado?.nome === g.nome ? ' · o mais travado' : '' }}</p>
+              <!-- A escada à esquerda e o tempo no cargo à direita, no computador. -->
+              <div class="lg:mt-4 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-6">
+                <ul class="mt-4 space-y-3 lg:mt-0">
+                  @for (g of escada(pc.grupos); track g.nome) {
+                    <li class="cartao-rh p-4" [class.cartao-travado]="pc.maisTravado?.nome === g.nome">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <p class="text-[16px] font-semibold">{{ g.nome }}</p>
+                          <p class="text-[13.5px] text-abeto-2">{{ g.lideres }} {{ g.lideres === 1 ? 'líder' : 'líderes' }}{{ pc.maisTravado?.nome === g.nome ? ' · o mais travado' : '' }}</p>
+                        </div>
+                        <p class="display shrink-0 text-[30px] leading-none font-bold tabular-nums">{{ g.media }}</p>
                       </div>
-                      <p class="display shrink-0 text-[30px] leading-none font-bold tabular-nums">{{ g.media }}</p>
-                    </div>
-                    <div class="mt-3 flex h-2.5 gap-[2px] overflow-hidden rounded-full" aria-hidden="true">
-                      @for (parte of g.faixas; track parte.codigo) {
-                        @if (parte.quantidade) {
-                          <span class="h-full" [style.width.%]="parte.percentual" [style.background]="faixa(parte.codigo)?.cor"></span>
+                      <div class="mt-3 flex h-2.5 gap-[2px] overflow-hidden rounded-full" aria-hidden="true">
+                        @for (parte of g.faixas; track parte.codigo) {
+                          @if (parte.quantidade) {
+                            <span class="h-full" [style.width.%]="parte.percentual" [style.background]="faixa(parte.codigo)?.cor"></span>
+                          }
                         }
-                      }
-                    </div>
-                    <p class="mt-2 text-[13px] text-abeto-2">{{ resumoFaixas(g.faixas) }}</p>
-                  </li>
-                }
-              </ul>
-              @if (pc.tempos.length) {
-                <h3 class="mt-7 text-[16px] font-semibold">Tempo no cargo</h3>
-                <ul class="mt-3 divide-y divide-linha/70 rounded-[20px] bg-white px-4 ring-1 ring-linha/70">
-                  @for (t of pc.tempos; track t.rotulo) {
-                    <li class="flex min-h-14 items-center justify-between gap-3 py-2.5">
-                      <span class="text-[15px]">{{ t.rotulo }}</span>
-                      @if (t.oculto) {
-                        <span class="text-right text-[13px] text-abeto-2">Menos de 3 líderes: sem números</span>
-                      } @else {
-                        <span class="text-right text-[14px]"><strong class="font-bold tabular-nums">{{ t.media }}</strong> <span class="text-abeto-2">· {{ t.lideres }} líderes</span></span>
-                      }
+                      </div>
+                      <p class="mt-2 text-[13px] text-abeto-2">{{ resumoFaixas(g.faixas) }}</p>
                     </li>
                   }
                 </ul>
-              }
+                @if (pc.tempos.length) {
+                  <div>
+                    <h3 class="mt-7 text-[16px] font-semibold lg:mt-0">Tempo no cargo</h3>
+                    <ul class="mt-3 divide-y divide-linha/70 rounded-[20px] bg-white px-4 ring-1 ring-linha/70">
+                      @for (t of pc.tempos; track t.rotulo) {
+                        <li class="flex min-h-14 items-center justify-between gap-3 py-2.5">
+                          <span class="text-[15px]">{{ t.rotulo }}</span>
+                          @if (t.oculto) {
+                            <span class="text-right text-[13px] text-abeto-2">Menos de 3 líderes: sem números</span>
+                          } @else {
+                            <span class="text-right text-[14px]"><strong class="font-bold tabular-nums">{{ t.media }}</strong> <span class="text-abeto-2">· {{ t.lideres }} líderes</span></span>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+              </div>
               @if (pc.notaAnonimato) {
                 <p class="mt-3 text-[13.5px] leading-snug text-abeto-2">{{ pc.notaAnonimato }}</p>
               }
@@ -279,9 +306,10 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
             <section class="mt-10" aria-labelledby="titulo-perguntas">
               <h2 id="titulo-perguntas" class="secao-titulo">O que os líderes responderam</h2>
               <p class="mt-1.5 text-[15px] leading-snug text-abeto-2">Quantos escolheram cada alternativa, sem nomes.</p>
-              <div class="mt-4 space-y-3">
-                @for (q of d.perguntas; track q.numero; let primeira = $first) {
-                  <details class="dobra cartao-rh px-4" [open]="primeira">
+              <div class="mt-4 space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
+                @for (q of d.perguntas; track q.numero) {
+                  <!-- Abertas de início: a primeira (no computador, a primeira de cada coluna). -->
+                  <details class="dobra cartao-rh px-4 lg:px-5" [open]="$index < (computador() ? 2 : 1)">
                     <summary class="flex min-h-15 cursor-pointer list-none items-start gap-3 py-3.5">
                       <span class="display grid size-8 shrink-0 place-items-center rounded-full bg-nevoa text-[15px] font-bold">{{ q.numero }}</span>
                       <span class="min-w-0 flex-1">
@@ -324,10 +352,11 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
         @if (temAcoes()) {
           <section class="mt-10" aria-labelledby="titulo-acoes">
             <h2 id="titulo-acoes" class="secao-titulo">O que a empresa pode fazer</h2>
-            <div class="mt-4 space-y-3">
+            <div class="mt-4 space-y-3 lg:grid lg:grid-cols-3 lg:items-start lg:gap-4 lg:space-y-0">
               @for (f of d.faixas; track f.codigo) {
                 @if (f.acoes.length) {
-                  <details class="dobra cartao-rh px-4" [open]="f.codigo === d.faixaDaMedia.codigo">
+                  <!-- No computador, as três abertas lado a lado; no celular, só a faixa do grupo. -->
+                  <details class="dobra cartao-rh px-4 lg:px-5" [open]="computador() || f.codigo === d.faixaDaMedia.codigo">
                     <summary class="flex min-h-15 cursor-pointer list-none items-center gap-3">
                       <i class="block size-3 shrink-0 rounded-full" [style.background]="faixa(f.codigo)?.cor" aria-hidden="true"></i>
                       <span class="flex-1 text-[16px] font-semibold">{{ f.titulo }}</span>
@@ -350,8 +379,8 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
         }
 
         <!-- O PDF para levar à reunião. -->
-        <section class="mt-10">
-          <button type="button" class="botao-primario w-full" [attr.aria-busy]="baixando()" [disabled]="baixando()" (click)="baixar()">
+        <section class="mt-10 lg:mt-12 lg:flex lg:flex-row-reverse lg:items-center lg:justify-between lg:gap-8">
+          <button type="button" class="botao-primario w-full lg:w-auto lg:shrink-0" [attr.aria-busy]="baixando()" [disabled]="baixando()" (click)="baixar('fim')">
             @if (baixando()) {
               <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
               Gerando o PDF…
@@ -360,15 +389,17 @@ const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice
               {{ compartilha ? 'Compartilhar o resultado em PDF' : 'Baixar o resultado em PDF' }}
             }
           </button>
-          @if (erroArquivo(); as e) {
-            <p class="aparecer mt-3 text-[15px] font-medium text-travada" role="alert">{{ e }}</p>
-          }
-          <p class="mt-4 text-[13.5px] leading-snug text-abeto-2">
-            Base: {{ r.respostas }} diagnósticos concluídos {{ d.periodo }}. {{ d.questionario }}.
-            @if (d.notaVersoes) {
-              {{ d.notaVersoes }}
+          <div class="min-w-0 lg:max-w-3xl">
+            @if (erroArquivo() && baixouDe() === 'fim') {
+              <p class="aparecer mt-3 text-[15px] font-medium text-travada lg:mt-0 lg:mb-2" role="alert">{{ erroArquivo() }}</p>
             }
-          </p>
+            <p class="mt-4 text-[13.5px] leading-snug text-abeto-2 lg:mt-0">
+              Base: {{ r.respostas }} diagnósticos concluídos {{ d.periodo }}. {{ d.questionario }}.
+              @if (d.notaVersoes) {
+                {{ d.notaVersoes }}
+              }
+            </p>
+          </div>
         </section>
       }
     }
@@ -388,8 +419,11 @@ export class ResultadoRhComponente {
   protected readonly minuscula = minuscula;
   protected readonly compartilha = podeCompartilharArquivos();
 
+  protected readonly computador = telaDeComputador();
   protected readonly baixando = signal(false);
   protected readonly erroArquivo = signal<string | null>(null);
+  /** De qual botão veio o pedido do PDF (no computador há um no topo e outro no fim): o erro aparece ao lado dele. */
+  protected readonly baixouDe = signal<'topo' | 'fim'>('fim');
 
   protected readonly pontos = computed<PontoGrupo[]>(() =>
     (this.resultado()?.dados?.pontos ?? []).map((p) => ({ indice: p.indice, cor: estiloFaixa(p.faixa)?.cor ?? FAIXAS['PLATO'].cor })),
@@ -429,7 +463,8 @@ export class ResultadoRhComponente {
     return nota < limites.alerta ? FAIXAS['TRAVADA'].cor : nota < limites.forte ? FAIXAS['PLATO'].cor : FAIXAS['ASCENSAO'].cor;
   }
 
-  protected async baixar() {
+  protected async baixar(de: 'topo' | 'fim') {
+    this.baixouDe.set(de);
     this.erroArquivo.set(null);
     this.baixando.set(true);
     try {

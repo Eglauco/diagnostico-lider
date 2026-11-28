@@ -33,13 +33,26 @@ export interface LogoEmpresa {
 /** Logo "quadrada" (só o símbolo) pede o nome ao lado; logo larga já traz o nome. */
 export const logoPedeNome = (logo: LogoEmpresa) => logo.largura < logo.altura * 1.8;
 
-/** A empresa do link: nome em destaque, logo ou monograma (iniciais) e a paleta. */
+/**
+ * Foto de fundo da página do RH (a entrada e o topo da página). O foco (0 a 100, da esquerda e
+ * do topo) é o ponto que fica sempre à vista quando a foto é cortada.
+ */
+export interface FundoEmpresa {
+  url: string;
+  largura: number;
+  altura: number;
+  focoX: number;
+  focoY: number;
+}
+
+/** A empresa do link: nome em destaque, logo ou monograma (iniciais), a paleta e a foto de fundo. */
 export interface MarcaEmpresa {
   nome: string;
   sigla: string;
   personalizada: boolean;
   tema: TemaMarca;
   logo: LogoEmpresa | null;
+  fundo?: FundoEmpresa | null;
 }
 
 /** Token do tema → variável de CSS (os nomes antigos continuam: abeto = tinta, brasa = destaque). */

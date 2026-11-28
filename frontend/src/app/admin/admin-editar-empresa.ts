@@ -17,13 +17,15 @@ import { PreviaMarca } from './cores/previa-marca';
 import { SecaoCores } from './cores/secao-cores';
 import { CampoLogo, MudancaLogo } from './logo/campo-logo';
 import { logoEmPrevia, salvarLogo } from './logo/salvar-logo';
+import { CampoFundo, MudancaFundo } from './fundo/campo-fundo';
+import { salvarFundo } from './fundo/salvar-fundo';
 
 type Campo = 'nome' | 'corPrimaria' | 'corSecundaria' | 'cargos';
 
-/** Editar nome, logo, cores, cargos e o encerramento da avaliação. O link fica como está: pode já estar impresso nos materiais. */
+/** Editar nome, logo, foto de fundo, cores, cargos e o encerramento da avaliação. O link fica como está: pode já estar impresso nos materiais. */
 @Component({
   selector: 'app-admin-editar-empresa',
-  imports: [CampoLogo, FormField, PreviaMarca, RouterLink, SecaoCargos, SecaoCores, SecaoEncerramento, SecaoGestores],
+  imports: [CampoFundo, CampoLogo, FormField, PreviaMarca, RouterLink, SecaoCargos, SecaoCores, SecaoEncerramento, SecaoGestores],
   templateUrl: './admin-editar-empresa.html',
   styleUrl: './admin.css',
   host: { class: 'block' },
@@ -57,6 +59,10 @@ export class AdminEditarEmpresa {
   protected readonly logo = signal<MudancaLogo>(null);
   protected readonly logoAtual = computed(() => (this.empresa.hasValue() ? this.empresa.value().logo : null));
   protected readonly logoPrevia = computed(() => logoEmPrevia(this.logo(), this.logoAtual()));
+
+  /** A foto de fundo da página do RH (troca, foco ou remoção, enviados ao salvar). */
+  protected readonly fundo = signal<MudancaFundo>(null);
+  protected readonly fundoAtual = computed(() => (this.empresa.hasValue() ? this.empresa.value().fundo : null));
 
   protected usarCoresDoLogo(cores: string[]) {
     this.corPrimaria.set(cores[0] ?? '');
@@ -129,6 +135,7 @@ export class AdminEditarEmpresa {
         }),
       );
       await salvarLogo(this.http, this.id(), this.logo());
+      await salvarFundo(this.http, this.id(), this.fundo());
       await this.router.navigate(['/administrador/empresas', this.id()], { replaceUrl: true, state: { salva: true } });
     } catch (e) {
       const problema = problemaDe(e);

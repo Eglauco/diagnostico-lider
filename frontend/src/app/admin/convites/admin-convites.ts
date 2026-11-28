@@ -1,4 +1,4 @@
-import { Component, computed, ElementRef, inject, input, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, ElementRef, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { HttpClient, httpResource } from '@angular/common/http';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
@@ -8,6 +8,7 @@ import { problemaDe } from '../../api/diagnostico-api';
 import { baixarArquivo, buscarArquivo, compartilharArquivo, podeCompartilharArquivos } from '../../compartilhado/download';
 import { quando } from '../../compartilhado/formatos';
 import { API_ADMIN, ConviteItem, Convites, EmpresaDetalhe, Importacao, StatusConvite } from '../admin-modelos';
+import { EmpresaAtual } from '../empresa/empresa-atual';
 import { encerramentoPorExtenso } from '../encerramento/secao-encerramento';
 import { CartaoAcompanhamento } from '../gestores/cartao-acompanhamento';
 import { CLASSE_STATUS, ROTULO_STATUS } from './convites';
@@ -41,6 +42,22 @@ export class AdminConvites {
   protected readonly empresa = httpResource<EmpresaDetalhe>(() => `${API_ADMIN}/empresas/${this.id()}`);
   protected readonly convites = httpResource<Convites>(() => `${API_ADMIN}/empresas/${this.id()}/convites`);
   private readonly dados = computed(() => (this.convites.hasValue() ? this.convites.value() : null));
+  /** O cabeçalho da empresa (aba Líderes): os números de lá acompanham a lista. */
+  private readonly empresaAtual = inject(EmpresaAtual, { optional: true });
+
+  constructor() {
+    // Líder adicionado, importado, retirado ou que acabou de responder: o cabeçalho ("24 de 29
+    // responderam", a contagem da aba) se atualiza junto. A primeira carga não conta.
+    let primeira = true;
+    effect(() => {
+      if (!this.dados()) return;
+      if (primeira) {
+        primeira = false;
+        return;
+      }
+      untracked(() => this.empresaAtual?.recarregar());
+    });
+  }
 
   protected readonly ROTULO_STATUS = ROTULO_STATUS;
   protected readonly CLASSE_STATUS = CLASSE_STATUS;

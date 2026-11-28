@@ -1,6 +1,7 @@
 package br.com.diagnosticolider.admin;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,17 +19,21 @@ import org.springframework.transaction.annotation.Transactional;
 import br.com.diagnosticolider.admin.AdminDtos.CampanhaResumo;
 import br.com.diagnosticolider.admin.AdminDtos.CargoFiltro;
 import br.com.diagnosticolider.admin.AdminDtos.Detalhe;
+import br.com.diagnosticolider.admin.AdminDtos.EncontradoEmEmpresa;
 import br.com.diagnosticolider.admin.AdminDtos.ItemLista;
 import br.com.diagnosticolider.admin.AdminDtos.Pagina;
 import br.com.diagnosticolider.admin.AdminDtos.Painel;
 import br.com.diagnosticolider.admin.AdminDtos.PontoCurva;
+import br.com.diagnosticolider.admin.AdminDtos.Referencia;
 import br.com.diagnosticolider.campanha.Campanha;
 import br.com.diagnosticolider.campanha.CampanhaRepository;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
+import br.com.diagnosticolider.convite.OrigemLider;
 import br.com.diagnosticolider.diagnostico.ContagemPorCampanha;
 import br.com.diagnosticolider.diagnostico.Diagnostico;
 import br.com.diagnosticolider.diagnostico.DiagnosticoRepository;
 import br.com.diagnosticolider.diagnostico.LinhaResumo;
+import br.com.diagnosticolider.diagnostico.MediaGeral;
 import br.com.diagnosticolider.diagnostico.StatusDiagnostico;
 import br.com.diagnosticolider.empresa.CargoService;
 import br.com.diagnosticolider.empresa.ContagemCargo;
@@ -102,7 +107,33 @@ public class AdminService {
 
 		return new Painel(resumo.total(), resumo.concluidos(), resumo.emAndamento(), resumo.indiceMedio(),
 				resumo.porFaixa(), pontos.subList(0, Math.min(pontos.size(), MAXIMO_PONTOS_CURVA)), resumoCampanhas,
-				cargosDoLink(campanha));
+				cargosDoLink(campanha), referencia(campanha));
+	}
+
+	/** A média geral, para comparar o link de uma empresa com todos os líderes (a mesma do RH). */
+	private Referencia referencia(String codigo) {
+		boolean deEmpresa = !vazio(codigo)
+				&& campanhas.findByCodigo(codigo).map(Campanha::vinculadaAEmpresa).orElse(false);
+		if (!deEmpresa) {
+			return null;
+		}
+		MediaGeral geral = diagnosticos.mediaGeral();
+		return geral.media() == null ? null : new Referencia((int) Math.round(geral.media()), geral.lideres());
+	}
+
+	/**
+	 * Busca do Diagnóstico Geral: em quais empresas a pessoa procurada também aparece, para levar
+	 * direto à lista delas.
+	 */
+	public List<EncontradoEmEmpresa> encontradosNasEmpresas(String busca) {
+		if (vazio(busca)) {
+			return List.of();
+		}
+		String termo = "%" + escaparLike(busca.strip().toLowerCase(Locale.ROOT)) + "%";
+		return diagnosticos.encontradosNasEmpresas(termo)
+			.stream()
+			.map(l -> new EncontradoEmEmpresa((Long) l[0], (String) l[1], ((Number) l[2]).longValue()))
+			.toList();
 	}
 
 	/**
@@ -139,7 +170,8 @@ public class AdminService {
 				Sort.by(Sort.Direction.DESC, "iniciadoEm"));
 		FiltroCargo filtroCargo = vazio(campanha) ? null : FiltroCargo.de(cargo);
 		Page<Diagnostico> resultado = diagnosticos.findAll(filtro(busca, status, faixa, campanha, filtroCargo, inativos), pedido);
-		List<ItemLista> itens = resultado.getContent().stream().map(AdminService::item).toList();
+		Map<UUID, OrigemLider> origens = origens(resultado.getContent());
+		List<ItemLista> itens = resultado.getContent().stream().map(d -> item(d, origens.get(d.getId()))).toList();
 		return new Pagina<>(itens, resultado.getTotalElements(), resultado.getNumber(), resultado.getSize(),
 				resultado.getTotalPages());
 	}
@@ -200,7 +232,8 @@ public class AdminService {
 		var r = d.getRespondente();
 		Campanha c = d.getCampanha();
 		var origem = new Detalhe.Origem(c.getCodigo(), c.getNome(),
-				d.getEmpresa() == null ? null : d.getEmpresa().getNome(), d.getVersao().getQuestionario().getTitulo(),
+				d.getEmpresa() == null ? null : d.getEmpresa().getNome(),
+				c.vinculadaAEmpresa() ? c.getEmpresa().getId() : null, d.getVersao().getQuestionario().getTitulo(),
 				d.getVersao().getNumero());
 		return new Detalhe(d.getId(), d.getStatus(), d.getStatusEmail(), d.getIniciadoEm(), d.getConcluidoEm(),
 				d.getConsentimentoEm(), d.getEmailEnviadoEm(),
@@ -210,14 +243,26 @@ public class AdminService {
 				resultado, respostas, d.getInativadoEm(), d.getSubstituidoPor());
 	}
 
-	private static ItemLista item(Diagnostico d) {
+	/** De onde veio o líder de cada diagnóstico da página (planilha, cadastro manual ou link). */
+	private Map<UUID, OrigemLider> origens(List<Diagnostico> pagina) {
+		if (pagina.isEmpty()) {
+			return Map.of();
+		}
+		Map<UUID, OrigemLider> origens = new HashMap<>();
+		for (Object[] linha : diagnosticos.origensDosDiagnosticos(pagina.stream().map(Diagnostico::getId).toList())) {
+			origens.put((UUID) linha[0], (OrigemLider) linha[1]);
+		}
+		return origens;
+	}
+
+	private static ItemLista item(Diagnostico d, OrigemLider origemDoLider) {
 		var r = d.getRespondente();
 		var c = d.getCampanha();
 		var f = d.getFaixa();
 		return new ItemLista(d.getId(), r.getNome(), r.getEmail(), r.getEmpresaInformada(), c.getCodigo(), c.getNome(),
 				c.vinculadaAEmpresa(), d.getStatus(), d.getPontuacao(), f == null ? null : f.getCodigo(),
 				f == null ? null : f.getTitulo(), d.getStatusEmail(), d.getIniciadoEm(), d.getConcluidoEm(),
-				d.perguntasRespondidas(), d.getVersao().getPerguntas().size(), d.cargoDescrito());
+				d.perguntasRespondidas(), d.getVersao().getPerguntas().size(), d.cargoDescrito(), origemDoLider);
 	}
 
 	/** Busca por nome, e-mail ou empresa (sem diferenciar maiúsculas) e filtros exatos. */

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import br.com.diagnosticolider.convite.OrigemLider;
 import br.com.diagnosticolider.diagnostico.StatusDiagnostico;
 import br.com.diagnosticolider.diagnostico.StatusEmail;
 
@@ -17,9 +18,18 @@ public final class AdminDtos {
 	/**
 	 * Indicadores do topo do painel, opcionalmente de uma campanha (e de um cargo dela). cargos: os
 	 * cargos do link escolhido, para filtrar (vazio no link geral e em empresas sem cargos).
+	 * referencia: a média geral de todos os líderes, para comparar o link de uma empresa (null fora dele).
 	 */
 	public record Painel(long total, long concluidos, long emAndamento, Integer indiceMedio, Map<String, Long> porFaixa,
-			List<PontoCurva> pontos, List<CampanhaResumo> campanhas, List<CargoFiltro> cargos) {
+			List<PontoCurva> pontos, List<CampanhaResumo> campanhas, List<CargoFiltro> cargos, Referencia referencia) {
+	}
+
+	/** A média geral (todas as empresas e o link geral) e quantos líderes concluídos ela soma. */
+	public record Referencia(int media, long lideres) {
+	}
+
+	/** Quantos diagnósticos de uma empresa batem com a busca do Diagnóstico Geral. */
+	public record EncontradoEmEmpresa(Long empresaId, String empresa, long total) {
 	}
 
 	/** valor: id do cargo ou "outro" (líderes que escolheram "Outro cargo"). */
@@ -39,7 +49,7 @@ public final class AdminDtos {
 	public record ItemLista(UUID id, String nome, String email, String empresa, String campanha, String campanhaNome,
 			boolean campanhaDeEmpresa, StatusDiagnostico status, Integer pontuacao, String faixa, String faixaTitulo,
 			StatusEmail statusEmail, Instant iniciadoEm, Instant concluidoEm, int respondidas, int totalPerguntas,
-			String cargo) {
+			String cargo, OrigemLider origem) {
 	}
 
 	public record Detalhe(UUID id, StatusDiagnostico status, StatusEmail statusEmail, Instant iniciadoEm,
@@ -51,8 +61,9 @@ public final class AdminDtos {
 				String tempoCargo) {
 		}
 
-		public record Origem(String campanha, String campanhaNome, String empresaVinculada, String questionario,
-				int versao) {
+		/** empresaId: a empresa do link (null no link geral), para voltar à aba Diagnóstico dela. */
+		public record Origem(String campanha, String campanhaNome, String empresaVinculada, Long empresaId,
+				String questionario, int versao) {
 		}
 
 		public record Resultado(int pontuacao, Faixa faixa, List<Dimensao> dimensoes) {

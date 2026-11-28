@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
+import br.com.diagnosticolider.campanha.LinksDaEmpresa;
 import br.com.diagnosticolider.compartilhado.Emails;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
@@ -84,9 +85,12 @@ public class AcessoRhService {
 
 	private final String urlPublica;
 
+	private final LinksDaEmpresa links;
+
 	AcessoRhService(CodigoRhRepository codigos, AcessoRhRepository acessos, AtividadeRhRepository atividades,
 			EmpresaRepository empresas, ProtecaoRh protecao, Correio correio, ITemplateEngine templates, Clock clock,
-			AppProperties propriedades) {
+			AppProperties propriedades, LinksDaEmpresa links) {
+		this.links = links;
 		this.codigos = codigos;
 		this.acessos = acessos;
 		this.atividades = atividades;
@@ -107,7 +111,8 @@ public class AcessoRhService {
 
 	}
 
-	public record EmpresaDoGestor(Long id, String nome) {
+	/** codigo: o do link da empresa, que também é o endereço da página do RH (/acompanhar/{codigo}). */
+	public record EmpresaDoGestor(Long id, String nome, String codigo) {
 	}
 
 	/** Entrou: o token vai no cookie (só o hash fica no banco). */
@@ -118,10 +123,12 @@ public class AcessoRhService {
 
 	/**
 	 * Manda o código, se o e-mail for de um gestor. Para quem não é, responde igual e não manda
-	 * nada: a tela não revela quem acompanha uma empresa.
+	 * nada: a tela não revela quem acompanha uma empresa. empresa: o código da página de onde a
+	 * pessoa pediu (/acompanhar/{codigo}); se ela acompanha essa empresa, o e-mail vem com a marca
+	 * dela e o botão entra direto nela.
 	 */
 	@Transactional
-	public void pedirCodigo(String bruto, String ip) {
+	public void pedirCodigo(String bruto, String ip, String empresa) {
 		String email = normalizar(bruto);
 		Emails.problema(email).ifPresent(problema -> {
 			throw RegraNegocioException.comStatus(HttpStatus.BAD_REQUEST, problema);
@@ -145,12 +152,20 @@ public class AcessoRhService {
 		String link = tokenAleatorio();
 		codigos.save(new CodigoRh(email, CodigoRh.Tipo.CODIGO, hash(codigo), hash(link), agora,
 				agora.plus(VALIDADE_CODIGO)));
-		Empresa unica = dele.size() == 1 ? dele.getFirst() : null;
-		var modelo = new AcessoRhEmail(unica == null ? null : unica.getNome(),
-				unica == null ? "DL" : MarcaEmpresa.siglaDe(unica.getNome()),
-				unica == null ? null : ConviteEmail.logoDe(unica, urlPublica), MarcaEmpresa.temaDe(unica),
-				codigo.substring(0, 3) + " " + codigo.substring(3), urlEntrar(link), pagina(), "10 minutos");
-		enviar(email, codigo + " é o seu código de acesso", modelo, unica == null ? null : unica.getId());
+		Map<Long, String> codigosDosLinks = links.codigos(dele.stream().map(Empresa::getId).toList());
+		Empresa destino = empresa == null || empresa.isBlank() ? null
+				: dele.stream().filter(e -> empresa.strip().equalsIgnoreCase(codigosDosLinks.get(e.getId()))).findFirst()
+					.orElse(null);
+		if (destino == null && dele.size() == 1) {
+			destino = dele.getFirst();
+		}
+		String codigoDestino = destino == null ? null : codigosDosLinks.get(destino.getId());
+		var modelo = new AcessoRhEmail(destino == null ? null : destino.getNome(),
+				destino == null ? "DL" : MarcaEmpresa.siglaDe(destino.getNome()),
+				destino == null ? null : ConviteEmail.logoDe(destino, urlPublica), MarcaEmpresa.temaDe(destino),
+				codigo.substring(0, 3) + " " + codigo.substring(3), urlEntrar(link, codigoDestino),
+				links.paginaDoRh(codigoDestino), "10 minutos");
+		enviar(email, codigo + " é o seu código de acesso", modelo, destino == null ? null : destino.getId());
 	}
 
 	@Transactional(noRollbackFor = RegraNegocioException.class)
@@ -294,9 +309,10 @@ public class AcessoRhService {
 		Instant agora = clock.instant();
 		String link = tokenAleatorio();
 		codigos.save(new CodigoRh(email, CodigoRh.Tipo.CONVITE, null, hash(link), agora, agora.plus(VALIDADE_CONVITE)));
+		String codigoDoLink = links.codigo(empresaId);
 		var modelo = new AcessoRhEmail(empresa.getNome(), MarcaEmpresa.siglaDe(empresa.getNome()),
-				ConviteEmail.logoDe(empresa, urlPublica), MarcaEmpresa.temaDe(empresa), null, urlEntrar(link), pagina(),
-				"7 dias");
+				ConviteEmail.logoDe(empresa, urlPublica), MarcaEmpresa.temaDe(empresa), null, urlEntrar(link, codigoDoLink),
+				links.paginaDoRh(codigoDoLink), "7 dias");
 		enviar(email, empresa.getNome() + ": acompanhe a avaliação dos líderes", modelo, empresaId);
 	}
 
@@ -304,8 +320,9 @@ public class AcessoRhService {
 	@Transactional(readOnly = true)
 	public String previaConvite(Long empresaId) {
 		Empresa empresa = empresa(empresaId);
+		String pagina = links.paginaDoRh(empresaId);
 		return html(new AcessoRhEmail(empresa.getNome(), MarcaEmpresa.siglaDe(empresa.getNome()),
-				ConviteEmail.logoDe(empresa, urlPublica), MarcaEmpresa.temaDe(empresa), null, pagina(), pagina(), "7 dias"));
+				ConviteEmail.logoDe(empresa, urlPublica), MarcaEmpresa.temaDe(empresa), null, pagina, pagina, "7 dias"));
 	}
 
 	// ------------------------------------------------------------------ apoio
@@ -327,21 +344,21 @@ public class AcessoRhService {
 		return templates.process("email/acesso-rh", contexto);
 	}
 
-	private String pagina() {
-		return urlPublica + "/acompanhar";
-	}
-
-	/** O token vai depois do #: não passa pelo servidor nem fica no histórico de quem pré-visualiza links. */
-	private String urlEntrar(String link) {
-		return urlPublica + "/acompanhar/entrar#" + link;
+	/**
+	 * O token vai depois do #: não passa pelo servidor nem fica no histórico de quem pré-visualiza
+	 * links. ?empresa= diz para onde ir depois de entrar (a empresa do e-mail).
+	 */
+	private String urlEntrar(String link, String empresa) {
+		return urlPublica + "/acompanhar/entrar" + (empresa == null ? "" : "?empresa=" + empresa) + "#" + link;
 	}
 
 	private Empresa empresa(Long id) {
 		return empresas.findById(id).orElseThrow(() -> new NaoEncontradoException("Empresa não encontrada."));
 	}
 
-	private static List<EmpresaDoGestor> empresasDe(List<Empresa> lista) {
-		return lista.stream().map(e -> new EmpresaDoGestor(e.getId(), e.getNome())).toList();
+	private List<EmpresaDoGestor> empresasDe(List<Empresa> lista) {
+		Map<Long, String> codigosDosLinks = links.codigos(lista.stream().map(Empresa::getId).toList());
+		return lista.stream().map(e -> new EmpresaDoGestor(e.getId(), e.getNome(), codigosDosLinks.get(e.getId()))).toList();
 	}
 
 	static String normalizar(String email) {

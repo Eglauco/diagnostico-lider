@@ -18,6 +18,8 @@ import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.PorCargo;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados.Referencia;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaService;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /** O que a página do RH (/acompanhar) troca com o servidor. */
@@ -26,11 +28,22 @@ final class RhDtos {
 	private RhDtos() {
 	}
 
-	record PedirCodigo(@NotBlank(message = "Digite o seu e-mail.") @Size(max = 254) String email) {
+	/** empresa: o código da página de onde pediu (/acompanhar/{codigo}), para o e-mail levar a ela. */
+	record PedirCodigo(@NotBlank(message = "Digite o seu e-mail.") @Size(max = 254) String email,
+			@Size(max = 80) String empresa) {
 	}
 
 	/** Pelo código digitado (email + codigo) ou pelo botão do e-mail (link). */
 	record Entrar(@Size(max = 254) String email, @Size(max = 20) String codigo, @Size(max = 100) String link) {
+	}
+
+	/**
+	 * O RH abriu a mensagem fora da plataforma. canal: EMAIL ou WHATSAPP. via (no e-mail): OUTLOOK,
+	 * GMAIL, APP (o programa do computador) ou COPIA (copiou a mensagem).
+	 */
+	record Contato(@NotEmpty @Size(max = 1000) List<Long> ids,
+			@NotBlank @Pattern(regexp = "EMAIL|WHATSAPP") String canal,
+			@Pattern(regexp = "OUTLOOK|GMAIL|APP|COPIA") String via) {
 	}
 
 	record Sessao(GestorDto gestor) {

@@ -5,7 +5,15 @@ package br.com.diagnosticolider.empresa;
  * "por Diagnóstico do Líder" discreto) e a paleta. "personalizada" diz se a empresa tem
  * cores próprias ou usa a identidade do Diagnóstico.
  */
-public record MarcaEmpresa(String nome, String sigla, boolean personalizada, PaletaMarca.Tema tema, Logo logo) {
+public record MarcaEmpresa(String nome, String sigla, boolean personalizada, PaletaMarca.Tema tema, Logo logo,
+		Fundo fundo) {
+
+	/**
+	 * A foto de fundo da página do RH (null sem foto): o endereço (assinado, do bucket, ou o do
+	 * backend), o tamanho e o ponto de foco (0 a 100), que vira o object-position do corte.
+	 */
+	public record Fundo(String url, int largura, int altura, int focoX, int focoY) {
+	}
 
 	/**
 	 * Logomarca enviada no cadastro e o tamanho, para o layout. A url é direta do bucket
@@ -39,9 +47,9 @@ public record MarcaEmpresa(String nome, String sigla, boolean personalizada, Pal
 	}
 
 	/** Use LogomarcaService.marca, que já resolve o endereço da logo. */
-	static MarcaEmpresa de(Empresa empresa, Logo logo) {
+	static MarcaEmpresa de(Empresa empresa, Logo logo, Fundo fundo) {
 		return new MarcaEmpresa(empresa.getNome(), siglaDe(empresa.getNome()), empresa.getCorPrimaria() != null,
-				empresa.tema(), logo);
+				empresa.tema(), logo, fundo);
 	}
 
 	/** Tema para quem não tem empresa (link geral): a identidade do Diagnóstico. */

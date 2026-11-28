@@ -24,6 +24,7 @@ import br.com.diagnosticolider.acompanhamento.Agenda.Acao;
 import br.com.diagnosticolider.acompanhamento.Agenda.Estado;
 import br.com.diagnosticolider.acompanhamento.EnvioAcompanhamento.Tipo;
 import br.com.diagnosticolider.acesso.QuemEsta;
+import br.com.diagnosticolider.campanha.LinksDaEmpresa;
 import br.com.diagnosticolider.compartilhado.Datas;
 import br.com.diagnosticolider.compartilhado.NaoEncontradoException;
 import br.com.diagnosticolider.compartilhado.RegraNegocioException;
@@ -96,11 +97,14 @@ public class AcompanhamentoService {
 
 	private final String urlPublica;
 
+	private final LinksDaEmpresa links;
+
 	AcompanhamentoService(EmpresaRepository empresas, ParticipacaoService participacao,
 			ResultadoDaEmpresa resultados, RelatorioPdfService pdf, LembreteService lembretes,
 			DiagnosticoRepository diagnosticos, EnvioAcompanhamentoRepository envios, EmailSender email, Correio correio,
 			EmailEnviadoRepository emailsEnviados, QuemEsta quemEsta, ITemplateEngine templates,
-			TransactionTemplate transacao, Clock clock, AppProperties propriedades) {
+			TransactionTemplate transacao, Clock clock, AppProperties propriedades, LinksDaEmpresa links) {
+		this.links = links;
 		this.correio = correio;
 		this.emailsEnviados = emailsEnviados;
 		this.quemEsta = quemEsta;
@@ -339,7 +343,7 @@ public class AcompanhamentoService {
 		var modelo = new GestorEmail(marca.nome(), MarcaEmpresa.siglaDe(marca.nome()), marca.logo(), marca.tema(), fim,
 				t.rotulo(), t.titulo(), t.subtitulo(), t.novidade(), t.prazo(), r.total() > 0 ? placar : List.of(),
 				pendentes, outros, fim ? List.of() : r.devolvidos(), consolidado, aviso, nomesAnexos, rodape,
-				urlPublica + "/acompanhar");
+				links.paginaDoRh(empresaId));
 		return new Montado(t.assunto(), modelo, anexos, r.responderam(), r.total());
 	}
 

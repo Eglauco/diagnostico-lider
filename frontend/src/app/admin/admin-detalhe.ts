@@ -43,7 +43,6 @@ export class AdminDetalhe {
   protected readonly linkWhatsapp = linkWhatsapp;
   protected readonly letras = 'ABCDEFGHIJ';
 
-  /** Volta para a lista preservando busca e filtros; se abriu direto, vai para o painel. */
   protected readonly confirmandoInativacao = signal(false);
   protected readonly mudandoAtivo = signal(false);
 
@@ -61,10 +60,22 @@ export class AdminDetalhe {
     }
   }
 
+  /** De onde o diagnóstico é: a aba Diagnóstico da empresa ou o Diagnóstico Geral. */
+  protected readonly destinoVolta = computed(() => {
+    const empresaId = this.dados()?.origem.empresaId;
+    return empresaId ? ['/administrador/empresas', empresaId, 'diagnostico'] : ['/administrador/geral'];
+  });
+  protected readonly rotuloVolta = computed(() => {
+    const d = this.dados();
+    if (!d) return 'Voltar';
+    return d.origem.empresaId ? `Diagnóstico · ${d.origem.empresaVinculada ?? d.origem.campanhaNome}` : 'Diagnóstico Geral';
+  });
+
+  /** Volta para a lista preservando busca e filtros; se abriu direto, vai para a lista de onde ele é. */
   protected voltar() {
     const estado = this.location.getState() as { navigationId?: number } | null;
     if ((estado?.navigationId ?? 1) > 1) this.location.back();
-    else void this.router.navigate(['/administrador']);
+    else void this.router.navigate(this.destinoVolta());
   }
 
   protected linkDaCampanha(codigo: string): string {

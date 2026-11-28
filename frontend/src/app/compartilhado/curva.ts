@@ -156,9 +156,14 @@ export class Curva {
   readonly rotulo = input('Você está aqui');
   /** Líderes a posicionar no modo grupo. */
   readonly pontos = input<PontoGrupo[]>([]);
+  /**
+   * Largura do desenho (a altura fica fixa). Numa coluna larga, um desenho mais largo deixa o traço
+   * e os pontos do tamanho do celular, em vez de crescer tudo junto.
+   */
+  readonly largura = input(360);
 
   protected readonly id = `curva-${++sequencia}`;
-  protected readonly g = computed(() => geometriaCurva(360, this.modo() === 'hero' ? 190 : 210));
+  protected readonly g = computed(() => geometriaCurva(this.largura(), this.modo() === 'hero' ? 190 : 210));
 
   /** Pontos do modo grupo: quem tem o mesmo índice fica empilhado acima da curva. */
   protected readonly contas = computed(() => {

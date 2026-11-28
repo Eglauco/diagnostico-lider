@@ -1,19 +1,19 @@
 <main class="mx-auto max-w-6xl px-4 pt-6 pb-20 sm:px-6">
   <button
     type="button"
-    class="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-[15px] font-semibold text-abeto-2 transition-colors hover:text-abeto"
+    class="-ml-2 inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full px-2 text-[15px] font-semibold text-abeto-2 transition-colors hover:text-abeto"
     (click)="voltar()"
   >
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
       <path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
-    Diagnósticos
+    <span class="truncate">{{ rotuloVolta() }}</span>
   </button>
 
   @if (detalhe.error()) {
     <div class="cartao mt-6 p-8 text-center" role="alert">
       <p class="text-[18px] font-semibold">Não encontramos este diagnóstico.</p>
-      <a routerLink="/administrador" class="botao-secundario mt-5">Ver todos os diagnósticos</a>
+      <a routerLink="/administrador/empresas" class="botao-secundario mt-5">Ir para Empresas</a>
     </div>
   } @else if (detalhe.value(); as d) {
     <!-- Cabeçalho: quem é e como falar com a pessoa -->
@@ -288,7 +288,13 @@
             </div>
             <div>
               <dt class="text-[13px] font-semibold text-abeto-2">Empresa vinculada ao link</dt>
-              <dd class="mt-0.5 font-medium">{{ d.origem.empresaVinculada ?? 'Nenhuma (link geral)' }}</dd>
+              <dd class="mt-0.5 font-medium">
+                @if (d.origem.empresaId) {
+                  <a [routerLink]="['/administrador/empresas', d.origem.empresaId]" class="underline decoration-linha underline-offset-4 hover:decoration-abeto">{{ d.origem.empresaVinculada ?? d.origem.campanhaNome }}</a>
+                } @else {
+                  Nenhuma (link geral)
+                }
+              </dd>
             </div>
             <div>
               <dt class="text-[13px] font-semibold text-abeto-2">Questionário</dt>

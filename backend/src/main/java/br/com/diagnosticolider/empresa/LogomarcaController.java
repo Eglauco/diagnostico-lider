@@ -18,8 +18,22 @@ class LogomarcaController {
 
 	private final LogomarcaService logomarcas;
 
-	LogomarcaController(LogomarcaService logomarcas) {
+	private final FotoDeFundoService fundos;
+
+	LogomarcaController(LogomarcaService logomarcas, FotoDeFundoService fundos) {
 		this.logomarcas = logomarcas;
+		this.fundos = fundos;
+	}
+
+	/** A foto de fundo da página do RH (quando os arquivos estão no disco; com bucket, vai direto dele). */
+	@GetMapping("/api/public/empresas/{id}/fundo-v{versao}.jpg")
+	ResponseEntity<byte[]> fundo(@PathVariable Long id, @PathVariable int versao) {
+		return fundos.ler(id, versao)
+			.map(jpeg -> ResponseEntity.ok()
+				.contentType(MediaType.IMAGE_JPEG)
+				.cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+				.body(jpeg))
+			.orElseGet(() -> ResponseEntity.notFound().build());
 	}
 
 	@GetMapping("/api/public/empresas/{id}/logo-v{versao}.png")

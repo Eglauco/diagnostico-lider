@@ -1,53 +1,49 @@
-<main class="mx-auto max-w-6xl px-4 pt-8 pb-20 sm:px-6 sm:pt-10">
-  <p class="rotulo text-brasa-escura">Painel</p>
-  <h1 class="display mt-2 text-[40px] leading-none font-bold sm:text-[52px]">Diagnósticos</h1>
+<main class="mx-auto max-w-6xl px-4 pb-20 sm:px-6" [class]="geral() ? 'pt-8 sm:pt-10' : 'pt-6'">
+  @if (geral()) {
+    <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <div class="min-w-0">
+        <p class="rotulo text-brasa-escura">Link direto</p>
+        <h1 class="display mt-2 text-[40px] leading-none font-bold sm:text-[52px]">Diagnóstico Geral</h1>
+        <p class="mt-3 max-w-2xl text-[16px] text-abeto-2">
+          Quem respondeu pelo link geral, sem empresa vinculada. As respostas de cada empresa ficam na tela dela, em
+          <a routerLink="/administrador/empresas" class="font-semibold text-abeto underline decoration-linha underline-offset-4 hover:decoration-abeto">Empresas</a>.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 sm:shrink-0">
+        <button type="button" class="botao-secundario min-h-12 flex-1 bg-white px-5 text-[15px] sm:flex-none" (click)="copiarLink()">
+          @if (copiado()) {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Link copiado
+          } @else {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" stroke-linecap="round" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" stroke-linecap="round" /></svg>
+            Copiar link geral
+          }
+        </button>
+        <a href="/" target="_blank" rel="noopener" class="grid size-12 shrink-0 place-items-center rounded-full bg-white text-abeto ring-1 ring-linha transition hover:ring-abeto-3" title="Abrir como o líder vê" aria-label="Abrir o link geral como o líder vê (abre em nova aba)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18V7.5A1.5 1.5 0 0 1 5.5 6H10" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </a>
+      </div>
+    </header>
+  } @else {
+    <h2 class="sr-only">Diagnóstico da empresa</h2>
+  }
 
   @if (painel.error() && !dadosPainel()) {
     <div class="cartao mt-8 p-6" role="alert">
-      <p class="font-semibold">Não foi possível carregar o painel.</p>
+      <p class="font-semibold">Não foi possível carregar o diagnóstico.</p>
       <p class="mt-1 text-[15px] text-abeto-2">Confira se o backend está rodando e tente de novo.</p>
       <button type="button" class="botao-secundario mt-4" (click)="painel.reload(); lista.reload()">Tentar de novo</button>
     </div>
   }
 
   @if (dadosPainel(); as p) {
-    <!-- Escopo: todos os links ou um link específico (ex.: de uma empresa). -->
-    <nav class="-mx-4 mt-6 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Filtrar por link de diagnóstico">
-      <div class="flex w-max gap-2">
-        <button type="button" class="chip" [attr.aria-pressed]="!campanha()" (click)="filtrar({ campanha: null, cargo: null, pagina: null })">
-          Todos os links <span class="contagem">{{ totalTodosOsLinks() }}</span>
-        </button>
-        @for (c of p.campanhas; track c.codigo) {
-          <button type="button" class="chip" [attr.aria-pressed]="campanha() === c.codigo" (click)="filtrar({ campanha: c.codigo, cargo: null, pagina: null })">
-            {{ c.empresa ?? 'Link geral' }} <span class="contagem">{{ c.total }}</span>
-          </button>
-        }
-        <a routerLink="empresas/nova" class="chip chip-novo">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round" /></svg>
-          Cadastrar empresa
-        </a>
-      </div>
-    </nav>
-
-    @if (campanhaSelecionada(); as c) {
-      <div class="aparecer mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-abeto-2">
-        <span><strong class="font-semibold text-abeto">{{ c.nome }}</strong> · {{ c.codigo === 'geral' ? '/' : '/c/' + c.codigo }}</span>
-        <button type="button" class="font-semibold text-abeto underline decoration-linha underline-offset-4 hover:decoration-abeto" (click)="copiarLink(c.codigo)">
-          {{ copiado() === c.codigo ? 'Link copiado' : 'Copiar link' }}
-        </button>
-        @if (c.empresaId) {
-          <a [routerLink]="['empresas', c.empresaId]" class="font-semibold text-abeto underline decoration-linha underline-offset-4 hover:decoration-abeto">QR Code e relatório da empresa</a>
-        }
-      </div>
-    }
-
-    <!-- Cargos do link escolhido (empresa com cargos): filtra indicadores, curva e lista. -->
-    @if (campanha() && p.cargos.length) {
-      <nav class="aparecer -mx-4 mt-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Filtrar por cargo">
+    <!-- Cargos da empresa: filtram indicadores, curva e lista. -->
+    @if (!geral() && p.cargos.length) {
+      <nav class="aparecer -mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Filtrar por cargo">
         <div class="flex w-max items-center gap-2">
           <span class="rotulo mr-1 text-abeto-2">Cargo</span>
           <button type="button" class="chip" [attr.aria-pressed]="!cargo()" (click)="filtrar({ cargo: null, pagina: null })">
-            Todos <span class="contagem">{{ campanhaSelecionada()?.total ?? p.total }}</span>
+            Todos
           </button>
           @for (c of p.cargos; track c.valor) {
             <button type="button" class="chip" [attr.aria-pressed]="cargo() === c.valor" (click)="filtrar({ cargo: c.valor, pagina: null })">
@@ -59,11 +55,11 @@
     }
 
     <!-- Indicadores -->
-    <dl class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4" [class]="geral() ? 'mt-8' : p.cargos.length ? 'mt-4' : ''">
       <div class="cartao kpi">
         <dt>Diagnósticos</dt>
         <dd>{{ p.total }}</dd>
-        <p>iniciados {{ cargoSelecionado() ? 'neste cargo' : campanha() ? 'neste link' : 'no total' }}</p>
+        <p>iniciados {{ cargoSelecionado() ? 'neste cargo' : geral() ? 'pelo link geral' : 'nesta empresa' }}</p>
       </div>
       <div class="cartao kpi">
         <dt>Concluídos</dt>
@@ -78,11 +74,11 @@
       <div class="cartao kpi">
         <dt>Índice médio</dt>
         <dd>{{ p.indiceMedio ?? '—' }}@if (p.indiceMedio !== null) {<small class="ml-0.5 text-[16px] font-medium text-abeto-3">/100</small>}</dd>
-        <p>dos diagnósticos concluídos</p>
+        <p>{{ comparacao() ?? 'dos diagnósticos concluídos' }}</p>
       </div>
     </dl>
 
-    <!-- A curva com todos os líderes + distribuição por faixa -->
+    <!-- A curva com os líderes + distribuição por faixa -->
     <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
       <figure class="cartao p-5 sm:p-6">
         <figcaption class="flex items-baseline justify-between gap-3">
@@ -131,8 +127,55 @@
         <p class="mt-3 text-[13px] text-abeto-2">Toque numa faixa para filtrar a lista.</p>
       </section>
     </div>
+
+    <!-- Relatório consolidado para enviar à empresa (sem nomes). -->
+    @if (empresa(); as e) {
+      <section class="cartao mt-3 flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8" aria-labelledby="titulo-consolidado">
+        <div class="flex items-start gap-3.5">
+          <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-abeto text-white" aria-hidden="true">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1-1.5z" stroke-linejoin="round" />
+              <path d="M9 16v-2.5M12 16v-5M15 16v-3.5" stroke="#FF5B37" stroke-linecap="round" />
+            </svg>
+          </span>
+          <div class="min-w-0">
+            <h2 id="titulo-consolidado" class="text-[17px] leading-snug font-semibold">Relatório consolidado</h2>
+            <p class="mt-1 max-w-2xl text-[14px] text-abeto-2">
+              PDF para a empresa, sem nomes: o grupo na curva, faixas, cargos, dimensões, cada pergunta e o que fazer com cada grupo.
+              É o mesmo resultado que os gestores veem: muda a cada 3 respostas novas, e cargos e perguntas entram no resultado final.
+            </p>
+          </div>
+        </div>
+        @if (faltamParaRelatorio() === 0) {
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:shrink-0">
+            <button type="button" class="botao-primario" [attr.aria-busy]="gerandoRelatorio()" [disabled]="gerandoRelatorio()" (click)="baixarRelatorio()">
+              @if (gerandoRelatorio()) {
+                <span class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true"></span>
+                Gerando o relatório…
+              } @else {
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                Baixar relatório (PDF)
+              }
+            </button>
+            <a [href]="urlRelatorio() + '?visualizar=true'" target="_blank" rel="noopener" class="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 text-[15px] font-semibold text-abeto-2 hover:text-abeto">
+              Abrir em nova aba <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        } @else {
+          <div class="lg:w-72 lg:shrink-0">
+            <div class="h-2 overflow-hidden rounded-full bg-nevoa ring-1 ring-linha/70" aria-hidden="true">
+              <span class="block h-full rounded-full bg-abeto transition-[width] duration-700" [style.width.%]="(e.indicadores.concluidos / e.minimoRelatorio) * 100"></span>
+            </div>
+            <p class="mt-2 text-[14px] text-abeto-2">
+              Disponível com <strong class="text-abeto">{{ e.minimoRelatorio }} concluídos</strong>, para ninguém ser identificado.
+              {{ faltamParaRelatorio() === 1 ? 'Falta 1.' : 'Faltam ' + faltamParaRelatorio() + '.' }}
+            </p>
+          </div>
+        }
+      </section>
+    }
   } @else if (!painel.error()) {
-    <div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" [class.mt-8]="geral()" aria-hidden="true">
       @for (i of [1, 2, 3, 4]; track i) {
         <div class="cartao h-28 animate-pulse"></div>
       }
@@ -143,7 +186,7 @@
   <!-- Altura mínima de uma tela: com poucos resultados a página não encolhe, e os filtros não saem do lugar. -->
   <section class="mt-12 min-h-[100dvh]" aria-labelledby="titulo-lista">
     <div class="flex flex-wrap items-end justify-between gap-2">
-      <h2 id="titulo-lista" class="display scroll-mt-28 text-[30px] leading-none font-bold">Respostas</h2>
+      <h2 id="titulo-lista" class="display scroll-mt-36 text-[30px] leading-none font-bold">Respostas</h2>
       @if (intervalo(); as i) {
         <p class="text-[14px] text-abeto-2" aria-live="polite">
           Mostrando {{ i.inicio }}–{{ i.fim }} de {{ i.total }}
@@ -153,15 +196,16 @@
 
     <div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
       <label class="relative block flex-1">
-        <span class="sr-only">Buscar por nome, e-mail ou empresa</span>
+        <span class="sr-only">{{ geral() ? 'Buscar por nome, e-mail ou empresa' : 'Buscar por nome ou e-mail' }}</span>
         <svg class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-abeto-2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
           <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" stroke-linecap="round" />
         </svg>
         <input
           #campoBusca
           type="search"
+          enterkeyhint="search"
           class="h-12 w-full rounded-full bg-white pr-12 pl-11 text-[16px] text-abeto ring-1 ring-linha outline-none placeholder:text-abeto-3 focus:ring-2 focus:ring-abeto"
-          placeholder="Buscar por nome, e-mail ou empresa"
+          [placeholder]="geral() ? 'Buscar por nome, e-mail ou empresa' : 'Buscar por nome ou e-mail'"
           autocomplete="off"
           [value]="termo()"
           (input)="termo.set(campoBusca.value)"
@@ -225,6 +269,24 @@
       </div>
     }
 
+    <!-- Busca no Diagnóstico Geral: a pessoa pode estar numa empresa. -->
+    @if (encontrados().length) {
+      <div class="aparecer mt-3 flex flex-col gap-2.5 rounded-[20px] bg-white px-4 py-3.5 ring-1 ring-linha sm:flex-row sm:flex-wrap sm:items-center" role="status">
+        <p class="flex items-center gap-2 text-[14.5px] text-abeto-2">
+          <svg class="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V8.5L12 4l8 4.5V20M9 20v-5h6v5" stroke-linejoin="round" /></svg>
+          <span><strong class="font-semibold text-abeto">“{{ busca() }}”</strong> também aparece em:</span>
+        </p>
+        <div class="flex flex-wrap gap-2">
+          @for (x of encontrados(); track x.empresaId) {
+            <a class="chip bg-nevoa-2" [routerLink]="['/administrador/empresas', x.empresaId, 'diagnostico']" [queryParams]="{ busca: busca() }">
+              {{ x.empresa }} <span class="contagem">{{ x.total }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </a>
+          }
+        </div>
+      </div>
+    }
+
     <div class="cartao mt-4 overflow-hidden transition-opacity" [class.opacity-60]="lista.isLoading()" [attr.aria-busy]="lista.isLoading()">
       @if (dadosLista(); as l) {
         @if (l.itens.length) {
@@ -233,8 +295,12 @@
             <thead>
               <tr class="text-[12px] tracking-[0.1em] text-abeto-2 uppercase">
                 <th scope="col" class="px-5 pt-5 pb-3 font-semibold">Líder</th>
-                <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Empresa</th>
-                <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Link</th>
+                @if (geral()) {
+                  <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Empresa informada</th>
+                } @else {
+                  <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Cargo</th>
+                  <th scope="col" class="hidden px-3 pt-5 pb-3 font-semibold lg:table-cell">Origem</th>
+                }
                 <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Situação</th>
                 <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Resultado</th>
                 <th scope="col" class="px-3 pt-5 pb-3 font-semibold">Iniciado</th>
@@ -245,16 +311,21 @@
               @for (item of l.itens; track item.id) {
                 <tr class="border-t border-linha transition-colors hover:bg-nevoa-2">
                   <td class="max-w-64 px-5 py-4">
-                    <a [routerLink]="['diagnosticos', item.id]" class="linha-link block truncate text-[15px] font-semibold text-abeto">{{ item.nome }}</a>
+                    <a [routerLink]="['/administrador/diagnosticos', item.id]" class="linha-link block truncate text-[15px] font-semibold text-abeto">{{ item.nome }}</a>
                     <span class="block truncate text-[13px] text-abeto-2">{{ item.email }}</span>
                   </td>
-                  <td class="max-w-44 truncate px-3 py-4 text-[14px]">{{ item.empresa ?? '—' }}</td>
-                  <td class="max-w-48 px-3 py-4 text-[14px] text-abeto-2" [title]="item.campanhaNome">
-                    <span class="block truncate">{{ rotuloCampanha(item) }}</span>
-                    @if (item.cargo) {
-                      <span class="block truncate text-[13px] font-medium text-abeto">{{ item.cargo }}</span>
-                    }
-                  </td>
+                  @if (geral()) {
+                    <td class="max-w-52 truncate px-3 py-4 text-[14px]" [class.text-abeto-3]="!item.empresa">{{ item.empresa ?? 'Não informou' }}</td>
+                  } @else {
+                    <td class="max-w-48 truncate px-3 py-4 text-[14px]" [class.text-abeto-3]="!item.cargo" [title]="item.cargo ?? ''">{{ item.cargo ?? 'Sem cargo' }}</td>
+                    <td class="hidden px-3 py-4 text-[14px] whitespace-nowrap text-abeto-2 lg:table-cell">
+                      @if (item.origem === 'LINK') {
+                        <span class="inline-flex min-h-6 items-center rounded-full bg-nevoa-2 px-2 text-[12.5px] font-semibold ring-1 ring-linha">pelo link</span>
+                      } @else {
+                        {{ origem(item) }}
+                      }
+                    </td>
+                  }
                   <td class="px-3 py-4"><app-selo-status [status]="item.status" [respondidas]="item.respondidas" [total]="item.totalPerguntas" /></td>
                   <td class="px-3 py-4"><app-selo-faixa [faixa]="item.faixa" [indice]="item.pontuacao" /></td>
                   <td class="px-3 py-4 text-[14px] whitespace-nowrap text-abeto-2">{{ quando(item.iniciadoEm) }}</td>
@@ -287,7 +358,7 @@
               <li class="relative px-4 py-4 transition-colors active:bg-nevoa-2">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <a [routerLink]="['diagnosticos', item.id]" class="linha-link block truncate text-[16px] font-semibold text-abeto">{{ item.nome }}</a>
+                    <a [routerLink]="['/administrador/diagnosticos', item.id]" class="linha-link block truncate text-[16px] font-semibold text-abeto">{{ item.nome }}</a>
                     <span class="block truncate text-[14px] text-abeto-2">{{ item.email }}</span>
                   </div>
                   @if (item.status === 'CONCLUIDO') {
@@ -297,7 +368,13 @@
                   }
                 </div>
                 <div class="mt-2 flex items-center justify-between gap-3 text-[13px] text-abeto-2">
-                  <span class="truncate">{{ item.campanhaDeEmpresa ? item.campanhaNome : (item.empresa ?? 'Link geral') }}{{ item.cargo ? ' · ' + item.cargo : '' }}</span>
+                  <span class="truncate">
+                    @if (geral()) {
+                      {{ item.empresa ?? 'Não informou a empresa' }}
+                    } @else {
+                      {{ item.cargo ?? 'Sem cargo' }}{{ item.origem === 'LINK' ? ' · pelo link' : '' }}
+                    }
+                  </span>
                   <span class="shrink-0">{{ quando(item.iniciadoEm) }}</span>
                 </div>
               </li>
@@ -306,14 +383,21 @@
         } @else {
           <div class="px-6 py-14 text-center">
             @if (temFiltros()) {
-              <p class="text-[17px] font-semibold">Nenhum diagnóstico com esses filtros.</p>
+              <p class="text-[17px] font-semibold">Nenhum diagnóstico com esses filtros{{ geral() ? ' no link geral' : '' }}.</p>
               <button type="button" class="botao-secundario mt-4" (click)="limparFiltros()">Limpar filtros</button>
-            } @else {
-              <p class="text-[17px] font-semibold">Ainda não há diagnósticos {{ campanha() ? 'neste link' : '' }}.</p>
-              <p class="mt-1 text-[15px] text-abeto-2">Compartilhe o link com os líderes para começar a receber respostas.</p>
-              <button type="button" class="botao-secundario mt-4" (click)="copiarLink(campanha() ?? 'geral')">
-                {{ copiado() ? 'Link copiado' : 'Copiar link do diagnóstico' }}
+            } @else if (geral()) {
+              <p class="text-[17px] font-semibold">Ninguém respondeu pelo link geral ainda.</p>
+              <p class="mt-1 text-[15px] text-abeto-2">Quem abrir o link sem empresa aparece aqui. Para uma empresa, use o link dela.</p>
+              <button type="button" class="botao-secundario mt-4" (click)="copiarLink()">
+                {{ copiado() ? 'Link copiado' : 'Copiar link geral' }}
               </button>
+            } @else {
+              <p class="text-[17px] font-semibold">Ninguém começou o diagnóstico ainda.</p>
+              <p class="mt-1 text-[15px] text-abeto-2">Mande o link para os líderes, ou os convites pela aba Líderes.</p>
+              <div class="mt-4 flex flex-col justify-center gap-2 sm:flex-row">
+                <button type="button" class="botao-secundario" (click)="copiarLink()">{{ copiado() ? 'Link copiado' : 'Copiar link da empresa' }}</button>
+                <a routerLink="../lideres" class="botao-secundario">Abrir Líderes</a>
+              </div>
             }
           </div>
         }

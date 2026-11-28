@@ -45,6 +45,8 @@ export const ROTULO_EVENTO: Record<TipoEventoConvite, string> = {
   REATIVADO: 'Líder reativado',
   COMECOU_PELO_LINK: 'Começou pelo link da empresa',
   RESPONDEU_DE_NOVO: 'Respondeu de novo',
+  CONTATO_EMAIL: 'Mensagem pelo e-mail do RH',
+  CONTATO_WHATSAPP: 'Mensagem pelo WhatsApp do RH',
 };
 
 export const ROTULO_ORIGEM: Record<OrigemLider, string> = {

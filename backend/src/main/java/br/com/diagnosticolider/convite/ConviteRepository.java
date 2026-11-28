@@ -61,9 +61,25 @@ interface ConviteRepository extends JpaRepository<Convite, Long> {
 			""")
 	List<br.com.diagnosticolider.diagnostico.Diagnostico> tentativasSemCadastro(Long empresaId);
 
-	/** Quantos líderes de cada origem a empresa tem (ativos). */
-	@Query("select c.origem, count(c) from Convite c where c.campanha.empresa.id = :empresaId and c.inativadoEm is null group by c.origem")
+	/** Quantos líderes de cada origem a empresa tem (ativos) e quantos deles já concluíram. */
+	@Query("""
+			select c.origem, count(c),
+			  sum(case when d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO then 1 else 0 end)
+			from Convite c left join c.diagnostico d
+			where c.campanha.empresa.id = :empresaId and c.inativadoEm is null
+			group by c.origem
+			""")
 	List<Object[]> origensDaEmpresa(Long empresaId);
+
+	/** Por empresa: líderes ativos no cadastro e quantos já concluíram (a carteira de empresas). */
+	@Query("""
+			select c.campanha.empresa.id, count(c),
+			  sum(case when d.status = br.com.diagnosticolider.diagnostico.StatusDiagnostico.CONCLUIDO then 1 else 0 end)
+			from Convite c left join c.diagnostico d
+			where c.inativadoEm is null and c.campanha.empresa is not null
+			group by c.campanha.empresa.id
+			""")
+	List<Object[]> lideresPorEmpresa();
 
 	/** Os que estão inativos (para dizer "reative" em vez de "já tem convite"). */
 	@Query("select lower(c.email) from Convite c where c.campanha.id = :campanhaId and c.inativadoEm is not null")

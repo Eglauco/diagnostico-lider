@@ -9,6 +9,13 @@ export const API_RH = '/api/acompanhar';
 export interface EmpresaDoGestor {
   id: number;
   nome: string;
+  /** O código do link da empresa: a página dela é /acompanhar/{codigo} (null: empresa sem link). */
+  codigo: string | null;
+}
+
+/** O endereço da página de uma empresa (pelo código; sem código, pelo número). */
+export function rotaDaEmpresa(e: EmpresaDoGestor): (string | number)[] {
+  return ['/acompanhar', e.codigo ?? e.id];
 }
 
 export interface GestorRh {
@@ -174,6 +181,50 @@ export interface DadosRh {
   notaVersoes: string | null;
 }
 
+/** Um passo da linha do tempo de um líder (só a participação). */
+export interface PassoRh {
+  tipo: string;
+  titulo: string;
+  detalhe: string | null;
+  quando: string;
+  /** A cor do ponto: neutro, envio, alerta ou concluido. */
+  tom: 'neutro' | 'envio' | 'alerta' | 'concluido';
+  /** A entrega do e-mail desse passo (ENTREGUE, DEVOLVIDO...). */
+  entrega: { situacao: string; entregueEm: string | null; atualizadoEm: string | null } | null;
+  /** O e-mail de quem do RH fez a ação (cadastro, edição, envio pela página do RH). */
+  por: string | null;
+}
+
+/** O que a página do RH precisa para gerenciar os líderes da empresa. */
+export interface GestaoRh {
+  cargos: { id: number; nome: string }[];
+  /** O envio de e-mails está ligado (senão, o convite vai pelo WhatsApp). */
+  emailAtivo: boolean;
+  encerrada: boolean;
+  /** Quantos ainda não receberam o convite. */
+  naoEnviados: number;
+  retirados: RetiradoRh[];
+}
+
+export interface RetiradoRh {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  /** Não respondeu: o RH pode devolver à lista. */
+  podeVoltar: boolean;
+}
+
+/** Os dados de um líder para o formulário de edição. */
+export interface LiderEditavel {
+  id: number;
+  nome: string;
+  email: string;
+  whatsapp: string | null;
+  cargoId: number | null;
+  cargoOutro: boolean;
+  respondeu: boolean;
+}
+
 export interface ResultadoRh {
   estado: 'AGUARDANDO' | 'PARCIAL' | 'FINAL';
   concluidos: number;
@@ -206,8 +257,9 @@ export class SessaoRh {
     return sessao.gestor;
   }
 
-  pedirCodigo(email: string): Promise<unknown> {
-    return firstValueFrom(this.http.post(`${API_RH}/codigo`, { email }));
+  /** empresa: o código da página de onde pediu, para o botão do e-mail abrir nela. */
+  pedirCodigo(email: string, empresa?: string | null): Promise<unknown> {
+    return firstValueFrom(this.http.post(`${API_RH}/codigo`, { email, empresa: empresa ?? null }));
   }
 
   async entrar(pedido: { email?: string; codigo?: string; link?: string }): Promise<GestorRh> {

@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { problemaDe } from '../api/diagnostico-api';
 import { Marca } from '../compartilhado/marca';
 import { EntrarRh } from './entrar-rh';
-import { GestorRh, SessaoRh } from './rh-api';
+import { GestorRh, rotaDaEmpresa, SessaoRh } from './rh-api';
 
 /**
  * /acompanhar: quem não entrou vê a entrada por código; quem acompanha uma empresa vai direto
@@ -36,7 +36,7 @@ import { GestorRh, SessaoRh } from './rh-api';
             @for (e of g.empresas; track e.id; let i = $index) {
               <li class="surgir" [style.--i]="i + 3">
                 <a
-                  [routerLink]="['/acompanhar', e.id]"
+                  [routerLink]="rotaDaEmpresa(e)"
                   class="flex min-h-16 items-center justify-between gap-3 rounded-[20px] bg-white px-5 py-4 text-[17px] font-semibold ring-1 ring-linha transition hover:ring-abeto-3"
                 >
                   {{ e.nome }}
@@ -63,6 +63,7 @@ export class AcompanharPagina {
   readonly voltar = input<string>();
 
   protected readonly falha = signal<string | null>(null);
+  protected readonly rotaDaEmpresa = rotaDaEmpresa;
 
   constructor() {
     void this.conferir();
@@ -80,11 +81,12 @@ export class AcompanharPagina {
 
   protected seguir(gestor: GestorRh) {
     const voltar = this.voltar();
-    const destino = voltar && /^\/acompanhar\/\d+/.test(voltar) ? voltar : null;
-    if (destino && gestor.empresas.some((e) => destino.startsWith(`/acompanhar/${e.id}`))) {
-      void this.router.navigateByUrl(destino, { replaceUrl: true });
+    // /acompanhar/demo (ou o número antigo, /acompanhar/1), com ou sem ?aba=.
+    const pedida = voltar?.match(/^\/acompanhar\/([\w-]+)(?:[?#].*)?$/)?.[1];
+    if (voltar && pedida && gestor.empresas.some((e) => e.codigo === pedida || String(e.id) === pedida)) {
+      void this.router.navigateByUrl(voltar, { replaceUrl: true });
     } else if (gestor.empresas.length === 1) {
-      void this.router.navigate(['/acompanhar', gestor.empresas[0].id], { replaceUrl: true });
+      void this.router.navigate(rotaDaEmpresa(gestor.empresas[0]), { replaceUrl: true });
     }
   }
 

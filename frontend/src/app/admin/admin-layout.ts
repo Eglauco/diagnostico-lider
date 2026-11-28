@@ -9,7 +9,7 @@ import { DialogoMinhaSenha } from './acesso/dialogo-minha-senha';
 import { MenuConta } from './acesso/menu-conta';
 import { SessaoPainel } from './acesso/sessao';
 
-type Secao = 'diagnosticos' | 'empresas' | 'usuarios';
+type Secao = 'empresas' | 'geral' | 'usuarios' | null;
 
 @Component({
   selector: 'app-admin-layout',
@@ -32,14 +32,17 @@ type Secao = 'diagnosticos' | 'empresas' | 'usuarios';
   template: `
     <header class="sticky top-0 z-30 border-b border-linha/80 bg-nevoa/85 backdrop-blur-md">
       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
-        <a routerLink="/administrador" class="flex shrink-0 items-center gap-3 rounded-xl" aria-label="Painel do administrador, início">
+        <a routerLink="/administrador/empresas" class="flex shrink-0 items-center gap-3 rounded-xl" aria-label="Painel do administrador, início (empresas)">
           <app-marca [compacta]="true" />
           <span class="hidden rounded-full bg-abeto px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-white uppercase md:inline">Admin</span>
         </a>
 
         <nav class="flex items-center gap-0.5 rounded-full bg-white/70 p-1 ring-1 ring-linha" aria-label="Seções do painel">
-          <a routerLink="/administrador" class="aba inline-flex" [attr.aria-current]="secao() === 'diagnosticos' ? 'page' : null">Diagnósticos</a>
           <a routerLink="/administrador/empresas" class="aba inline-flex" [attr.aria-current]="secao() === 'empresas' ? 'page' : null">Empresas</a>
+          <!-- No celular, "Geral" para caber ao lado da marca e da conta. -->
+          <a routerLink="/administrador/geral" class="aba inline-flex" aria-label="Diagnóstico Geral" [attr.aria-current]="secao() === 'geral' ? 'page' : null">
+            <span class="sm:hidden">Geral</span><span class="hidden sm:inline">Diagnóstico Geral</span>
+          </a>
           <a routerLink="/administrador/usuarios" class="aba hidden sm:inline-flex" [attr.aria-current]="secao() === 'usuarios' ? 'page' : null">Usuários</a>
         </nav>
 
@@ -65,9 +68,11 @@ export class AdminLayout {
 
   protected readonly secao = computed<Secao>(() => {
     const url = this.url();
-    if (url.startsWith('/administrador/empresas')) return 'empresas';
+    if (url.startsWith('/administrador/geral')) return 'geral';
     if (url.startsWith('/administrador/usuarios')) return 'usuarios';
-    return 'diagnosticos';
+    // O diagnóstico de um líder pode ser de uma empresa ou do link geral: nenhuma aba acesa.
+    if (url.startsWith('/administrador/diagnosticos')) return null;
+    return 'empresas';
   });
 
   constructor() {

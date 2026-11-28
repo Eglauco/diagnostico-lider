@@ -118,12 +118,48 @@ class EnvioConvitesService {
 	 * o agendador espera o fim para registrar quantos saíram. Cota, chave ou domínio param o lote.
 	 */
 	ResultadoLembrete lembrar(List<Long> ids, String chamada) {
+		return lembrar(ids, chamada, null);
+	}
+
+	/**
+	 * O "Lembrar todos que faltam" da página do RH, em segundo plano: primeiro os convites (quem não
+	 * começou), depois os lembretes (quem começou e parou), um por vez, como os outros envios.
+	 */
+	@Async
+	public void cobrar(List<Long> convites, List<Long> lembretes, String chamada, String autor) {
+		if (!convites.isEmpty()) {
+			enviar(convites, autor);
+		}
+		if (!lembretes.isEmpty()) {
+			ResultadoLembrete r = lembrar(lembretes, chamada, autor);
+			log.info("Lembretes pela página do RH: {} enviados, {} falhas", r.enviados(), r.falhas());
+		}
+	}
+
+	/** Um lembrete só, na hora (a página do RH espera e mostra se saiu). A falha entra na linha do tempo. */
+	void lembrarAgora(Long id, String chamada, String autor) {
+		try {
+			transacao.executeWithoutResult(status -> lembrarUm(id, chamada, autor));
+		}
+		catch (EmailSender.FalhaEnvio e) {
+			log.warn("O lembrete do convite {} não saiu: {}", id, e.getMessage());
+			registrarFalha(id, "Lembrete: " + e.getMessage());
+			throw e;
+		}
+		catch (RuntimeException e) {
+			log.error("Falha ao enviar o lembrete do convite {}", id, e);
+			registrarFalha(id, resumo(e));
+			throw e;
+		}
+	}
+
+	private ResultadoLembrete lembrar(List<Long> ids, String chamada, String autor) {
 		int enviados = 0;
 		int falhas = 0;
 		String motivo = null;
 		for (Long id : ids) {
 			try {
-				if (Boolean.TRUE.equals(transacao.execute(status -> lembrarUm(id, chamada)))) {
+				if (Boolean.TRUE.equals(transacao.execute(status -> lembrarUm(id, chamada, autor)))) {
 					enviados++;
 				}
 			}
@@ -146,7 +182,7 @@ class EnvioConvitesService {
 		return new ResultadoLembrete(enviados, falhas, motivo);
 	}
 
-	private boolean lembrarUm(Long id, String chamada) {
+	private boolean lembrarUm(Long id, String chamada, String autor) {
 		Convite convite = convites.findWithCampanhaById(id).orElse(null);
 		if (convite == null || convite.inativo() || !LEMBRAVEIS.contains(convite.status())
 				|| convite.getCampanha().encerrada(agora())) {
@@ -157,7 +193,7 @@ class EnvioConvitesService {
 				new Correio.Origem(EmailEnviado.Tipo.LEMBRETE, convite.getCampanha().getEmpresa().getId(), convite.getId(),
 						null));
 		eventos.save(new EventoConvite(convite, TipoEvento.LEMBRETE, agora(),
-				chamada + ". Para " + convite.getEmail() + ".", null, emailId));
+				chamada + ". Para " + convite.getEmail() + ".", autor, emailId));
 		return true;
 	}
 

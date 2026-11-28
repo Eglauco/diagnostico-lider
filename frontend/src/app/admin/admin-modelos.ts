@@ -1,6 +1,6 @@
 /** Contratos da API do painel (espelham AdminDtos no backend). */
 
-import { LogoEmpresa, TemaMarca } from '../compartilhado/tema-marca';
+import { FundoEmpresa, LogoEmpresa, TemaMarca } from '../compartilhado/tema-marca';
 
 export type StatusDiagnostico = 'EM_ANDAMENTO' | 'CONCLUIDO';
 export type StatusEmail = 'NAO_ENVIADO' | 'PENDENTE' | 'ENVIADO' | 'FALHOU';
@@ -15,13 +15,25 @@ export interface Painel {
   campanhas: { codigo: string; nome: string; empresa: string | null; empresaId: number | null; total: number }[];
   /** Cargos do link escolhido, para filtrar (valor: id do cargo ou "outro"). Vazio sem cargos. */
   cargos: { valor: string; nome: string; total: number }[];
+  /** Média geral de todos os líderes, para comparar o link de uma empresa (null fora dele). */
+  referencia: { media: number; lideres: number } | null;
 }
+
+/** Quantos diagnósticos de uma empresa batem com a busca do Diagnóstico Geral. */
+export interface EncontradoEmEmpresa {
+  empresaId: number;
+  empresa: string;
+  total: number;
+}
+
 
 /** Empresas (espelham EmpresaDtos no backend). */
 export interface LinkEmpresa {
   codigo: string;
   url: string;
   ativo: boolean;
+  /** A página do RH da empresa (/acompanhar/{codigo}): abre direto nela. */
+  paginaRh: string;
 }
 
 export interface EmpresaResumo {
@@ -35,6 +47,11 @@ export interface EmpresaResumo {
   cores: CoresEmpresa;
   logo: LogoEmpresa | null;
   encerramento: Encerramento;
+  /** O cadastro de líderes e quantos dele já concluíram (o progresso da avaliação). */
+  lideres: number;
+  lideresConcluiram: number;
+  /** Índice médio dos concluídos, sem arredondar (null: nenhum concluído). */
+  indiceMedio: number | null;
 }
 
 /** Até quando a avaliação vai (em: ISO, null sem data) e se já encerrou. */
@@ -70,6 +87,8 @@ export interface EmpresaDetalhe {
     lideres: number;
     convidados: number;
     peloLink: number;
+    /** Quantos do cadastro já concluíram. */
+    lideresConcluiram: number;
   };
   /** Diagnósticos concluídos necessários para o relatório consolidado (anonimato). */
   minimoRelatorio: number;
@@ -82,6 +101,8 @@ export interface EmpresaDetalhe {
   encerramento: Encerramento;
   /** E-mails dos gestores que recebem os relatórios automáticos (pode ser vazio). */
   gestores: string[];
+  /** A foto de fundo da página do RH (null sem foto). */
+  fundo: FundoEmpresa | null;
 }
 
 export interface Disponibilidade {
@@ -119,6 +140,8 @@ export interface ItemLista {
   totalPerguntas: number;
   /** "Gerente", "Outro: Head de vendas", "Outro cargo" ou null. */
   cargo: string | null;
+  /** De onde veio o líder (null: fora do cadastro de líderes, como no link geral). */
+  origem: OrigemLider | null;
 }
 
 export interface Detalhe {
@@ -137,7 +160,8 @@ export interface Detalhe {
     cargo: string | null;
     tempoCargo: string | null;
   };
-  origem: { campanha: string; campanhaNome: string; empresaVinculada: string | null; questionario: string; versao: number };
+  /** empresaId: a empresa do link (null no link geral), para voltar à aba Diagnóstico dela. */
+  origem: { campanha: string; campanhaNome: string; empresaVinculada: string | null; empresaId: number | null; questionario: string; versao: number };
   resultado: {
     pontuacao: number;
     faixa: { codigo: string; titulo: string; resumo: string };
@@ -277,7 +301,9 @@ export type TipoEventoConvite =
   | 'INATIVADO'
   | 'REATIVADO'
   | 'COMECOU_PELO_LINK'
-  | 'RESPONDEU_DE_NOVO';
+  | 'RESPONDEU_DE_NOVO'
+  | 'CONTATO_EMAIL'
+  | 'CONTATO_WHATSAPP';
 
 export interface EventoConvite {
   tipo: TipoEventoConvite;

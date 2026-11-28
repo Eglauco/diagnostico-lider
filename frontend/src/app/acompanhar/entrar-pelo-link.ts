@@ -3,11 +3,12 @@ import { Router, RouterLink } from '@angular/router';
 
 import { problemaDe } from '../api/diagnostico-api';
 import { Marca } from '../compartilhado/marca';
-import { SessaoRh } from './rh-api';
+import { GestorRh, SessaoRh } from './rh-api';
 
 /**
- * /acompanhar/entrar#token: o botão do e-mail. O token vem depois do # (não passa pelo servidor nem
- * por quem pré-visualiza links) e é trocado pelo acesso com um POST, uma vez só.
+ * /acompanhar/entrar?empresa=demo#token: o botão do e-mail. O token vem depois do # (não passa pelo
+ * servidor nem por quem pré-visualiza links) e é trocado pelo acesso com um POST, uma vez só.
+ * ?empresa= é a empresa do e-mail: depois de entrar, a página abre nela.
  */
 @Component({
   selector: 'app-entrar-pelo-link',
@@ -21,7 +22,7 @@ import { SessaoRh } from './rh-api';
           <p class="rotulo surgir text-brasa-escura" style="--i: 0">Acompanhamento da avaliação</p>
           <h1 class="display surgir mt-2 text-[34px] leading-[1.05] font-bold" style="--i: 1">Este botão não entra mais</h1>
           <p class="surgir mt-4 text-[17px] leading-snug text-abeto-2" style="--i: 2" role="alert">{{ e }}</p>
-          <a routerLink="/acompanhar" class="botao-primario surgir mt-8" style="--i: 3">Receber um código</a>
+          <a [routerLink]="empresa ? ['/acompanhar', empresa] : ['/acompanhar']" class="botao-primario surgir mt-8" style="--i: 3">Receber um código</a>
         } @else {
           <div class="flex flex-col items-center gap-4 text-center" aria-busy="true">
             <span class="size-9 animate-spin rounded-full border-[3px] border-linha border-t-abeto" aria-hidden="true"></span>
@@ -37,6 +38,8 @@ export class EntrarPeloLink {
   private readonly router = inject(Router);
 
   protected readonly erro = signal<string | null>(null);
+  /** Para onde ir depois de entrar: a empresa do e-mail, se a pessoa a acompanha. */
+  protected readonly empresa = new URLSearchParams(location.search).get('empresa');
 
   constructor() {
     const link = location.hash.replace(/^#/, '');
@@ -53,16 +56,20 @@ export class EntrarPeloLink {
     try {
       // A sessão entrega o cookie CSRF que o POST precisa (e diz se já está lembrado aqui).
       await this.sessao.conferir(true);
-      await this.sessao.entrar({ link });
-      void this.router.navigate(['/acompanhar'], { replaceUrl: true });
+      this.seguir(await this.sessao.entrar({ link }));
     } catch (e) {
       // Quem já está lembrado neste aparelho não precisa do botão.
       const gestor = await this.sessao.conferir(true).catch(() => null);
       if (gestor) {
-        void this.router.navigate(['/acompanhar'], { replaceUrl: true });
+        this.seguir(gestor);
         return;
       }
       this.erro.set(problemaDe(e).detail ?? 'Algo deu errado. Tente de novo.');
     }
+  }
+
+  private seguir(gestor: GestorRh) {
+    const destino = this.empresa ? gestor.empresas.find((e) => e.codigo === this.empresa) : undefined;
+    void this.router.navigate(destino ? ['/acompanhar', destino.codigo] : ['/acompanhar'], { replaceUrl: true });
   }
 }

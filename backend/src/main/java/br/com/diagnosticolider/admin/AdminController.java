@@ -1,6 +1,7 @@
 package br.com.diagnosticolider.admin;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.CacheControl;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.diagnosticolider.admin.AdminDtos.Detalhe;
+import br.com.diagnosticolider.admin.AdminDtos.EncontradoEmEmpresa;
 import br.com.diagnosticolider.admin.AdminDtos.ItemLista;
 import br.com.diagnosticolider.admin.AdminDtos.Pagina;
 import br.com.diagnosticolider.admin.AdminDtos.Painel;
@@ -71,6 +73,12 @@ class AdminController {
 			@RequestParam(defaultValue = "false") boolean inativos, @RequestParam(defaultValue = "0") int pagina,
 			@RequestParam(defaultValue = "20") int tamanho) {
 		return service.listar(busca, status, faixa, campanha, cargo, inativos, pagina, tamanho);
+	}
+
+	/** Em quais empresas a busca do Diagnóstico Geral também encontra alguém (com quantos). */
+	@GetMapping("/diagnosticos/nas-empresas")
+	List<EncontradoEmEmpresa> encontradosNasEmpresas(@RequestParam(required = false) String busca) {
+		return service.encontradosNasEmpresas(busca);
 	}
 
 	/** A lista filtrada inteira em Excel (os mesmos filtros da tela, sem paginar). */

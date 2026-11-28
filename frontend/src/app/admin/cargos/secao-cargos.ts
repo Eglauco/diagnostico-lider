@@ -13,7 +13,7 @@ import { CargoEditavel, cargosSugeridos, MAXIMO_CARGOS, novoCargo } from './carg
   selector: 'app-secao-cargos',
   host: { class: 'block' },
   template: `
-    <fieldset id="cargos-secao" tabindex="-1" class="scroll-mt-24 outline-none">
+    <fieldset id="cargos-secao" tabindex="-1" class="scroll-mt-36 outline-none">
       <legend class="text-[15px] font-semibold">Cargos dos líderes</legend>
       <p class="mt-1 text-[14px] text-abeto-2">
         No link da empresa, o líder escolhe o cargo dele e o relatório mostra em que nível a carreira mais trava.

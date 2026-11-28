@@ -1,4 +1,4 @@
-import { afterNextRender, Component, computed, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, ElementRef, inject, input, linkedSignal, output, signal, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
@@ -7,10 +7,21 @@ import { API_ADMIN, CargoOpcao } from '../admin-modelos';
 import { problemaTelefone } from '../../compartilhado/entrada-telefone';
 import { CampoRevisao, LinhaRevisao, mascarar, OUTRO_CARGO, paraEnvio, problemas } from './convites';
 
+/** Os dados de um líder para editar (página do RH): o formulário abre preenchido e salva com PUT. */
+export interface EdicaoLider {
+  url: string;
+  nome: string;
+  email: string;
+  whatsapp: string | null;
+  cargoId: number | null;
+  cargoOutro: boolean;
+}
+
 /**
  * "Adicionar líder": um convite feito no painel, para quem ficou de fora da planilha. Mesmas
  * regras da importação (e-mail válido e sem repetir, cargo da lista); recebe o e-mail de convite
- * quando o envio estiver liberado, como os outros.
+ * quando o envio estiver liberado, como os outros. Também serve à página do RH: para cadastrar
+ * (destino: a API do RH) e para editar um líder (edicao).
  */
 @Component({
   selector: 'app-novo-convite',
@@ -20,8 +31,10 @@ import { CampoRevisao, LinhaRevisao, mascarar, OUTRO_CARGO, paraEnvio, problemas
       <form class="dialogo-corpo" novalidate (submit)="adicionar($event)">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h2 id="novo-convite-titulo" class="display text-[28px] leading-tight font-bold">Adicionar líder</h2>
-            <p class="mt-1 text-[14px] text-abeto-2">Para quem ficou de fora da planilha. Ele ganha um link pessoal como os outros.</p>
+            <h2 id="novo-convite-titulo" class="display text-[28px] leading-tight font-bold">{{ edicao() ? 'Editar dados' : 'Adicionar líder' }}</h2>
+            <p class="mt-1 text-[14px] text-abeto-2">
+              {{ edicao() ? 'Os dados novos valem para o link pessoal e para os próximos e-mails.' : 'Para quem ficou de fora da planilha: recebe um link pessoal, como os outros.' }}
+            </p>
           </div>
           <button type="button" class="-mt-1 -mr-2 grid size-11 shrink-0 place-items-center rounded-full text-abeto-2 hover:bg-nevoa hover:text-abeto" aria-label="Fechar" (click)="fechar()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" /></svg>
@@ -65,7 +78,7 @@ import { CampoRevisao, LinhaRevisao, mascarar, OUTRO_CARGO, paraEnvio, problemas
         <div class="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" class="botao-secundario" (click)="fechar()">Cancelar</button>
           <button type="submit" class="botao-primario" [attr.aria-busy]="enviando()" [disabled]="enviando()">
-            {{ enviando() ? 'Adicionando…' : 'Adicionar líder' }}
+            {{ edicao() ? (enviando() ? 'Salvando…' : 'Salvar') : enviando() ? 'Adicionando…' : 'Adicionar líder' }}
           </button>
         </div>
       </form>
@@ -78,22 +91,29 @@ export class NovoConvite {
 
   readonly empresaId = input.required<number>();
   readonly cargos = input<CargoOpcao[]>([]);
+  /** Para onde vai o cadastro (padrão: o painel do administrador). */
+  readonly destino = input<string | null>(null);
+  /** Editar um líder em vez de cadastrar: o formulário abre com os dados dele. */
+  readonly edicao = input<EdicaoLider | null>(null);
   readonly adicionado = output<string>();
   readonly fechou = output();
 
   protected readonly OUTRO = OUTRO_CARGO;
   protected readonly mascarar = mascarar;
-  protected readonly dados = signal<LinhaRevisao>({
-    chave: 'novo',
-    linha: 0,
-    nome: '',
-    email: '',
-    whatsapp: '',
-    cargo: '',
-    cargoTexto: '',
-    sugestaoCargoId: null,
-    jaConvidado: false,
-    exemplo: false,
+  protected readonly dados = linkedSignal<LinhaRevisao>(() => {
+    const e = this.edicao();
+    return {
+      chave: 'novo',
+      linha: 0,
+      nome: e?.nome ?? '',
+      email: e?.email ?? '',
+      whatsapp: e?.whatsapp ?? '',
+      cargo: e ? (e.cargoOutro ? OUTRO_CARGO : e.cargoId != null ? String(e.cargoId) : '') : '',
+      cargoTexto: '',
+      sugestaoCargoId: null,
+      jaConvidado: false,
+      exemplo: false,
+    };
   });
   private readonly tentou = signal(false);
   /** Campos que a pessoa já deixou: o erro deles aparece sem esperar o "Adicionar". */
@@ -141,14 +161,20 @@ export class NovoConvite {
     }
     this.enviando.set(true);
     try {
+      const edicao = this.edicao();
       await firstValueFrom(
-        this.http.post(`${API_ADMIN}/empresas/${this.empresaId()}/convites`, { convites: [paraEnvio(this.dados())], origem: 'painel' }),
+        edicao
+          ? this.http.put(edicao.url, paraEnvio(this.dados()))
+          : this.http.post(this.destino() ?? `${API_ADMIN}/empresas/${this.empresaId()}/convites`, {
+              convites: [paraEnvio(this.dados())],
+              origem: 'painel',
+            }),
       );
       this.adicionado.emit(this.dados().nome.trim());
       this.dialogo().nativeElement.close();
     } catch (e) {
-      const problema = problemaDe(e) as { detail?: string; linhas?: Record<string, string> };
-      const daLinha = problema.linhas?.['0'];
+      const problema = problemaDe(e) as { detail?: string; linhas?: Record<string, string>; campos?: Record<string, string> };
+      const daLinha = problema.linhas?.['0'] ?? problema.campos?.['email'];
       if (daLinha) {
         this.erroServidor.set(daLinha);
         document.getElementById('novo-email')?.focus();

@@ -29,8 +29,10 @@ import br.com.diagnosticolider.admin.EmpresaDtos.Disponibilidade;
 import br.com.diagnosticolider.admin.EmpresaDtos.EditarEmpresa;
 import br.com.diagnosticolider.admin.EmpresaDtos.EmpresaDetalhe;
 import br.com.diagnosticolider.admin.EmpresaDtos.EmpresaResumo;
+import br.com.diagnosticolider.admin.EmpresaDtos.FocoFundo;
 import br.com.diagnosticolider.admin.EmpresaDtos.NovaEmpresa;
 import br.com.diagnosticolider.admin.EmpresaDtos.PreviaTema;
+import br.com.diagnosticolider.empresa.FotoDeFundoService;
 import br.com.diagnosticolider.empresa.LogomarcaService;
 import br.com.diagnosticolider.relatorio.RelatorioEmpresaDados;
 import br.com.diagnosticolider.relatorio.RelatorioPdfService;
@@ -48,12 +50,15 @@ class AdminEmpresaController {
 
 	private final LogomarcaService logomarcas;
 
+	private final FotoDeFundoService fundos;
+
 	AdminEmpresaController(AdminEmpresaService service, ResultadoDaEmpresa resultados, RelatorioPdfService pdf,
-			LogomarcaService logomarcas) {
+			LogomarcaService logomarcas, FotoDeFundoService fundos) {
 		this.service = service;
 		this.resultados = resultados;
 		this.pdf = pdf;
 		this.logomarcas = logomarcas;
+		this.fundos = fundos;
 	}
 
 	@GetMapping
@@ -88,6 +93,27 @@ class AdminEmpresaController {
 	@DeleteMapping("/{id}/logo")
 	EmpresaDetalhe removerLogo(@PathVariable Long id) {
 		logomarcas.remover(id);
+		return service.detalhe(id);
+	}
+
+	/** Foto de fundo da página do RH: o painel envia um JPEG já reduzido, com o ponto de foco. */
+	@PutMapping(value = "/{id}/fundo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	EmpresaDetalhe enviarFundo(@PathVariable Long id, @RequestPart("arquivo") MultipartFile arquivo,
+			@RequestParam(defaultValue = "50") int focoX, @RequestParam(defaultValue = "50") int focoY) throws IOException {
+		fundos.gravar(id, arquivo.getBytes(), focoX, focoY);
+		return service.detalhe(id);
+	}
+
+	/** Só o ponto de foco (a mesma foto, cortada em outro lugar). */
+	@PutMapping("/{id}/fundo/foco")
+	EmpresaDetalhe focarFundo(@PathVariable Long id, @RequestBody @Validated FocoFundo foco) {
+		fundos.focar(id, foco.x(), foco.y());
+		return service.detalhe(id);
+	}
+
+	@DeleteMapping("/{id}/fundo")
+	EmpresaDetalhe removerFundo(@PathVariable Long id) {
+		fundos.remover(id);
 		return service.detalhe(id);
 	}
 
